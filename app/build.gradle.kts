@@ -1,3 +1,10 @@
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -22,11 +29,6 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        manifestPlaceholders["exactAlarmPermission"] = if (exactAlarmMode == "SCHEDULE") {
-            "android.permission.SCHEDULE_EXACT_ALARM"
-        } else {
-            "android.permission.USE_EXACT_ALARM"
-        }
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -80,6 +82,48 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// tools:node is validated before manifest placeholders are substituted, so the
+// mode switch is a generated manifest merged into every variant.
+abstract class GenerateExactAlarmManifestTask : DefaultTask() {
+    @get:Input
+    abstract val mode: Property<String>
+
+    @get:OutputFile
+    abstract val manifestFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val xml = if (mode.get() == "SCHEDULE") {
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+            </manifest>
+            """.trimIndent()
+        } else {
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+                <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+            </manifest>
+            """.trimIndent()
+        }
+        val output = manifestFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(xml + "\n")
+    }
+}
+
+val generateExactAlarmManifest = tasks.register<GenerateExactAlarmManifestTask>("generateExactAlarmManifest") {
+    mode.set(exactAlarmMode)
+    manifestFile.set(layout.buildDirectory.file("generated/exactAlarm/AndroidManifest.xml"))
+}
+
+extensions.getByType(ApplicationAndroidComponentsExtension::class.java).onVariants { variant ->
+    variant.sources.manifests.addGeneratedManifestFile(generateExactAlarmManifest) { it.manifestFile }
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
@@ -130,21 +174,40 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
             "Debug manifest is missing DebugReceiver"
         }
 
-        val expected = if (mode == "SCHEDULE") {
-            "android.permission.SCHEDULE_EXACT_ALARM"
-        } else {
-            "android.permission.USE_EXACT_ALARM"
-        }
-        val forbidden = if (mode == "SCHEDULE") {
-            "android.permission.USE_EXACT_ALARM"
-        } else {
-            "android.permission.SCHEDULE_EXACT_ALARM"
-        }
         for ((variant, text) in listOf("release" to release, "debug" to debug)) {
-            check(text.contains(expected)) { "$variant manifest is missing $expected" }
-            check(!text.contains(forbidden)) { "$variant manifest must not contain $forbidden" }
+            val permissions = usesPermissions(text)
+            val useExact = permissions.filter { it.name == "android.permission.USE_EXACT_ALARM" }
+            val scheduleExact = permissions.filter { it.name == "android.permission.SCHEDULE_EXACT_ALARM" }
+            if (mode == "SCHEDULE") {
+                check(useExact.isEmpty()) {
+                    "$variant SCHEDULE manifest must not declare USE_EXACT_ALARM: $useExact"
+                }
+                check(scheduleExact.size == 1 && scheduleExact.single().maxSdk == null) {
+                    "$variant SCHEDULE manifest must declare SCHEDULE_EXACT_ALARM with no maxSdkVersion: $scheduleExact"
+                }
+            } else {
+                check(useExact.size == 1 && useExact.single().maxSdk == null) {
+                    "$variant USE manifest must declare USE_EXACT_ALARM with no maxSdkVersion: $useExact"
+                }
+                check(scheduleExact.size == 1 && scheduleExact.single().maxSdk == "32") {
+                    "$variant USE manifest must declare SCHEDULE_EXACT_ALARM only with maxSdkVersion=32: $scheduleExact"
+                }
+            }
         }
     }
+}
+
+private data class ManifestPermission(val name: String, val maxSdk: String?)
+
+private fun usesPermissions(xml: String): List<ManifestPermission> {
+    val tags = Regex("""<uses-permission\b([^>]*)/?>""").findAll(xml)
+    return tags.map { match ->
+        val attrs = match.groupValues[1]
+        val name = Regex("""android:name="([^"]+)"""").find(attrs)?.groupValues?.get(1)
+            ?: error("uses-permission is missing android:name: $attrs")
+        val maxSdk = Regex("""android:maxSdkVersion="([^"]+)"""").find(attrs)?.groupValues?.get(1)
+        ManifestPermission(name, maxSdk)
+    }.toList()
 }
 
 tasks.matching {

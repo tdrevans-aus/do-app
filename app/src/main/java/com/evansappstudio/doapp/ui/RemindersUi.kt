@@ -63,6 +63,7 @@ import com.evansappstudio.doapp.AppContainer
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.UserUnlock
 import com.evansappstudio.doapp.alarm.AlarmPermissions
+import com.evansappstudio.doapp.alarm.ExactAlarmPolicy
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.data.Reminder
 import kotlinx.coroutines.launch
@@ -150,7 +151,10 @@ fun ReminderApp(container: AppContainer) {
     } else {
         ReminderListScreen(
             reminders = reminders,
-            showExactAlarmBanner = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !exactAllowed,
+            showExactAlarmBanner = ExactAlarmPolicy.shouldShowExactAlarmBanner(
+                Build.VERSION.SDK_INT,
+                exactAllowed,
+            ),
             showNotificationBanner = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 !notificationsAllowed,
             onDone = viewModel::markDone,
