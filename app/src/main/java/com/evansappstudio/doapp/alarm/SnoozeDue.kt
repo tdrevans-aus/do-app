@@ -109,6 +109,15 @@ object SnoozeLabels {
         SnoozeKind.AT_TIME -> atTime(option.value)
     }
 
+    /**
+     * Spoken label for the custom action. From Now is "Snooze 1 hour";
+     * At Time is the clock label itself, for example "9:00 am".
+     */
+    fun contentDescription(option: SnoozeOption): String = when (option.kind) {
+        SnoozeKind.FROM_NOW -> "Snooze ${fromNow(option.value).removePrefix("+")}"
+        SnoozeKind.AT_TIME -> atTime(option.value)
+    }
+
     fun fromNow(minutes: Int): String {
         if (minutes > 0 && minutes % SnoozeOption.MINUTES_PER_DAY == 0) {
             val days = minutes / SnoozeOption.MINUTES_PER_DAY

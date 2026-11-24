@@ -110,7 +110,11 @@ class ReminderNotifier(
         val choices = options()
         val done = donePending(id)
         val snoozes = choices.mapIndexed { index, option ->
-            SnoozeAction(snoozePending(id, index, option), SnoozeLabels.format(option))
+            SnoozeAction(
+                snoozePending(id, index, option),
+                SnoozeLabels.format(option),
+                SnoozeLabels.contentDescription(option),
+            )
         }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_reminder)
@@ -196,11 +200,14 @@ class ReminderNotifier(
         val views = RemoteViews(context.packageName, R.layout.notification_reminder_expanded)
         views.setTextViewText(R.id.notification_title, title)
         views.setTextViewText(R.id.notification_text, dueText(dueAt))
-        views.setTextViewText(R.id.action_done, context.getString(R.string.action_done))
+        val doneLabel = context.getString(R.string.action_done)
+        views.setTextViewText(R.id.action_done, doneLabel)
+        views.setContentDescription(R.id.action_done, doneLabel)
         views.setOnClickPendingIntent(R.id.action_done, done)
         val ids = intArrayOf(R.id.action_snooze_0, R.id.action_snooze_1, R.id.action_snooze_2)
         for (index in ids.indices) {
             views.setTextViewText(ids[index], snoozes[index].label)
+            views.setContentDescription(ids[index], snoozes[index].description)
             views.setOnClickPendingIntent(ids[index], snoozes[index].pending)
         }
         return views
@@ -358,7 +365,11 @@ class ReminderNotifier(
 
     private data class PostedReminder(val id: Long, val title: String, val dueAt: Long)
 
-    private data class SnoozeAction(val pending: PendingIntent, val label: String)
+    private data class SnoozeAction(
+        val pending: PendingIntent,
+        val label: String,
+        val description: String,
+    )
 
     companion object {
         const val CHANNEL_ID = "reminders"

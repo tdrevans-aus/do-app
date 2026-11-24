@@ -93,6 +93,11 @@ class SnoozeDueTest {
         assertEquals("9:00 am", SnoozeLabels.atTime(9 * 60))
         assertEquals("12:00 am", SnoozeLabels.atTime(0))
         assertEquals("3:30 pm", SnoozeLabels.atTime(15 * 60 + 30))
+        assertEquals("Snooze 1 hour", SnoozeLabels.contentDescription(SnoozeOption(SnoozeKind.FROM_NOW, 60)))
+        assertEquals("Snooze 3 hours", SnoozeLabels.contentDescription(SnoozeOption(SnoozeKind.FROM_NOW, 180)))
+        assertEquals("Snooze 1 day", SnoozeLabels.contentDescription(SnoozeOption(SnoozeKind.FROM_NOW, 24 * 60)))
+        assertEquals("Snooze 15 minutes", SnoozeLabels.contentDescription(SnoozeOption(SnoozeKind.FROM_NOW, 15)))
+        assertEquals("9:00 am", SnoozeLabels.contentDescription(SnoozeOption(SnoozeKind.AT_TIME, 9 * 60)))
     }
 
     @Test
