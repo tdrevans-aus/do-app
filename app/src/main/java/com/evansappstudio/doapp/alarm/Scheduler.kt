@@ -4,6 +4,7 @@ import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.notify.ReminderNotifier
 import kotlinx.coroutines.sync.Mutex
+import java.time.ZoneId
 
 /**
  * Arms, cancels and rebuilds the single alarm for every active reminder.
@@ -63,6 +64,71 @@ class Scheduler(
         mirror.remove(id)
     }
 
+    /**
+     * One-tap snooze. [option] is the choice baked into the action, not a fresh
+     * settings read, so a lock-screen tap does not need credential storage.
+     * Before unlock the new due is stored on the mirror and applied to Room
+     * by [rescheduleAll]. A pending done wins over a pending snooze.
+     */
+    suspend fun snooze(id: Long, optionIndex: Int, option: SnoozeOption) = guarded {
+        applySnooze(id, optionIndex, option)
+    }
+
+    /** Applies [option] to every reminder notification currently showing. */
+    suspend fun snoozeShowing(optionIndex: Int, option: SnoozeOption) = guarded {
+        val ids = notifications.showingIds()
+        for (id in ids) {
+            applySnooze(id, optionIndex, option)
+        }
+    }
+
+    /**
+     * Edit save. A new due time is a reschedule: dismiss, cancel, arm the new
+     * due. Title or nag alone updates the row and a visible notification. A nag
+     * change re-arms the next fire from the current due.
+     */
+    suspend fun update(id: Long, title: String, dueAt: Long, nagMinutes: Int?) = guarded {
+        check(unlocked()) { "Cannot save a reminder before unlock" }
+        val cleanTitle = title.trim()
+        require(cleanTitle.isNotEmpty()) { "title is required" }
+        val nag = NagSchedule.normalize(nagMinutes)
+        val existing = dao().getById(id) ?: return@guarded
+        if (existing.isDone) return@guarded
+        val now = System.currentTimeMillis()
+        if (dueAt != existing.dueAt) {
+            dao().updateDetails(id, cleanTitle, dueAt, nag)
+            alarms.cancel(id)
+            notifications.dismiss(id)
+            val next = SnoozeDue.nextFire(dueAt, now)
+            mirror.upsert(
+                existing.copy(title = cleanTitle, dueAt = dueAt, nagMinutes = nag)
+                    .toMirror(nextFireAt = next),
+            )
+            alarms.schedule(id, next)
+            return@guarded
+        }
+        val nagChanged = nag != existing.nagMinutes
+        val titleChanged = cleanTitle != existing.title
+        if (!nagChanged && !titleChanged) return@guarded
+        dao().updateDetails(id, cleanTitle, existing.dueAt, nag)
+        if (nagChanged) {
+            val next = SnoozeDue.nextFireAfterNagChange(existing.dueAt, nag, now)
+            alarms.cancel(id)
+            mirror.upsert(
+                existing.copy(title = cleanTitle, nagMinutes = nag).toMirror(nextFireAt = next),
+            )
+            if (next != null) alarms.schedule(id, next)
+        } else {
+            val entry = mirror.get(id)
+            if (entry != null) mirror.upsert(entry.copy(title = cleanTitle))
+        }
+        notifications.refreshIfShowing(id, cleanTitle, existing.dueAt)
+    }
+
+    suspend fun rebuildShowingNotifications() = guarded {
+        notifications.rebuildShowing()
+    }
+
     suspend fun delete(id: Long) = guarded {
         if (unlocked()) dao().deleteById(id)
         alarms.cancel(id)
@@ -109,6 +175,21 @@ class Scheduler(
             notifications.dismiss(entry.id)
             mirror.remove(entry.id)
         }
+        val pendingSnooze = mirror.all().filter { !it.pendingDone && it.pendingSnoozeDueAt != null }
+        for (entry in pendingSnooze) {
+            val due = entry.pendingSnoozeDueAt ?: continue
+            val reminder = dao().getById(entry.id)
+            if (reminder == null || reminder.isDone) continue
+            dao().updateDetails(reminder.id, reminder.title, due, reminder.nagMinutes)
+            mirror.upsert(
+                entry.copy(
+                    title = reminder.title,
+                    dueAt = due,
+                    nagMinutes = reminder.nagMinutes,
+                    pendingSnoozeDueAt = null,
+                ),
+            )
+        }
         val active = dao().active()
         val activeIds = active.map { it.id }.toSet()
         val stale = mirror.all().filter { it.id !in activeIds }
@@ -149,6 +230,48 @@ class Scheduler(
         }
     }
 
+    private suspend fun applySnooze(id: Long, optionIndex: Int, option: SnoozeOption) {
+        val now = System.currentTimeMillis()
+        val newDue = SnoozeDue.compute(option, now, ZoneId.systemDefault())
+        val nextFire = SnoozeDue.nextFire(newDue, now)
+        DoAlarmLog.snooze(id, newDue, optionIndex)
+        alarms.cancel(id)
+        notifications.dismiss(id)
+        if (!unlocked()) {
+            val existing = mirror.get(id)
+            if (existing?.pendingDone == true) {
+                DoAlarmLog.snoozeSkipped(id, "pending-done")
+                return
+            }
+            val base = existing ?: MirrorEntry(
+                id = id,
+                title = "",
+                dueAt = newDue,
+                nagMinutes = null,
+                nextFireAt = nextFire,
+            )
+            mirror.upsert(
+                base.copy(
+                    dueAt = newDue,
+                    nextFireAt = nextFire,
+                    pendingDone = false,
+                    pendingSnoozeDueAt = newDue,
+                ),
+            )
+            alarms.schedule(id, nextFire)
+            return
+        }
+        val reminder = dao().getById(id)
+        if (reminder == null || reminder.isDone) {
+            mirror.remove(id)
+            DoAlarmLog.snoozeSkipped(id, "inactive")
+            return
+        }
+        dao().updateDetails(id, reminder.title, newDue, reminder.nagMinutes)
+        mirror.upsert(reminder.copy(dueAt = newDue).toMirror(nextFireAt = nextFire))
+        alarms.schedule(id, nextFire)
+    }
+
     private fun scheduleAfterDelivery(
         id: Long,
         dueAt: Long,
@@ -157,6 +280,7 @@ class Scheduler(
         actual: Long,
     ) {
         val next = NagSchedule.afterDelivery(dueAt, nagMinutes, actual)
+        val existing = mirror.get(id)
         mirror.upsert(
             MirrorEntry(
                 id = id,
@@ -164,6 +288,8 @@ class Scheduler(
                 dueAt = dueAt,
                 nagMinutes = nagMinutes,
                 nextFireAt = next,
+                pendingDone = existing?.pendingDone ?: false,
+                pendingSnoozeDueAt = existing?.pendingSnoozeDueAt,
             ),
         )
         if (next == null) {

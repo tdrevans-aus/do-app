@@ -22,6 +22,12 @@ interface ReminderDao {
     @Query("UPDATE reminder SET isDone = 1, doneAt = :doneAt WHERE id = :id AND isDone = 0")
     suspend fun markDone(id: Long, doneAt: Long)
 
+    @Query(
+        "UPDATE reminder SET title = :title, dueAt = :dueAt, nagMinutes = :nagMinutes " +
+            "WHERE id = :id AND isDone = 0",
+    )
+    suspend fun updateDetails(id: Long, title: String, dueAt: Long, nagMinutes: Int?)
+
     @Query("DELETE FROM reminder WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

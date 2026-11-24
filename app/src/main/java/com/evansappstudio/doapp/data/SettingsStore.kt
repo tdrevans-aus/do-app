@@ -1,7 +1,11 @@
 package com.evansappstudio.doapp.data
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.evansappstudio.doapp.alarm.NagSchedule
+import com.evansappstudio.doapp.alarm.SnoozeDue
+import com.evansappstudio.doapp.alarm.SnoozeKind
+import com.evansappstudio.doapp.alarm.SnoozeOption
 
 /**
  * App settings. The default nag for a new reminder is 5 minutes.
@@ -27,6 +31,32 @@ class SettingsStore(context: Context) {
     fun markNotificationPermissionRequested() {
         prefs.edit().putBoolean(KEY_ASKED_NOTIFICATIONS, true).apply()
     }
+
+    /** Three one-tap snoozes. Missing keys stay on the factory defaults. */
+    fun snoozeOptions(): List<SnoozeOption> = List(SnoozeDue.DEFAULTS.size) { index ->
+        val kind = SnoozeKind.fromName(prefs.getString(snoozeKindKey(index), null))
+        val value = prefs.getInt(snoozeValueKey(index), Int.MIN_VALUE)
+        if (kind == null) {
+            SnoozeDue.DEFAULTS[index]
+        } else {
+            SnoozeOption.orNull(kind, value) ?: SnoozeDue.DEFAULTS[index]
+        }
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun setSnoozeOption(index: Int, option: SnoozeOption) {
+        require(index in SnoozeDue.DEFAULTS.indices) { "snooze option index $index" }
+        require(option.isValid()) { "invalid snooze option" }
+        // commit, not apply: QA kills the process immediately after CONFIG_SNOOZE.
+        prefs.edit()
+            .putString(snoozeKindKey(index), option.kind.name)
+            .putInt(snoozeValueKey(index), option.value)
+            .commit()
+    }
+
+    private fun snoozeKindKey(index: Int) = "snooze_${index}_kind"
+
+    private fun snoozeValueKey(index: Int) = "snooze_${index}_value"
 
     private companion object {
         const val PREFS = "do_settings"

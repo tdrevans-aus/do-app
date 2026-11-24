@@ -40,6 +40,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -77,14 +78,24 @@ import java.time.format.DateTimeFormatter
 private const val EXACT_ALARM_PERMISSION_CHANGED =
     "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"
 
+private const val SCREEN_LIST = "list"
+private const val SCREEN_ADD = "add"
+private const val SCREEN_EDIT = "edit"
+private const val SCREEN_SNOOZE = "snooze"
+
 private val nagChoices = listOf(1, 5, 10, 15, 30, 60, 0)
 
 @Composable
-fun ReminderApp(container: AppContainer) {
+fun ReminderApp(
+    container: AppContainer,
+    openRequest: Long?,
+    onOpenRequestConsumed: () -> Unit,
+) {
     val context = LocalContext.current
     val viewModel: ReminderViewModel = viewModel(factory = ReminderViewModelFactory(container))
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
-    var adding by rememberSaveable { mutableStateOf(false) }
+    var screen by rememberSaveable { mutableStateOf(SCREEN_LIST) }
+    var editId by rememberSaveable { mutableStateOf<Long?>(null) }
     var exactAllowed by remember { mutableStateOf(AlarmPermissions.canScheduleExact(context)) }
     var notificationsAllowed by remember { mutableStateOf(AlarmPermissions.canPostNotifications(context)) }
 
@@ -132,13 +143,25 @@ fun ReminderApp(container: AppContainer) {
         }
     }
 
-    if (adding) {
-        AddReminderScreen(
-            defaultNagMinutes = viewModel.defaultNagMinutes,
-            onBack = { adding = false },
+    LaunchedEffect(openRequest) {
+        val id = openRequest ?: return@LaunchedEffect
+        editId = id
+        screen = SCREEN_EDIT
+        onOpenRequestConsumed()
+    }
+
+    when (screen) {
+        SCREEN_ADD -> ReminderFormScreen(
+            heading = stringResource(R.string.add_reminder),
+            formKey = "add",
+            initialTitle = "",
+            initialDueAt = null,
+            initialNagMinutes = viewModel.defaultNagMinutes,
+            saveEnabled = true,
+            onBack = { screen = SCREEN_LIST },
             onSave = { title, dueAt, nagMinutes ->
                 viewModel.add(title, dueAt, nagMinutes)
-                adding = false
+                screen = SCREEN_LIST
             },
             requestNotificationsFirst = {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -148,8 +171,16 @@ fun ReminderApp(container: AppContainer) {
             onNotificationPrompt = { viewModel.markNotificationPermissionRequested() },
             onPermissionResult = { refreshPermissions() },
         )
-    } else {
-        ReminderListScreen(
+        SCREEN_EDIT -> EditReminderScreen(
+            viewModel = viewModel,
+            editId = editId,
+            onBack = { screen = SCREEN_LIST },
+        )
+        SCREEN_SNOOZE -> SnoozeSettingsScreen(
+            viewModel = viewModel,
+            onBack = { screen = SCREEN_LIST },
+        )
+        else -> ReminderListScreen(
             reminders = reminders,
             showExactAlarmBanner = ExactAlarmPolicy.shouldShowExactAlarmBanner(
                 Build.VERSION.SDK_INT,
@@ -159,7 +190,12 @@ fun ReminderApp(container: AppContainer) {
                 !notificationsAllowed,
             onDone = viewModel::markDone,
             onDelete = viewModel::delete,
-            onAdd = { adding = true },
+            onOpen = { id ->
+                editId = id
+                screen = SCREEN_EDIT
+            },
+            onAdd = { screen = SCREEN_ADD },
+            onSnoozeSettings = { screen = SCREEN_SNOOZE },
             onAllowExactAlarms = { openExactAlarmSettings(context) },
             onOpenNotificationSettings = { openNotificationSettings(context) },
         )
@@ -174,12 +210,23 @@ private fun ReminderListScreen(
     showNotificationBanner: Boolean,
     onDone: (Long) -> Unit,
     onDelete: (Long) -> Unit,
+    onOpen: (Long) -> Unit,
     onAdd: () -> Unit,
+    onSnoozeSettings: () -> Unit,
     onAllowExactAlarms: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.app_name)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    TextButton(onClick = onSnoozeSettings) {
+                        Text(stringResource(R.string.snooze_settings_button))
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAdd) {
                 Text(stringResource(R.string.add))
@@ -228,6 +275,7 @@ private fun ReminderListScreen(
             items(reminders, key = { it.id }) { reminder ->
                 ReminderRow(
                     reminder = reminder,
+                    onOpen = { onOpen(reminder.id) },
                     onDone = { onDone(reminder.id) },
                     onDelete = { onDelete(reminder.id) },
                 )
@@ -253,11 +301,16 @@ private fun PermissionBanner(message: String, button: String, onClick: () -> Uni
 }
 
 @Composable
-private fun ReminderRow(reminder: Reminder, onDone: () -> Unit, onDelete: () -> Unit) {
+private fun ReminderRow(
+    reminder: Reminder,
+    onOpen: () -> Unit,
+    onDone: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = onDelete)
+            .combinedClickable(onClick = onOpen, onLongClick = onDelete)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -285,31 +338,102 @@ private fun ReminderRow(reminder: Reminder, onDone: () -> Unit, onDelete: () -> 
     }
 }
 
+@Composable
+private fun EditReminderScreen(
+    viewModel: ReminderViewModel,
+    editId: Long?,
+    onBack: () -> Unit,
+) {
+    var reminder by remember(editId) { mutableStateOf<Reminder?>(null) }
+    var checked by remember(editId) { mutableStateOf(false) }
+    LaunchedEffect(editId) {
+        val id = editId
+        reminder = if (id == null) null else viewModel.reminderOrNull(id)
+        checked = true
+    }
+    when {
+        !checked -> Unit
+        reminder == null -> MissingReminderScreen(onBack)
+        else -> {
+            val current = reminder!!
+            ReminderFormScreen(
+                heading = stringResource(R.string.edit_reminder),
+                formKey = current.id,
+                initialTitle = current.title,
+                initialDueAt = current.dueAt,
+                initialNagMinutes = current.nagMinutes ?: 0,
+                saveEnabled = !current.isDone,
+                onBack = onBack,
+                onSave = { title, dueAt, nagMinutes ->
+                    viewModel.update(current.id, title, dueAt, nagMinutes)
+                    onBack()
+                },
+                requestNotificationsFirst = { false },
+                onNotificationPrompt = {},
+                onPermissionResult = {},
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddReminderScreen(
-    defaultNagMinutes: Int,
+private fun MissingReminderScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.edit_reminder)) },
+                navigationIcon = {
+                    TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+                },
+            )
+        },
+    ) { padding ->
+        Text(
+            text = stringResource(R.string.missing_reminder),
+            modifier = Modifier.padding(padding).padding(16.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderFormScreen(
+    heading: String,
+    formKey: Any,
+    initialTitle: String,
+    initialDueAt: Long?,
+    initialNagMinutes: Int,
+    saveEnabled: Boolean,
     onBack: () -> Unit,
     onSave: (title: String, dueAt: Long, nagMinutes: Int?) -> Unit,
     requestNotificationsFirst: () -> Boolean,
     onNotificationPrompt: () -> Unit,
     onPermissionResult: () -> Unit,
 ) {
-    val initial = remember { ZonedDateTime.now().plusMinutes(5) }
-    var title by rememberSaveable { mutableStateOf("") }
-    var dateMillis by rememberSaveable {
+    val initial = remember(formKey) {
+        if (initialDueAt == null) {
+            ZonedDateTime.now().plusMinutes(5)
+        } else {
+            Instant.ofEpochMilli(initialDueAt).atZone(ZoneId.systemDefault())
+        }
+    }
+    var title by rememberSaveable(formKey) { mutableStateOf(initialTitle) }
+    var dateMillis by rememberSaveable(formKey) {
         mutableLongStateOf(
             initial.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         )
     }
-    var hour by rememberSaveable { mutableIntStateOf(initial.hour) }
-    var minute by rememberSaveable { mutableIntStateOf(initial.minute) }
-    var nagMinutes by rememberSaveable { mutableIntStateOf(defaultNagMinutes) }
-    var showDate by rememberSaveable { mutableStateOf(false) }
-    var showTime by rememberSaveable { mutableStateOf(false) }
-    var saveAfterPermission by rememberSaveable { mutableStateOf(false) }
+    var hour by rememberSaveable(formKey) { mutableIntStateOf(initial.hour) }
+    var minute by rememberSaveable(formKey) { mutableIntStateOf(initial.minute) }
+    var nagMinutes by rememberSaveable(formKey) { mutableIntStateOf(initialNagMinutes) }
+    var showDate by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showTime by rememberSaveable(formKey) { mutableStateOf(false) }
+    var saveAfterPermission by rememberSaveable(formKey) { mutableStateOf(false) }
 
-    val dueAt = remember(dateMillis, hour, minute) { combineDue(dateMillis, hour, minute) }
+    val dueAt = remember(dateMillis, hour, minute, initialDueAt) {
+        dueToSave(initialDueAt, combineDue(dateMillis, hour, minute))
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
@@ -334,7 +458,7 @@ private fun AddReminderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.add_reminder)) },
+                title = { Text(heading) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
                 },
@@ -381,7 +505,7 @@ private fun AddReminderScreen(
                     )
                 }
             }
-            Button(onClick = { commit() }, enabled = title.isNotBlank()) {
+            Button(onClick = { commit() }, enabled = saveEnabled && title.isNotBlank()) {
                 Text(stringResource(R.string.save))
             }
         }
@@ -420,6 +544,22 @@ private fun AddReminderScreen(
             text = { TimePicker(state = state) },
         )
     }
+}
+
+/**
+ * Keeps the stored due when the form is still on that minute. Debug adds and
+ * snoozes carry seconds the minute picker cannot show; saving a title or nag
+ * change must not look like a new due time.
+ */
+private fun dueToSave(initialDueAt: Long?, edited: Long): Long {
+    if (initialDueAt == null) return edited
+    val zone = ZoneId.systemDefault()
+    val original = Instant.ofEpochMilli(initialDueAt).atZone(zone)
+    val next = Instant.ofEpochMilli(edited).atZone(zone)
+    val sameMinute = original.toLocalDate() == next.toLocalDate() &&
+        original.hour == next.hour &&
+        original.minute == next.minute
+    return if (sameMinute) initialDueAt else edited
 }
 
 private fun combineDue(dateMillis: Long, hour: Int, minute: Int): Long {

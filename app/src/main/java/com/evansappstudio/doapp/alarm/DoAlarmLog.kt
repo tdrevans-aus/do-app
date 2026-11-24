@@ -14,6 +14,18 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm debug-add id=$id dueAt=$dueAt nagMinutes=$logged")
     }
 
+    fun snooze(id: Long, newDue: Long, option: Int) {
+        Log.i(TAG, "DoAlarm snooze id=$id newDue=$newDue option=$option")
+    }
+
+    fun configSnooze(option: Int, kind: String, value: Int) {
+        Log.i(TAG, "DoAlarm config-snooze option=$option kind=$kind value=$value")
+    }
+
+    fun snoozeSkipped(id: Long, reason: String) {
+        Log.i(TAG, "DoAlarm snooze skipped id=$id reason=$reason")
+    }
+
     fun exactUnavailable(id: Long, error: Exception?) {
         if (error == null) {
             Log.w(TAG, "DoAlarm exact alarm unavailable id=$id; using setAndAllowWhileIdle")
