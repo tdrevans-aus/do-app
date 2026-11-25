@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Do</string>
     <string name="add">Add</string>
     <string name="add_reminder">Add reminder</string>
@@ -17,7 +17,23 @@
     <string name="due_preview">Due %1$s</string>
     <string name="empty_reminders">No reminders</string>
     <string name="delete_hint">Long-press a reminder to delete it.</string>
-    <string name="action_done">Done</string>
+    <string name="action_done">Mark Done</string>
+    <string name="action_snooze_all">Snooze all</string>
+    <string name="summary_overdue" tools:ignore="PluralsCandidate">%1$d overdue</string>
+    <string name="summary_channel_name">Reminder summary</string>
+    <string name="summary_channel_description">Silent count of overdue reminders</string>
+    <string name="notification_snooze">Notification snooze</string>
+    <string name="snooze_settings_button">Snooze</string>
+    <string name="snooze_from_now">From Now</string>
+    <string name="snooze_at_time">At Time</string>
+    <string name="snooze_minutes_label">Minutes from now</string>
+    <string name="snooze_minutes_hint">60 = 1 hour, 1440 = 1 day</string>
+    <string name="snooze_option_row">Option %1$d</string>
+    <string name="snooze_default_0">+1 hour</string>
+    <string name="snooze_default_1">+3 hours</string>
+    <string name="snooze_default_2">+1 day</string>
+    <string name="edit_reminder">Edit reminder</string>
+    <string name="missing_reminder">That reminder is gone.</string>
     <string name="notification_due">Due %1$s</string>
     <string name="banner_exact_alarm">Reminders may be late. Allow Alarms &amp; reminders</string>
     <string name="banner_exact_alarm_button">Allow Alarms &amp; reminders</string>

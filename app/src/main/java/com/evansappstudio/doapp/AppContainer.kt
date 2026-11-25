@@ -6,6 +6,8 @@ import com.evansappstudio.doapp.alarm.AlarmScheduler
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.ReminderMirror
 import com.evansappstudio.doapp.alarm.Scheduler
+import com.evansappstudio.doapp.alarm.SnoozeConfig
+import com.evansappstudio.doapp.alarm.SnoozeOption
 import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.data.SettingsStore
@@ -20,7 +22,8 @@ class AppContainer(context: Context) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val mirror = ReminderMirror(appContext)
     val alarms = AlarmScheduler(appContext)
-    val notifications = ReminderNotifier(appContext)
+    val snoozeConfig = SnoozeConfig(appContext)
+    val notifications = ReminderNotifier(appContext, snoozeConfig::get)
     val settings = SettingsStore(appContext)
 
     private val database: AppDatabase by lazy {
@@ -40,10 +43,17 @@ class AppContainer(context: Context) {
 
     fun reminderDao(): ReminderDao = database.reminderDao()
 
+    /** Credential settings are the source of truth. The device-protected copy feeds notifications. */
+    fun saveSnoozeOption(index: Int, option: SnoozeOption) {
+        settings.setSnoozeOption(index, option)
+        snoozeConfig.setAll(settings.snoozeOptions())
+    }
+
     fun start() {
         scope.launch {
             try {
                 if (UserUnlock.isUnlocked(appContext)) {
+                    snoozeConfig.setAll(settings.snoozeOptions())
                     scheduler.rescheduleAll()
                 } else {
                     scheduler.rescheduleFromMirror()
