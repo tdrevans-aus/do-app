@@ -1,7 +1,7 @@
 # Spec 4: Repeats
 
 Owner: Gareth (PM). Build: Jim, via a cloud coding agent, one PR to `tdrevans-aus/do-app`. QA: Mark. Status: ready to build, 25 Nov 2026.
-Sources: `DO-RESEARCH.md` s. 1.3, 4 and 6; Due help "Repeat a reminder" (article 203530769, updated 27 Oct 2026). The workspace scrape `src/due-kb.txt` 367-418 is truncated mid-article; the full body is in `src/zd1.json`. Due help "Modifying due dates for repeating reminders" (`due-kb.txt` 629-653). Rule: if in doubt, copy Due.
+Sources: `DO-RESEARCH.md` s. 1.3, 4 and 6; Due help "Repeat a reminder" (article 203530769, updated 27 Oct 2026). The workspace scrape `src/due-kb.txt` 367-418 is truncated mid-article; the full body is in `src/zd1.json`. Due help "Modifying due dates for repeating reminders" (`due-kb.txt` 629-653). Menu labels and Week Starts on were checked against Due 26.6.1 (16468) iPad screenshots in `/workspace/due-screens/batch2/` (`email1-image2.jpg`, `email1-image5.jpg`, `email3-image8.jpg`), 25 Nov 2026. Rule: if in doubt, copy Due.
 
 ## 1. Goal
 A reminder can repeat the way Due's does: daily, weekdays, weekly, monthly or yearly in one tap, or a custom every-N rule, including chosen weekdays, a day of the month, the nth or last weekday, the first or last day, and repeat from completion. Mark Done advances to the next occurrence and the Spec 1 nag loop starts again from that new due. Snooze and Quick Times move only this occurrence unless the user says otherwise. Do also fills Due's documented gap with every-N-minutes and every-N-hours repeats.
@@ -30,20 +30,22 @@ Spec 1 treated `dueAt` as a fixed instant and left "how repeats keep local wall 
 
 Null / Repeat Off means no rule, and `patternDueAt` is null. Reject invalid combinations (interval out of range, `WEEK` with no days, `MONTH` with no `monthOn`, `On` set on a `DAY` or `YEAR` rule). Minute and hour units are a Do addition (below); they do not use `On`.
 
-**Presets, names follow the due date.** Set the due date first, then pick a repeat (`due-kb.txt` 382). The one-tap choices map to:
+**Presets, names follow the due date.** Set the due date first, then pick a repeat (`due-kb.txt` 382). Due's menu (Due 26.6.1, `email1-image2.jpg`, due Wednesday 25 Nov at 6:04 pm, Repeat Off selected) lists, in this order: a Repeat heading, Repeat Off (checked when off), then the five presets with the due time on the same line, then Custom.... The rules are unchanged; the visible labels are:
 
-| Menu choice | Rule |
+| Menu label (that due) | Rule |
 |---|---|
-| Daily | every 1 day, from due date |
-| Weekdays | every 1 week, from due date, On Monday-Friday |
-| Weekly | every 1 week, from due date, On the due date's weekday |
-| Monthly | every 1 month, from due date, On that day of the month (the quick label is like "25th each month at 5:30 pm") |
-| Yearly | every 1 year, from due date, same month and day |
+| Daily 6:04 pm | every 1 day, from due date |
+| Weekdays 6:04 pm | every 1 week, from due date, On Monday-Friday |
+| Wednesdays 6:04 pm | every 1 week, from due date, On the due date's weekday (plural weekday name, not the word "Weekly") |
+| 25th each month at 6:04 pm | every 1 month, from due date, On that day of the month |
+| Every 25 Nov at 6:04 pm | every 1 year, from due date, same month and day (not the word "Yearly") |
+
+Times follow the device 12/24-hour setting. Copy this pattern for other dues (for example Thursday 9:30 am: "Thursdays 9:30 am", "9th each month at 9:30 am", "Every 9 Nov at 9:30 am").
 
 **Next occurrence, from due date.** The first fire is the reminder's current `dueAt`, even if that instant would not be produced by `On` (the user already chose the first time). Every later occurrence keeps the local time of day (`due-kb.txt` 402: "Every repeat keeps this time of day"). Computations use `java.time` in the device zone.
 
 - `DAY`: add `interval` calendar days to `patternDueAt` (`plusDays`).
-- `WEEK`: the selected `On` days in a cycle of `interval` weeks. Week 0 is the ISO week that contains `patternDueAt`'s date (Monday start, assumed; Due does not say). After the last On-day in that week, skip to the same On-days in week `interval`, `2 * interval`, and so on. Time of day is unchanged. If `interval` is 1 and On is Wednesday only, the next date after this Wednesday is next Wednesday. If On is Monday, Wednesday and Friday, the next after Wednesday is Friday, then Monday.
+- `WEEK`: the selected `On` days in a cycle of `interval` weeks. Week 0 is the week that contains `patternDueAt`'s date, using the **Week Starts on** setting (Monday, Saturday or Sunday; Due 26.6.1, `email3-image8.jpg`. This iPad has Monday selected; whether that is Due's factory default is not shown). After the last On-day in that week, skip to the same On-days in week `interval`, `2 * interval`, and so on. Time of day is unchanged. If `interval` is 1 and On is Wednesday only, the next date after this Wednesday is next Wednesday. If On is Monday, Wednesday and Friday, the next after Wednesday is Friday, then Monday. The screenshots do not show a repeating reminder after changing Week Starts on, so treating that setting as the week boundary for this maths is a Gareth call, not a filmed result.
 - `MONTH` day-of-month: add `interval` months, then land on that day of the month. If the month is short (31 January plus one month, or 29 February in a non-leap year), clamp to the last day of that month (`ZonedDateTime.plusMonths` / `plusYears`, assumed; Due does not document short months).
 - `MONTH` nth / last weekday or day: in the month that is `interval` months after the pattern month, pick the 1st/2nd/3rd/4th/Last matching day. "Last weekday" is the last Monday-Friday in that month (Due: "the first or last Monday-to-Friday day").
 - `YEAR`: add `interval` years, same month and day, with the same clamp as above.
@@ -78,7 +80,7 @@ A title or nag-only save does not prompt. From-completion does not prompt either
 **Picker UI.** Still a test harness, no design polish. On the add and edit screen:
 
 - A repeat button (two arrows) at the top of the editor (the top bar is fine). It looks grey while the reminder does not repeat (`due-kb.txt` 383-384).
-- The menu offers Daily, Weekdays, Weekly, Monthly, Yearly (labels follow the draft due), Custom…, and Repeat Off. Under the selected choice, show the next date (`due-kb.txt` 387). For from-completion, there is no next date until Done.
+- The menu matches `email1-image2.jpg`: a Repeat heading, then Repeat Off first (checked when off), then Daily, Weekdays, the plural weekday, "{nth} each month at {time}", "Every {day month} at {time}", and Custom.... Each preset includes the due time on the same line. The help article also says that after a repeat is chosen, opening the menu again shows the next date under that choice (`due-kb.txt` 387); that state is not in this screenshot (Repeat Off is selected). For from-completion, there is no next date until Done.
 - Custom is one screen: Repeat (the rule in words); How often (count on the left, unit on the right, including minute and hour); From (Due Date or Completion); On, for week and month only; Next, hidden when From is Completion. A checkmark at the top right accepts the draft rule; it does not write Room. Save in the editor persists the rule and, if due also changed, may show the this/all prompt. Leaving without Save discards the draft rule and the Quick Times taps, as in Spec 3.
 - The chosen rule, in words, shows under the due date in the editor (`due-kb.txt` 386) and on each list row under the due time. Copy Due's wording where we have it: "Every 2 weeks" / "Every 2 weeks on Wednesday"; "Weekdays"; "25th each month at 5:30 pm"; "3rd Friday"; "Repeat 3 months after completion". Use the device 12/24-hour setting for times. A one-shot row shows no repeat line.
 
@@ -94,15 +96,15 @@ A title or nag-only save does not prompt. From-completion does not prompt either
 
 The release build still must not contain the receiver (Spec 1 AT-17).
 
-**UI.** Still a test harness. Add the repeat button, the custom screen, the list/editor rule text, the this/all-future prompt, the warning icon, and Restore warnings and prompts. No design polish.
+**UI.** Still a test harness. Add the repeat button, the custom screen, the list/editor rule text, the this/all-future prompt, the warning icon, Restore warnings and prompts, and a Week Starts on setting (Monday, Saturday, Sunday) in the test-harness settings, stored in `SettingsStore` with `commit`. No design polish.
 
 ## 4. Out of scope
-End date and "end after N occurrences": Due's help has no such control (only Repeat Off), so this PR does not invent one. Natural-language parsing of repeats, including "Bins out every Tuesday at 7am" (`DO-RESEARCH.md` s. 2, StillDue, and Due's typed dates in `due-kb.txt` 671-708): Spec 5. Hourly or minute repeats restricted to chosen days of the week (`DO-RESEARCH.md` s. 4 Must and s. 6 item 7): a later spec, so the custom On row can stay as Due's. The notification Quick Times grid, Custom Snooze and "Snooze to..." (still deferred from Spec 3). A log of completed occurrences (a Should in `DO-RESEARCH.md` s. 4). Reusable timers (Due's stand-in for hourly repeats). Alert levels, widgets, tiles, Wear OS, quiet hours, the health check, paywall, backup, Open Link, and any design polish. Changing `setAlarmClock()` or the exact-alarm permission plan. Changing the three notification snooze options or the Quick Times factory slots.
+End date and "end after N occurrences": Due's help has no such control (only Repeat Off), and the 26.6.1 repeat menu (`email1-image2.jpg`) has none either, so this PR does not invent one. Settings rows named Repeat At Least and Repeat Indefinitely (`email1-image4.jpg`, `email3-image3.jpg`, `email3-image4.jpg`) are Auto Snooze / iOS notification-budget controls, not an end condition on the repeat rule. Natural-language parsing of repeats, including "Bins out every Tuesday at 7am" (`DO-RESEARCH.md` s. 2, StillDue, and Due's typed dates in `due-kb.txt` 671-708): Spec 5. Hourly or minute repeats restricted to chosen days of the week (`DO-RESEARCH.md` s. 4 Must and s. 6 item 7): a later spec, so the custom On row can stay as Due's. The notification Quick Times grid, Custom Snooze and "Snooze to..." (still deferred from Spec 3). A log of completed occurrences (a Should in `DO-RESEARCH.md` s. 4). Reusable timers (Due's stand-in for hourly repeats). Alert levels, widgets, tiles, Wear OS, quiet hours, the health check, paywall, backup, Open Link, and any design polish. Changing `setAlarmClock()` or the exact-alarm permission plan. Changing the three notification snooze options or the Quick Times factory slots.
 
 ## 5. Acceptance tests (Mark)
 Setup, package, tolerance and `.debug.ADD` / `.debug.DONE` / `.debug.SNOOZE` / `.debug.APPLY_QAT` are as in Specs 1-3. New: `adb shell am broadcast -a com.evansappstudio.doapp.debug.SET_REPEAT -n com.evansappstudio.doapp/.debug.DebugReceiver --el id <id> --ei interval 1 --es unit DAY --es from DUE_DATE`, and the same pattern for `DUMP_REPEAT`, `SHIFT_DUE` and `CONFIG_REPEAT_PROMPT`. Capture `adb logcat -s DoAlarm`. Tests marked **human** need a person on the add/edit screen or the lock screen; the rest should be scriptable over adb. Restore automatic time zone, and Restore warnings and prompts, before handing the phone back. Do not add a PIN on Tim's phone without his ok.
 
-1. **Picker, labels and list. Human.** Open add or edit. The repeat button is at the top and grey when off. The menu offers Daily, Weekdays, Weekly, Monthly, Yearly (names follow the draft due, for example a due of Wednesday the 25th at 5:30 pm shows a monthly label like "25th each month at 5:30 pm"), Custom… and Repeat Off. The selected preset shows the next date under it. Custom has Repeat in words, How often, From, On (only for week and month) and Next; From Completion hides On and Next. The checkmark does not save; Save does. The rule then shows under the due date in the editor and on the list row. Leave without Save: the stored rule is unchanged.
+1. **Picker, labels and list. Human.** Open add or edit. The repeat button is at the top and grey when off. The menu order and wording match Due 26.6.1 (`email1-image2.jpg`): Repeat Off first, then for a due of Wednesday 25 Nov at 5:30 pm the presets read "Daily 5:30 pm", "Weekdays 5:30 pm", "Wednesdays 5:30 pm", "25th each month at 5:30 pm", "Every 25 Nov at 5:30 pm", then Custom.... A selected on preset should also show the next date under that choice (`due-kb.txt` 387). Custom has Repeat in words, How often, From, On (only for week and month) and Next; From Completion hides On and Next. The checkmark does not save; Save does. The rule then shows under the due date in the editor and on the list row. Leave without Save: the stored rule is unchanged. Settings include Week Starts on with Monday, Saturday and Sunday (`email3-image8.jpg`).
 
 2. **Presets and Done.** Add a reminder due in 2 minutes, nag off. `SET_REPEAT` Daily, `DUMP_REPEAT` `count` 4: `i=0` is the current `dueAt`, then +1, +2 and +3 calendar days, same local time. `.debug.DONE`: `repeat-advance` `newDue` is +1 calendar day, `isDone` is false, the list still shows it active, `dumpsys alarm` is at `newDue`, and it fires at `newDue` within tolerance. Repeat the DUMP check for Weekdays (On Monday-Friday), Weekly (On the due weekday only), Monthly (that day of month) and Yearly (same month and day).
 
@@ -132,7 +134,7 @@ Setup, package, tolerance and `.debug.ADD` / `.debug.DONE` / `.debug.SNOOZE` / `
 
 15. **Direct boot Done. Human,** same PIN rule as Spec 1 AT-9 and Spec 2 AT-12. Reboot, do not unlock, wait for a repeating reminder (daily, nag off, due shortly) to fire on the lock screen, then Mark Done. After unlock, the row is not `isDone`, `dueAt` is the next occurrence, and an alarm is armed there. If this cannot be run without creating a PIN, mark it NOT RUN; it stays an outstanding device check.
 
-16. **CI green.** Unit tests cover presets, every-N weeks and months, On days, nth/last weekday, first/last day, short-month and leap-year clamps, from-completion date and time-of-day (including after a postpone), this-occurrence vs all-future (Due's 27th/28th fixture), missed-occurrence catch-up (one step, no auto-skip), wall time across DST, time-zone rewrite for calendar units vs elapsed minute/hour, and the Room v2 migration of a version-1 one-shot row. The release build contains no debug receiver.
+16. **CI green.** Unit tests cover presets, every-N weeks and months (including Week Starts on Monday, Saturday and Sunday), On days, nth/last weekday, first/last day, short-month and leap-year clamps, from-completion date and time-of-day (including after a postpone), this-occurrence vs all-future (Due's 27th/28th fixture), missed-occurrence catch-up (one step, no auto-skip), wall time across DST, time-zone rewrite for calendar units vs elapsed minute/hour, and the Room v2 migration of a version-1 one-shot row. The release build contains no debug receiver.
 
 ## 6. Risks
 - The Due scrape in `due-kb.txt` is truncated. The next-date, from-completion time-of-day, and "what Due can't repeat" rules come from the full 27 Oct 2026 article in `src/zd1.json`. If that file and the live help ever disagree, the live article wins and the spec should be updated, not guessed.
@@ -150,7 +152,7 @@ Defaults Jim should build to, unless Tim walks them back:
 3. **Hourly on chosen days is out of this PR,** so On stays week-and-month only, like Due. It can come back as its own spec.
 4. **Missed occurrences stay overdue** and Done advances one pattern step, even if that step is still in the past. No auto-skip to the next future date.
 5. **Short months and leap days clamp** to the last real day (`plusMonths` / `plusYears`).
-6. **Every-N-weeks uses ISO weeks** (Monday start) measured from the week that contains `patternDueAt`.
+6. **Every-N-weeks uses the Week Starts on setting** (Monday, Saturday or Sunday; `email3-image8.jpg`) measured from the week that contains `patternDueAt`. Factory default is Monday, assumed: this iPad has Monday selected, and Due's factory default is not shown.
 7. **Snooze and Snooze all are always this occurrence only.** No prompt on the notification.
 8. **Weekly All future,** when several On days are set, updates the time of day but does not rewrite the On set. A single On day retargets to the new weekday.
 9. **From-completion plus a minute or hour interval** uses the completion local date, at the reminder's due time of day, then adds the duration.
