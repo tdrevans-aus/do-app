@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,6 +67,11 @@ import com.evansappstudio.doapp.UserUnlock
 import com.evansappstudio.doapp.alarm.AlarmPermissions
 import com.evansappstudio.doapp.alarm.ExactAlarmPolicy
 import com.evansappstudio.doapp.alarm.DoAlarmLog
+import com.evansappstudio.doapp.alarm.PostponeMode
+import com.evansappstudio.doapp.alarm.QuickTimeBase
+import com.evansappstudio.doapp.alarm.QuickTimeDay
+import com.evansappstudio.doapp.alarm.QuickTimeSlot
+import com.evansappstudio.doapp.alarm.QuickTimes
 import com.evansappstudio.doapp.data.Reminder
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -94,6 +100,7 @@ fun ReminderApp(
     val context = LocalContext.current
     val viewModel: ReminderViewModel = viewModel(factory = ReminderViewModelFactory(container))
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
+    val quickTimes by viewModel.quickTimes.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var editId by rememberSaveable { mutableStateOf<Long?>(null) }
     var exactAllowed by remember { mutableStateOf(AlarmPermissions.canScheduleExact(context)) }
@@ -109,6 +116,7 @@ fun ReminderApp(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshPermissions()
+                viewModel.reloadQuickTimes()
                 container.scope.launch {
                     if (UserUnlock.isUnlocked(context)) {
                         container.scheduler.rescheduleAll()
@@ -145,6 +153,7 @@ fun ReminderApp(
 
     LaunchedEffect(openRequest) {
         val id = openRequest ?: return@LaunchedEffect
+        viewModel.reloadQuickTimes()
         editId = id
         screen = SCREEN_EDIT
         onOpenRequestConsumed()
@@ -170,10 +179,18 @@ fun ReminderApp(
             },
             onNotificationPrompt = { viewModel.markNotificationPermissionRequested() },
             onPermissionResult = { refreshPermissions() },
+            quickSlots = quickTimes.slots,
+            postpone = quickTimes.postpone,
+            onQuickSlotChange = viewModel::setQuickTimeSlot,
+            onPostponeChange = viewModel::setPostponeMode,
         )
         SCREEN_EDIT -> EditReminderScreen(
             viewModel = viewModel,
             editId = editId,
+            quickSlots = quickTimes.slots,
+            postpone = quickTimes.postpone,
+            onQuickSlotChange = viewModel::setQuickTimeSlot,
+            onPostponeChange = viewModel::setPostponeMode,
             onBack = { screen = SCREEN_LIST },
         )
         SCREEN_SNOOZE -> SnoozeSettingsScreen(
@@ -191,10 +208,14 @@ fun ReminderApp(
             onDone = viewModel::markDone,
             onDelete = viewModel::delete,
             onOpen = { id ->
+                viewModel.reloadQuickTimes()
                 editId = id
                 screen = SCREEN_EDIT
             },
-            onAdd = { screen = SCREEN_ADD },
+            onAdd = {
+                viewModel.reloadQuickTimes()
+                screen = SCREEN_ADD
+            },
             onSnoozeSettings = { screen = SCREEN_SNOOZE },
             onAllowExactAlarms = { openExactAlarmSettings(context) },
             onOpenNotificationSettings = { openNotificationSettings(context) },
@@ -342,6 +363,10 @@ private fun ReminderRow(
 private fun EditReminderScreen(
     viewModel: ReminderViewModel,
     editId: Long?,
+    quickSlots: List<QuickTimeSlot>,
+    postpone: PostponeMode,
+    onQuickSlotChange: (Int, QuickTimeSlot) -> Unit,
+    onPostponeChange: (PostponeMode) -> Unit,
     onBack: () -> Unit,
 ) {
     var reminder by remember(editId) { mutableStateOf<Reminder?>(null) }
@@ -371,6 +396,10 @@ private fun EditReminderScreen(
                 requestNotificationsFirst = { false },
                 onNotificationPrompt = {},
                 onPermissionResult = {},
+                quickSlots = quickSlots,
+                postpone = postpone,
+                onQuickSlotChange = onQuickSlotChange,
+                onPostponeChange = onPostponeChange,
             )
         }
     }
@@ -410,29 +439,55 @@ private fun ReminderFormScreen(
     requestNotificationsFirst: () -> Boolean,
     onNotificationPrompt: () -> Unit,
     onPermissionResult: () -> Unit,
+    quickSlots: List<QuickTimeSlot>,
+    postpone: PostponeMode,
+    onQuickSlotChange: (Int, QuickTimeSlot) -> Unit,
+    onPostponeChange: (PostponeMode) -> Unit,
 ) {
-    val initial = remember(formKey) {
-        if (initialDueAt == null) {
-            ZonedDateTime.now().plusMinutes(5)
-        } else {
-            Instant.ofEpochMilli(initialDueAt).atZone(ZoneId.systemDefault())
-        }
-    }
+    val initialDraft = remember(formKey) { startingDraft(initialDueAt) }
     var title by rememberSaveable(formKey) { mutableStateOf(initialTitle) }
-    var dateMillis by rememberSaveable(formKey) {
-        mutableLongStateOf(
-            initial.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-        )
-    }
-    var hour by rememberSaveable(formKey) { mutableIntStateOf(initial.hour) }
-    var minute by rememberSaveable(formKey) { mutableIntStateOf(initial.minute) }
+    var draftDueAt by rememberSaveable(formKey) { mutableLongStateOf(initialDraft) }
+    var draftExact by rememberSaveable(formKey) { mutableStateOf(false) }
     var nagMinutes by rememberSaveable(formKey) { mutableIntStateOf(initialNagMinutes) }
     var showDate by rememberSaveable(formKey) { mutableStateOf(false) }
     var showTime by rememberSaveable(formKey) { mutableStateOf(false) }
+    var openTimeAfterDate by rememberSaveable(formKey) { mutableStateOf(false) }
     var saveAfterPermission by rememberSaveable(formKey) { mutableStateOf(false) }
+    val is24Hour = rememberIs24Hour()
 
-    val dueAt = remember(dateMillis, hour, minute, initialDueAt) {
-        dueToSave(initialDueAt, combineDue(dateMillis, hour, minute))
+    val dueAt = if (draftExact) draftDueAt else dueToSave(initialDueAt, draftDueAt)
+
+    fun applyDate(dateMillis: Long) {
+        val zone = ZoneId.systemDefault()
+        val current = Instant.ofEpochMilli(draftDueAt).atZone(zone)
+        val date = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
+        draftDueAt = ZonedDateTime.of(date, LocalTime.of(current.hour, current.minute), zone)
+            .toInstant()
+            .toEpochMilli()
+        draftExact = false
+    }
+
+    fun applyClock(hour: Int, minute: Int) {
+        val zone = ZoneId.systemDefault()
+        val date = Instant.ofEpochMilli(draftDueAt).atZone(zone).toLocalDate()
+        draftDueAt = ZonedDateTime.of(date, LocalTime.of(hour, minute), zone)
+            .toInstant()
+            .toEpochMilli()
+        draftExact = false
+    }
+
+    fun applyQuick(index: Int, base: QuickTimeBase?, day: QuickTimeDay?) {
+        val slot = quickSlots.getOrNull(index) ?: return
+        draftDueAt = QuickTimes.apply(
+            slot = slot,
+            draftDueAt = draftDueAt,
+            now = System.currentTimeMillis(),
+            zone = ZoneId.systemDefault(),
+            postpone = postpone,
+            base = base,
+            day = day,
+        )
+        draftExact = true
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -468,6 +523,7 @@ private fun ReminderFormScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(padding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -479,9 +535,28 @@ private fun ReminderFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            Text(text = stringResource(R.string.due_preview, formatDue(dueAt)))
+            Text(
+                text = stringResource(R.string.quick_times),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            QuickTimesBanner(
+                draftDueAt = draftDueAt,
+                is24Hour = is24Hour,
+                onClick = {
+                    openTimeAfterDate = true
+                    showDate = true
+                },
+            )
+            QuickTimesGrid(
+                slots = quickSlots,
+                is24Hour = is24Hour,
+                onApply = { index, base, day -> applyQuick(index, base, day) },
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showDate = true }) { Text(stringResource(R.string.pick_date)) }
+                Button(onClick = {
+                    openTimeAfterDate = false
+                    showDate = true
+                }) { Text(stringResource(R.string.pick_date)) }
                 Button(onClick = { showTime = true }) { Text(stringResource(R.string.pick_time)) }
             }
             Text(text = stringResource(R.string.nag_label))
@@ -508,33 +583,54 @@ private fun ReminderFormScreen(
             Button(onClick = { commit() }, enabled = saveEnabled && title.isNotBlank()) {
                 Text(stringResource(R.string.save))
             }
+            QuickTimesSettings(
+                slots = quickSlots,
+                postpone = postpone,
+                is24Hour = is24Hour,
+                onPostponeChange = onPostponeChange,
+                onSlotChange = onQuickSlotChange,
+            )
         }
     }
 
     if (showDate) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = dateMillis)
+        val state = rememberDatePickerState(initialSelectedDateMillis = utcDateMillis(draftDueAt))
         DatePickerDialog(
-            onDismissRequest = { showDate = false },
+            onDismissRequest = {
+                showDate = false
+                openTimeAfterDate = false
+            },
             confirmButton = {
                 TextButton(onClick = {
-                    state.selectedDateMillis?.let { dateMillis = it }
+                    state.selectedDateMillis?.let { applyDate(it) }
                     showDate = false
+                    if (openTimeAfterDate) {
+                        openTimeAfterDate = false
+                        showTime = true
+                    }
                 }) { Text(stringResource(R.string.ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDate = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = {
+                    showDate = false
+                    openTimeAfterDate = false
+                }) { Text(stringResource(R.string.cancel)) }
             },
         ) { DatePicker(state = state) }
     }
 
     if (showTime) {
-        val state = rememberTimePickerState(initialHour = hour, initialMinute = minute, is24Hour = true)
+        val zoned = Instant.ofEpochMilli(draftDueAt).atZone(ZoneId.systemDefault())
+        val state = rememberTimePickerState(
+            initialHour = zoned.hour,
+            initialMinute = zoned.minute,
+            is24Hour = is24Hour,
+        )
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTime = false },
             confirmButton = {
                 TextButton(onClick = {
-                    hour = state.hour
-                    minute = state.minute
+                    applyClock(state.hour, state.minute)
                     showTime = false
                 }) { Text(stringResource(R.string.ok)) }
             },
@@ -562,11 +658,20 @@ private fun dueToSave(initialDueAt: Long?, edited: Long): Long {
     return if (sameMinute) initialDueAt else edited
 }
 
-private fun combineDue(dateMillis: Long, hour: Int, minute: Int): Long {
-    val date = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
-    return ZonedDateTime.of(date, LocalTime.of(hour, minute), ZoneId.systemDefault())
-        .toInstant()
-        .toEpochMilli()
+/** New reminders start at now plus 5 minutes, truncated to the minute the picker can show. */
+private fun startingDraft(initialDueAt: Long?): Long {
+    if (initialDueAt != null) return initialDueAt
+    val zoned = ZonedDateTime.now().plusMinutes(5)
+    return ZonedDateTime.of(
+        zoned.toLocalDate(),
+        LocalTime.of(zoned.hour, zoned.minute),
+        ZoneId.systemDefault(),
+    ).toInstant().toEpochMilli()
+}
+
+private fun utcDateMillis(dueAt: Long): Long {
+    val date = Instant.ofEpochMilli(dueAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    return date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 }
 
 private fun formatDue(dueAt: Long): String {

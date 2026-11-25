@@ -3,6 +3,11 @@ package com.evansappstudio.doapp.data
 import android.annotation.SuppressLint
 import android.content.Context
 import com.evansappstudio.doapp.alarm.NagSchedule
+import com.evansappstudio.doapp.alarm.PostponeMode
+import com.evansappstudio.doapp.alarm.QuickTimeSlot
+import com.evansappstudio.doapp.alarm.QuickTimeUnit
+import com.evansappstudio.doapp.alarm.QuickTimes
+import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
@@ -54,14 +59,66 @@ class SettingsStore(context: Context) {
             .commit()
     }
 
+    /** Twelve Quick Times slots and postpone behaviour. Missing keys stay on the factory defaults. */
+    fun quickTimes(): QuickTimesSettings {
+        val postpone = PostponeMode.fromName(prefs.getString(KEY_QAT_POSTPONE, null))
+            ?: QuickTimes.DEFAULT_POSTPONE
+        val slots = List(QuickTimes.SLOT_COUNT) { index -> quickTimeSlot(index) }
+        return QuickTimesSettings(slots, postpone)
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun setQuickTimeSlot(index: Int, slot: QuickTimeSlot) {
+        require(index in QuickTimes.FACTORY.indices) { "quick time slot $index" }
+        require(slot.isValid()) { "invalid quick time slot" }
+        val stored = if (slot.kind == SnoozeKind.AT_TIME) {
+            slot.copy(unit = QuickTimeUnit.MINUTE)
+        } else {
+            slot
+        }
+        // commit, not apply: QA kills the process immediately after CONFIG_QAT.
+        prefs.edit()
+            .putString(qatKindKey(index), stored.kind.name)
+            .putInt(qatAmountKey(index), stored.amount)
+            .putString(qatUnitKey(index), stored.unit.name)
+            .commit()
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun setPostponeMode(mode: PostponeMode) {
+        // commit, not apply: QA kills the process immediately after CONFIG_POSTPONE.
+        prefs.edit().putString(KEY_QAT_POSTPONE, mode.name).commit()
+    }
+
+    private fun quickTimeSlot(index: Int): QuickTimeSlot {
+        val factory = QuickTimes.FACTORY[index]
+        val kind = SnoozeKind.fromName(prefs.getString(qatKindKey(index), null)) ?: return factory
+        if (!prefs.contains(qatAmountKey(index))) return factory
+        val amount = prefs.getInt(qatAmountKey(index), 0)
+        val unit = when (kind) {
+            SnoozeKind.AT_TIME -> QuickTimeUnit.fromName(prefs.getString(qatUnitKey(index), null))
+                ?: QuickTimeUnit.MINUTE
+            SnoozeKind.FROM_NOW -> QuickTimeUnit.fromName(prefs.getString(qatUnitKey(index), null))
+                ?: return factory
+        }
+        return QuickTimeSlot.orNull(kind, amount, unit) ?: factory
+    }
+
     private fun snoozeKindKey(index: Int) = "snooze_${index}_kind"
 
     private fun snoozeValueKey(index: Int) = "snooze_${index}_value"
+
+    private fun qatKindKey(index: Int) = "qat_${index}_kind"
+
+    private fun qatAmountKey(index: Int) = "qat_${index}_amount"
+
+    private fun qatUnitKey(index: Int) = "qat_${index}_unit"
 
     private companion object {
         const val PREFS = "do_settings"
         const val KEY_DEFAULT_NAG = "default_nag_minutes"
         const val KEY_ASKED_NOTIFICATIONS = "asked_post_notifications"
+        const val KEY_QAT_POSTPONE = "qat_postpone"
         const val DEFAULT_NAG_MINUTES = 5
     }
 }
