@@ -12,4 +12,30 @@ data class Reminder(
     val isDone: Boolean = false,
     val doneAt: Long? = null,
     val createdAt: Long,
-)
+    val repeatInterval: Int? = null,
+    val repeatUnit: String? = null,
+    val repeatFrom: String? = null,
+    val repeatWeekDays: String? = null,
+    val repeatMonthOn: String? = null,
+    val patternDueAt: Long? = null,
+) {
+    fun repeatRule(): RepeatRule? = RepeatRule.fromColumns(
+        interval = repeatInterval,
+        unit = repeatUnit,
+        from = repeatFrom,
+        weekDays = repeatWeekDays,
+        monthOn = repeatMonthOn,
+    )
+
+    fun withRepeat(rule: RepeatRule?, patternDueAt: Long?): Reminder {
+        val days = rule?.weekDays?.joinToString(",") { it.name }
+        return copy(
+            repeatInterval = rule?.interval,
+            repeatUnit = rule?.unit?.name,
+            repeatFrom = rule?.from?.name,
+            repeatWeekDays = days?.takeIf { it.isNotEmpty() },
+            repeatMonthOn = rule?.monthOn?.token(),
+            patternDueAt = if (rule == null) null else patternDueAt,
+        )
+    }
+}

@@ -25,6 +25,8 @@ data class MirrorEntry(
     val nextFireAt: Long?,
     val pendingDone: Boolean = false,
     val pendingSnoozeDueAt: Long? = null,
+    val pendingDoneAt: Long? = null,
+    val wallClock: Boolean = false,
 )
 
 class ReminderMirror(context: Context) {
@@ -80,6 +82,12 @@ class ReminderMirror(context: Context) {
                             } else {
                                 item.getLong("pendingSnoozeDueAt")
                             },
+                            pendingDoneAt = if (!item.has("pendingDoneAt") || item.isNull("pendingDoneAt")) {
+                                null
+                            } else {
+                                item.getLong("pendingDoneAt")
+                            },
+                            wallClock = item.optBoolean("wallClock", false),
                         ),
                     )
                 }
@@ -101,7 +109,9 @@ class ReminderMirror(context: Context) {
                     .put("nagMinutes", entry.nagMinutes ?: JSONObject.NULL)
                     .put("nextFireAt", entry.nextFireAt ?: JSONObject.NULL)
                     .put("pendingDone", entry.pendingDone)
-                    .put("pendingSnoozeDueAt", entry.pendingSnoozeDueAt ?: JSONObject.NULL),
+                    .put("pendingSnoozeDueAt", entry.pendingSnoozeDueAt ?: JSONObject.NULL)
+                    .put("pendingDoneAt", entry.pendingDoneAt ?: JSONObject.NULL)
+                    .put("wallClock", entry.wallClock),
             )
         }
         val temp = File(file.parentFile, "$FILE_NAME.tmp")
@@ -121,6 +131,7 @@ fun Reminder.toMirror(
     nextFireAt: Long?,
     pendingDone: Boolean = false,
     pendingSnoozeDueAt: Long? = null,
+    pendingDoneAt: Long? = null,
 ): MirrorEntry = MirrorEntry(
     id = id,
     title = title,
@@ -129,4 +140,6 @@ fun Reminder.toMirror(
     nextFireAt = nextFireAt,
     pendingDone = pendingDone,
     pendingSnoozeDueAt = pendingSnoozeDueAt,
+    pendingDoneAt = pendingDoneAt,
+    wallClock = repeatRule()?.keepsWallClock() == true,
 )

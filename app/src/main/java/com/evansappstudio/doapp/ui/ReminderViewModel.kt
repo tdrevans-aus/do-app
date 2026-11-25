@@ -8,7 +8,10 @@ import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.data.DueShiftMode
 import com.evansappstudio.doapp.data.Reminder
+import com.evansappstudio.doapp.data.RepeatPromptMode
+import com.evansappstudio.doapp.data.RepeatRule
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,12 +51,27 @@ class ReminderViewModel(
         }
     }
 
-    fun add(title: String, dueAt: Long, nagMinutes: Int?) {
-        viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes) }
+    fun add(title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?) {
+        viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes, rule) }
     }
 
-    fun update(id: Long, title: String, dueAt: Long, nagMinutes: Int?) {
-        viewModelScope.launch { container.scheduler.update(id, title, dueAt, nagMinutes) }
+    fun update(
+        id: Long,
+        title: String,
+        dueAt: Long,
+        nagMinutes: Int?,
+        rule: RepeatRule?,
+        dueShift: DueShiftMode?,
+    ) {
+        viewModelScope.launch {
+            container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift)
+        }
+    }
+
+    fun repeatPromptMode(): RepeatPromptMode = container.settings.repeatPromptMode()
+
+    fun setRepeatPromptMode(mode: RepeatPromptMode) {
+        container.settings.setRepeatPromptMode(mode)
     }
 
     suspend fun reminderOrNull(id: Long): Reminder? = container.reminderDao().getById(id)

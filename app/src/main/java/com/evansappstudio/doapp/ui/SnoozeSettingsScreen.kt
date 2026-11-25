@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.alarm.SnoozeKind
+import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.alarm.SnoozeLabels
 import com.evansappstudio.doapp.alarm.SnoozeOption
 
@@ -76,6 +77,14 @@ fun SnoozeSettingsScreen(
                             stringResource(R.string.snooze_at_time)
                         },
                     )
+                }
+            }
+            item {
+                TextButton(
+                    onClick = { viewModel.setRepeatPromptMode(RepeatPromptMode.PROMPT) },
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+                ) {
+                    Text(stringResource(R.string.restore_prompts))
                 }
             }
         }

@@ -7,8 +7,10 @@ import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.ReminderMirror
 import com.evansappstudio.doapp.alarm.Scheduler
 import com.evansappstudio.doapp.alarm.SnoozeConfig
+import com.evansappstudio.doapp.alarm.ZoneMemory
 import com.evansappstudio.doapp.alarm.SnoozeOption
 import com.evansappstudio.doapp.data.AppDatabase
+import com.evansappstudio.doapp.data.MIGRATION_1_2
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.data.SettingsStore
 import com.evansappstudio.doapp.notify.ReminderNotifier
@@ -25,10 +27,13 @@ class AppContainer(context: Context) {
     val snoozeConfig = SnoozeConfig(appContext)
     val notifications = ReminderNotifier(appContext, snoozeConfig::get)
     val settings = SettingsStore(appContext)
+    val zones = ZoneMemory(appContext)
 
     private val database: AppDatabase by lazy {
         check(UserUnlock.isUnlocked(appContext)) { "Room is unavailable before unlock" }
-        Room.databaseBuilder(appContext, AppDatabase::class.java, "do.db").build()
+        Room.databaseBuilder(appContext, AppDatabase::class.java, "do.db")
+            .addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     val scheduler: Scheduler by lazy {
@@ -38,6 +43,7 @@ class AppContainer(context: Context) {
             alarms = alarms,
             notifications = notifications,
             unlocked = { UserUnlock.isUnlocked(appContext) },
+            zones = zones,
         )
     }
 

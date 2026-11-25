@@ -57,7 +57,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 @Composable
-private fun deviceLocale(): Locale = LocalLocale.current.platformLocale
+fun deviceLocale(): Locale = LocalLocale.current.platformLocale
 
 @Composable
 fun rememberIs24Hour(): Boolean {
@@ -84,6 +84,7 @@ fun QuickTimesBanner(
     draftDueAt: Long,
     is24Hour: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var now by remember(draftDueAt) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(draftDueAt) {
@@ -101,7 +102,7 @@ fun QuickTimesBanner(
         locale = deviceLocale(),
     )
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick, role = Role.Button),
         color = if (overdue) {
