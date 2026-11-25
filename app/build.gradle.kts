@@ -7,6 +7,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     alias(libs.plugins.android.application)
@@ -135,6 +136,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.process)
+    releaseImplementation(libs.androidx.billing)
+    releaseImplementation(libs.androidx.billing.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.coroutines.android)
@@ -146,8 +150,13 @@ dependencies {
 
 val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     group = "verification"
-    description = "Release manifest has no debug receiver, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption."
-    dependsOn("processReleaseMainManifest", "processDebugMainManifest")
+    description = "Release manifest has no debug receiver, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption. Release classes have no fake billing."
+    dependsOn(
+        "processReleaseMainManifest",
+        "processDebugMainManifest",
+        "compileReleaseKotlin",
+        "compileDebugKotlin",
+    )
     val buildDirectory = layout.buildDirectory
     val mode = exactAlarmMode
     doLast {
@@ -173,9 +182,19 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         check(!release.contains("com.evansappstudio.doapp.debug")) {
             "Release manifest contains the debug package"
         }
+        check(!release.contains("FAKE_PURCHASE")) {
+            "Release manifest contains FAKE_PURCHASE"
+        }
+        check(!release.contains("FakeUnlockBilling")) {
+            "Release manifest contains FakeUnlockBilling"
+        }
         check(debug.contains("com.evansappstudio.doapp.debug.DebugReceiver")) {
             "Debug manifest is missing DebugReceiver"
         }
+        check(debug.contains("FAKE_PURCHASE")) {
+            "Debug manifest is missing FAKE_PURCHASE"
+        }
+        assertReleaseHasNoFakeBilling(root)
 
         for ((variant, text) in listOf("release" to release, "debug" to debug)) {
             check(!text.contains("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")) {
@@ -201,6 +220,66 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
             }
         }
     }
+}
+
+private fun assertReleaseHasNoFakeBilling(root: java.io.File) {
+    val needles = listOf("FakeUnlockBilling", "FAKE_PURCHASE")
+    val releaseFiles = root.walkTopDown().filter { file ->
+        file.isFile &&
+            file.path.replace('\\', '/').contains("/release/") &&
+            !file.path.replace('\\', '/').contains("/debug/") &&
+            file.extension in setOf("class", "jar", "dex", "apk")
+    }.toList()
+    check(releaseFiles.isNotEmpty()) { "No release class output under $root" }
+    for (needle in needles) {
+        val hit = releaseFiles.firstOrNull { file -> fileContainsNeedle(file, needle) }
+        check(hit == null) { "Release output contains $needle in $hit" }
+    }
+    val debugHasFake = root.walkTopDown().any { file ->
+        file.isFile &&
+            file.path.replace('\\', '/').contains("/debug/") &&
+            !file.path.replace('\\', '/').contains("/release/") &&
+            (file.name.contains("FakeUnlockBilling") || (file.extension == "class" && fileContainsNeedle(file, "FakeUnlockBilling")))
+    }
+    check(debugHasFake) { "Debug output is missing FakeUnlockBilling" }
+}
+
+private fun fileContainsNeedle(file: java.io.File, needle: String): Boolean {
+    val bytes = needle.toByteArray(Charsets.UTF_8)
+    if (file.extension == "jar" || file.extension == "apk") {
+        return try {
+            ZipFile(file).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    if (entry.name.contains(needle)) return true
+                    if (entry.isDirectory || entry.size > 5_000_000) continue
+                    val data = zip.getInputStream(entry).readBytes()
+                    if (indexOfBytes(data, bytes) >= 0) return true
+                }
+                false
+            }
+        } catch (error: Throwable) {
+            false
+        }
+    }
+    if (file.length() > 20_000_000) return false
+    return indexOfBytes(file.readBytes(), bytes) >= 0
+}
+
+private fun indexOfBytes(data: ByteArray, needle: ByteArray): Int {
+    if (needle.isEmpty() || data.size < needle.size) return -1
+    for (start in 0..data.size - needle.size) {
+        var match = true
+        for (offset in needle.indices) {
+            if (data[start + offset] != needle[offset]) {
+                match = false
+                break
+            }
+        }
+        if (match) return start
+    }
+    return -1
 }
 
 private data class ManifestPermission(val name: String, val maxSdk: String?)

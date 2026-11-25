@@ -42,6 +42,7 @@ object HealthEvaluator {
             add(standby(facts))
             add(boot(facts))
             late(facts)?.let { add(it) }
+            add(backup(facts))
         }
         val badge = items.any { it.status == HealthStatus.WARN || it.status == HealthStatus.BLOCKED }
         val testMessage = testMessage(facts)
@@ -312,6 +313,33 @@ object HealthEvaluator {
         )
     }
 
+    private fun backup(facts: HealthFacts): HealthItem {
+        if (facts.backupOk) {
+            val whenText = facts.backupSuccessText.ifBlank { "a previous backup" }
+            return item(
+                HealthIds.BACKUP,
+                HealthStatus.OK,
+                "Backup",
+                "Last backed up $whenText.",
+                HealthFix("Fix", HealthActionKind.BACKUP),
+            )
+        }
+        val explanation = if (facts.backupFailed && facts.backupSuccessText.isNotBlank()) {
+            "The last backup did not succeed. The last successful backup was ${facts.backupSuccessText}."
+        } else if (facts.backupFailed) {
+            "The last backup did not succeed."
+        } else {
+            "Reminders have not been backed up to a folder you chose."
+        }
+        return item(
+            HealthIds.BACKUP,
+            HealthStatus.WARN,
+            "Reminders Not Backed Up",
+            explanation,
+            HealthFix("Fix", HealthActionKind.BACKUP),
+        )
+    }
+
     private fun late(facts: HealthFacts): HealthItem? {
         val lag = facts.lateLagMs ?: return null
         if (lag <= LATE_BOUNDARY_MS) return null
@@ -378,6 +406,7 @@ object HealthEvaluator {
             "lastLate=$late",
             "test=$test",
             "late=${status(HealthIds.LATE, "OK")}",
+            "backup=${status(HealthIds.BACKUP)}",
         ).joinToString(" ")
     }
 
@@ -409,6 +438,7 @@ object HealthIds {
     const val STANDBY = "standby"
     const val BOOT = "boot"
     const val LATE = "late"
+    const val BACKUP = "backup"
 }
 
 enum class HealthActionKind {
@@ -425,6 +455,7 @@ enum class HealthActionKind {
     REENABLE_BOOT,
     CLEAR_LATE,
     LEARN_MORE,
+    BACKUP,
 }
 
 data class HealthFix(
@@ -471,6 +502,9 @@ data class HealthFacts(
     val testResult: String = HealthEvaluator.TEST_NONE,
     val testPending: Boolean = false,
     val testEarly: Boolean = false,
+    val backupOk: Boolean = false,
+    val backupFailed: Boolean = false,
+    val backupSuccessText: String = "",
 )
 
 data class HealthItem(

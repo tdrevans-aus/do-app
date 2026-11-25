@@ -20,3 +20,27 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
         db.execSQL(AlertSchema.V2_TO_V3)
     }
 }
+
+/** Existing rows get a new random uuid. New rows set one at insert. */
+object UuidSchema {
+    const val ADD_COLUMN = "ALTER TABLE reminder ADD COLUMN uuid TEXT NOT NULL DEFAULT ''"
+}
+
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(UuidSchema.ADD_COLUMN)
+        val ids = ArrayList<Long>()
+        val cursor = db.query("SELECT id FROM reminder WHERE uuid IS NULL OR uuid = ''")
+        try {
+            while (cursor.moveToNext()) ids += cursor.getLong(0)
+        } finally {
+            cursor.close()
+        }
+        for (id in ids) {
+            db.execSQL(
+                "UPDATE reminder SET uuid = ? WHERE id = ?",
+                arrayOf<Any>(java.util.UUID.randomUUID().toString(), id),
+            )
+        }
+    }
+}

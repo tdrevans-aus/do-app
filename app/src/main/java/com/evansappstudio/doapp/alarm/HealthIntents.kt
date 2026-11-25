@@ -30,6 +30,7 @@ object HealthIntents {
         HealthActionKind.RESTORE_ALARMS,
         HealthActionKind.REENABLE_BOOT,
         HealthActionKind.CLEAR_LATE,
+        HealthActionKind.BACKUP,
         -> null
     }
 
@@ -54,6 +55,7 @@ object HealthIntents {
             HealthActionKind.RESTORE_ALARMS,
             HealthActionKind.REENABLE_BOOT,
             HealthActionKind.CLEAR_LATE,
+            HealthActionKind.BACKUP,
             -> return emptyList()
         }
         val chain = when (fix.kind) {

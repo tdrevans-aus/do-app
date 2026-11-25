@@ -47,13 +47,16 @@ import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.WeekStart
 import com.evansappstudio.doapp.alarm.SnoozeLabels
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.billing.UnlockUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SnoozeSettingsScreen(
     viewModel: ReminderViewModel,
+    unlock: UnlockUiState,
     onBack: () -> Unit,
     onOpenHealth: () -> Unit,
+    onUnlock: () -> Unit,
 ) {
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
@@ -90,6 +93,30 @@ fun SnoozeSettingsScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onUnlock() }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = if (unlock.unlocked) {
+                            stringResource(R.string.unlock_done)
+                        } else {
+                            stringResource(R.string.unlock_do)
+                        },
+                    )
+                    Text(
+                        text = when {
+                            unlock.pending -> stringResource(R.string.unlock_pending)
+                            unlock.unlocked -> stringResource(R.string.unlock_restore)
+                            else -> unlock.price ?: stringResource(R.string.unlock_price_unavailable)
+                        },
+                    )
+                }
+            }
             itemsIndexed(options) { index, option ->
                 Column(
                     modifier = Modifier

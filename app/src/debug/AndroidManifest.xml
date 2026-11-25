@@ -28,6 +28,14 @@
                 <action android:name="com.evansappstudio.doapp.debug.DUMP_HEALTH" />
                 <action android:name="com.evansappstudio.doapp.debug.TEST_HEALTH" />
                 <action android:name="com.evansappstudio.doapp.debug.NOTE_LATE" />
+                <action android:name="com.evansappstudio.doapp.debug.FAKE_PURCHASE" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_UNLOCK" />
+                <action android:name="com.evansappstudio.doapp.debug.EXPORT" />
+                <action android:name="com.evansappstudio.doapp.debug.IMPORT" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_BACKUP" />
+                <action android:name="com.evansappstudio.doapp.debug.CONFIG_BACKUP_FOLDER" />
+                <action android:name="com.evansappstudio.doapp.debug.AUTO_BACKUP" />
+                <action android:name="com.evansappstudio.doapp.debug.SET_TITLE" />
             </intent-filter>
         </receiver>
     </application>
