@@ -59,6 +59,9 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_CONFIG_PARSE -> configParse(context, intent)
             ACTION_CONFIG_ALERT_DEFAULT -> configAlertDefault(context, intent)
             ACTION_DUMP_ALERT -> dumpAlert(context, intent)
+            ACTION_DUMP_HEALTH -> dumpHealth(context)
+            ACTION_TEST_HEALTH -> testHealth(context)
+            ACTION_NOTE_LATE -> noteLate(context, intent)
         }
     }
 
@@ -632,6 +635,54 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun dumpHealth(context: Context) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.health.dump()
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun testHealth(context: Context) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm health-test user locked")
+            pending.finish()
+            return
+        }
+        app.container.scope.launch {
+            try {
+                app.container.health.armTest()
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun noteLate(context: Context, intent: Intent) {
+        val lagMs = if (intent.hasExtra(EXTRA_LAG_MS)) intent.getLongExtra(EXTRA_LAG_MS, 0L) else 0L
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.health.noteSyntheticLate(lagMs)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     companion object {
         const val ACTION_ADD = "com.evansappstudio.doapp.debug.ADD"
         const val ACTION_DONE = "com.evansappstudio.doapp.debug.DONE"
@@ -650,6 +701,9 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_CONFIG_PARSE = "com.evansappstudio.doapp.debug.CONFIG_PARSE"
         const val ACTION_CONFIG_ALERT_DEFAULT = "com.evansappstudio.doapp.debug.CONFIG_ALERT_DEFAULT"
         const val ACTION_DUMP_ALERT = "com.evansappstudio.doapp.debug.DUMP_ALERT"
+        const val ACTION_DUMP_HEALTH = "com.evansappstudio.doapp.debug.DUMP_HEALTH"
+        const val ACTION_TEST_HEALTH = "com.evansappstudio.doapp.debug.TEST_HEALTH"
+        const val ACTION_NOTE_LATE = "com.evansappstudio.doapp.debug.NOTE_LATE"
         const val EXTRA_TITLE = "title"
         const val EXTRA_IN_SECONDS = "inSeconds"
         const val EXTRA_NAG_MINUTES = "nagMinutes"
@@ -673,6 +727,7 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_PARSE = "parse"
         const val EXTRA_ALERT = "alert"
         const val EXTRA_LEVEL = "level"
+        const val EXTRA_LAG_MS = "lagMs"
         private const val MAX_APPLY_COUNT = 1_000
         private const val MAX_DUMP_COUNT = 24
     }

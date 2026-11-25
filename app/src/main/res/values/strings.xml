@@ -117,4 +117,13 @@
     <string name="repeat_warning_title">Off the pattern</string>
     <string name="repeat_warning_body">This due time no longer matches the repeat. Apply it to all future occurrences?</string>
     <string name="restore_prompts">Restore warnings and prompts</string>
+    <string name="health_check">Health check</string>
+    <string name="health_lead">These checks look for anything that would stop reminders firing or nagging.</string>
+    <string name="health_test_button">Test alarm in 1 minute</string>
+    <string name="health_menu">Menu</string>
+    <string name="health_menu_warning">Menu, health warning</string>
+    <string name="health_status_ok">OK</string>
+    <string name="health_status_warning">Warning</string>
+    <string name="health_status_blocked">Blocked</string>
+    <string name="health_status_check">Check</string>
 </resources>

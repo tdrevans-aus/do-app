@@ -25,6 +25,9 @@
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_PARSE" />
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_ALERT_DEFAULT" />
                 <action android:name="com.evansappstudio.doapp.debug.DUMP_ALERT" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_HEALTH" />
+                <action android:name="com.evansappstudio.doapp.debug.TEST_HEALTH" />
+                <action android:name="com.evansappstudio.doapp.debug.NOTE_LATE" />
             </intent-filter>
         </receiver>
     </application>
