@@ -35,11 +35,14 @@
             android:exported="false" />
 
         <receiver
+<<<<<<< HEAD
             android:name=".alarm.SnoozeReceiver"
             android:directBootAware="true"
             android:exported="false" />
 
         <receiver
+=======
+>>>>>>> origin/main
             android:name=".alarm.RescheduleReceiver"
             android:directBootAware="true"
             android:exported="true">

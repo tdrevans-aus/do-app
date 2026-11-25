@@ -9,8 +9,11 @@ import com.evansappstudio.doapp.UserUnlock
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.DoneReceiver
 import com.evansappstudio.doapp.alarm.NagSchedule
+<<<<<<< HEAD
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
+=======
+>>>>>>> origin/main
 import kotlinx.coroutines.launch
 
 /**
@@ -22,8 +25,11 @@ class DebugReceiver : BroadcastReceiver() {
         when (intent.action) {
             ACTION_ADD -> add(context, intent)
             ACTION_DONE -> done(context, intent)
+<<<<<<< HEAD
             ACTION_SNOOZE -> snooze(context, intent)
             ACTION_CONFIG_SNOOZE -> configSnooze(context, intent)
+=======
+>>>>>>> origin/main
         }
     }
 
@@ -75,6 +81,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+<<<<<<< HEAD
     private fun snooze(context: Context, intent: Intent) {
         val id = DoneReceiver.longExtra(intent)
         if (id == null) {
@@ -144,5 +151,13 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_OPTION = "option"
         const val EXTRA_KIND = "kind"
         const val EXTRA_VALUE = "value"
+=======
+    companion object {
+        const val ACTION_ADD = "com.evansappstudio.doapp.debug.ADD"
+        const val ACTION_DONE = "com.evansappstudio.doapp.debug.DONE"
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_IN_SECONDS = "inSeconds"
+        const val EXTRA_NAG_MINUTES = "nagMinutes"
+>>>>>>> origin/main
     }
 }
