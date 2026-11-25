@@ -23,12 +23,12 @@ Taps stack and can be mixed. Tapping +10 min twice adds 20 minutes. Tapping 6:30
 | Row | Slots | Buttons |
 |---|---|---|
 | 1. Set a time | 0-3 | 9:30 am, 12:00 pm, 6:30 pm, 10:00 pm |
-| 2. Move later | 4-7 | +10 min, +1 hr, +3 hr, +1 day |
-| 3. Move earlier | 8-11 | -10 min, -1 hr, -3 hr, -1 day |
+| 2. Move later | 4-7 | +10 min., +1 hr, +3 hrs, +1 day |
+| 3. Move earlier | 8-11 | -10 min., -1 hr, -3 hrs, -1 day |
 
 Store each slot as kind (`AT_TIME` or `FROM_NOW`), a non-zero signed `amount`, and a unit (`MINUTE`, `HOUR`, `DAY`, `WEEK`). At Time stores minutes-from-midnight (0 to 1439) in `amount` and ignores unit. Do not flatten days into 1440 minutes: +1 day and +1 week keep local wall time (see DST). Reuse the At Time / From Now chooser idea from Spec 2's snooze settings, with the From Now wheel offering minute, hour, day and week, and both signs (Due's customise wheel). Amount 0 is invalid and is rejected.
 
-**Button labels.** Copy Due's short forms: `+10 min`, `+1 hr`, `+3 hr`, `+1 day`, and the matching minus labels. Pluralise only the count (`+2 days`, `+2 weeks`, `+5 min`, `+2 hr`). At Time follows the device 12/24-hour setting and the device locale: `9:30 am`, `12:00 pm`, `6:30 pm`, `10:00 pm` in 12-hour; `09:30`, `12:00`, `18:30`, `22:00` in 24-hour. Leave the Spec 2 snooze labels (`+1 hour`, `+3 hours`) alone.
+**Button labels.** Copy Due 26.6.1: `+10 min.`, `+1 hr`, `+3 hrs`, `+1 day`, and the matching minus labels (`-10 min.`, `-3 hrs`). The 10-minute slots take a full stop. The 3-hour slots use `hrs`. Other counts stay unpluralised hours and minutes without a stop (`+2 days`, `+2 weeks`, `+5 min`, `+2 hr`). At Time follows the device 12/24-hour setting and the device locale: `9:30 am`, `12:00 pm`, `6:30 pm`, `10:00 pm` in 12-hour; `09:30`, `12:00`, `18:30`, `22:00` in 24-hour. Leave the Spec 2 snooze labels (`+1 hour`, `+3 hours`) alone.
 
 **Date banner and time picker.** The banner above the grid always shows the draft due (local date and time, plus a short relative phrase such as "in 18 hours" or "1 hour ago"). It turns red when the draft is due or overdue (`dueAt <= now`). Tapping the banner opens the existing date and time pickers. A picker change updates the draft and the banner; the next Quick Times tap uses that new draft as its base. The editor time picker must follow the device 12/24-hour setting (it is currently hardcoded to 24-hour; fix that here). The separate Pick date / Pick time buttons may stay as a second way in, or be folded into the banner. New reminders keep today's starting draft of now plus 5 minutes (already in the form). Quick Times then apply from that draft.
 
@@ -103,7 +103,7 @@ Setup, package, tolerance and `.debug.ADD` / `.debug.DONE` are as in Spec 1. New
 ## 7. Gareth calls
 Defaults Jim should build to, unless Tim walks them back:
 
-1. **Factory slots are Due's screenshot:** 9:30 am, 12:00 pm, 6:30 pm, 10:00 pm, +10 min, +1 hr, +3 hr, +1 day, -10 min, -1 hr, -3 hr, -1 day.
+1. **Factory slots are Due's screenshot:** 9:30 am, 12:00 pm, 6:30 pm, 10:00 pm, +10 min., +1 hr, +3 hrs, +1 day, -10 min., -1 hr, -3 hrs, -1 day.
 2. **+1 day and +1 week keep local wall time** when applied to a due date. Due's postpone help says adding days should keep the original time of day. This is not Spec 2's snooze +1 day (24 hours from now).
 3. **At Time lands on the current due date first,** and only rolls forward if that instant is not after now.
 4. **Postpone default is Auto,** with Due's 2:30 pm / 2:43 pm table as the fixture.

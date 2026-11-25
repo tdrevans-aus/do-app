@@ -84,6 +84,24 @@ class SettingsStore(context: Context) {
             .commit()
     }
 
+    /** Factory is prompt each time. Always-this is opt-in. */
+    fun repeatPromptMode(): RepeatPromptMode =
+        RepeatPromptMode.fromName(prefs.getString(KEY_REPEAT_PROMPT, null)) ?: RepeatPromptMode.PROMPT
+
+    fun weekStart(): WeekStart =
+        WeekStart.fromName(prefs.getString(KEY_WEEK_START, null)) ?: WeekStart.DEFAULT
+
+    @SuppressLint("ApplySharedPref")
+    fun setWeekStart(start: WeekStart) {
+        prefs.edit().putString(KEY_WEEK_START, start.name).commit()
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun setRepeatPromptMode(mode: RepeatPromptMode) {
+        // commit, not apply: QA kills the process immediately after CONFIG_REPEAT_PROMPT.
+        prefs.edit().putString(KEY_REPEAT_PROMPT, mode.name).commit()
+    }
+
     @SuppressLint("ApplySharedPref")
     fun setPostponeMode(mode: PostponeMode) {
         // commit, not apply: QA kills the process immediately after CONFIG_POSTPONE.
@@ -119,6 +137,8 @@ class SettingsStore(context: Context) {
         const val KEY_DEFAULT_NAG = "default_nag_minutes"
         const val KEY_ASKED_NOTIFICATIONS = "asked_post_notifications"
         const val KEY_QAT_POSTPONE = "qat_postpone"
+        const val KEY_REPEAT_PROMPT = "repeat_prompt"
+        const val KEY_WEEK_START = "week_start"
         const val DEFAULT_NAG_MINUTES = 5
     }
 }

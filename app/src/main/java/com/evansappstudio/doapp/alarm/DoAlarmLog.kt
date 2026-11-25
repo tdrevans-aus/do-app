@@ -46,6 +46,30 @@ object DoAlarmLog {
         Log.e(TAG, "DoAlarm inexact alarm failed id=$id", error)
     }
 
+    fun repeat(id: Long, rule: String, from: String, dueAt: Long, patternDue: Long?, next: String?) {
+        val pattern = patternDue?.toString() ?: "null"
+        val tail = if (next == null) "" else " next=$next"
+        Log.i(TAG, "DoAlarm repeat id=$id rule=$rule from=$from dueAt=$dueAt patternDue=$pattern$tail")
+    }
+
+    fun repeatNext(id: Long, index: Int, at: Long) {
+        Log.i(TAG, "DoAlarm repeat-next id=$id i=$index at=$at")
+    }
+
+    fun repeatAdvance(id: Long, newDue: Long, patternDue: Long?, from: String) {
+        val pattern = patternDue?.toString() ?: "null"
+        Log.i(TAG, "DoAlarm repeat-advance id=$id newDue=$newDue patternDue=$pattern from=$from")
+    }
+
+    fun shiftDue(id: Long, newDue: Long, mode: String, patternDue: Long?) {
+        val pattern = patternDue?.toString() ?: "null"
+        Log.i(TAG, "DoAlarm shift-due id=$id newDue=$newDue mode=$mode patternDue=$pattern")
+    }
+
+    fun configRepeatPrompt(value: String) {
+        Log.i(TAG, "DoAlarm config-repeat-prompt value=$value")
+    }
+
     fun handlingFailed(id: Long, error: Throwable) {
         Log.e(TAG, "DoAlarm handling failed id=$id", error)
     }

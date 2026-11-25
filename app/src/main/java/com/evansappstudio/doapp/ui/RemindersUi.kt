@@ -72,7 +72,14 @@ import com.evansappstudio.doapp.alarm.QuickTimeBase
 import com.evansappstudio.doapp.alarm.QuickTimeDay
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimes
+import com.evansappstudio.doapp.alarm.RepeatText
+import com.evansappstudio.doapp.data.DueShiftMode
 import com.evansappstudio.doapp.data.Reminder
+import com.evansappstudio.doapp.data.RepeatChoice
+import com.evansappstudio.doapp.data.RepeatPresets
+import com.evansappstudio.doapp.data.RepeatPromptMode
+import com.evansappstudio.doapp.data.RepeatRule
+import com.evansappstudio.doapp.data.WeekStart
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalTime
@@ -168,10 +175,13 @@ fun ReminderApp(
             initialNagMinutes = viewModel.defaultNagMinutes,
             saveEnabled = true,
             onBack = { screen = SCREEN_LIST },
-            onSave = { title, dueAt, nagMinutes ->
-                viewModel.add(title, dueAt, nagMinutes)
+            onSave = { title, dueAt, nagMinutes, rule, _ ->
+                viewModel.add(title, dueAt, nagMinutes, rule)
                 screen = SCREEN_LIST
             },
+            promptMode = viewModel::repeatPromptMode,
+            onPromptMode = viewModel::setRepeatPromptMode,
+            weekStart = viewModel.weekStart(),
             requestNotificationsFirst = {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     !AlarmPermissions.canPostNotifications(context) &&
@@ -328,6 +338,7 @@ private fun ReminderRow(
     onDone: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val is24Hour = rememberIs24Hour()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -342,6 +353,18 @@ private fun ReminderRow(
                 textDecoration = if (reminder.isDone) TextDecoration.LineThrough else null,
             )
             Text(text = formatDue(reminder.dueAt), style = MaterialTheme.typography.bodyMedium)
+            val repeatLine = reminder.repeatRule()?.let { rule ->
+                RepeatText.describe(
+                    rule,
+                    reminder.dueAt,
+                    ZoneId.systemDefault(),
+                    is24Hour,
+                    deviceLocale(),
+                )
+            }
+            if (repeatLine != null) {
+                Text(text = repeatLine, style = MaterialTheme.typography.bodySmall)
+            }
             Text(
                 text = stringResource(R.string.list_nag, formatNag(reminder.nagMinutes)),
                 style = MaterialTheme.typography.bodySmall,
@@ -387,12 +410,17 @@ private fun EditReminderScreen(
                 initialTitle = current.title,
                 initialDueAt = current.dueAt,
                 initialNagMinutes = current.nagMinutes ?: 0,
+                initialRule = current.repeatRule(),
+                initialPatternDueAt = current.patternDueAt,
                 saveEnabled = !current.isDone,
                 onBack = onBack,
-                onSave = { title, dueAt, nagMinutes ->
-                    viewModel.update(current.id, title, dueAt, nagMinutes)
+                onSave = { title, dueAt, nagMinutes, rule, shift ->
+                    viewModel.update(current.id, title, dueAt, nagMinutes, rule, shift)
                     onBack()
                 },
+                promptMode = viewModel::repeatPromptMode,
+                onPromptMode = viewModel::setRepeatPromptMode,
+                weekStart = viewModel.weekStart(),
                 requestNotificationsFirst = { false },
                 onNotificationPrompt = {},
                 onPermissionResult = {},
@@ -433,9 +461,14 @@ private fun ReminderFormScreen(
     initialTitle: String,
     initialDueAt: Long?,
     initialNagMinutes: Int,
+    initialRule: RepeatRule? = null,
+    initialPatternDueAt: Long? = null,
     saveEnabled: Boolean,
     onBack: () -> Unit,
-    onSave: (title: String, dueAt: Long, nagMinutes: Int?) -> Unit,
+    onSave: (title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, shift: DueShiftMode?) -> Unit,
+    promptMode: () -> RepeatPromptMode,
+    onPromptMode: (RepeatPromptMode) -> Unit,
+    weekStart: WeekStart,
     requestNotificationsFirst: () -> Boolean,
     onNotificationPrompt: () -> Unit,
     onPermissionResult: () -> Unit,
@@ -449,36 +482,60 @@ private fun ReminderFormScreen(
     var draftDueAt by rememberSaveable(formKey) { mutableLongStateOf(initialDraft) }
     var draftExact by rememberSaveable(formKey) { mutableStateOf(false) }
     var nagMinutes by rememberSaveable(formKey) { mutableIntStateOf(initialNagMinutes) }
+    var ruleText by rememberSaveable(formKey) { mutableStateOf(RepeatRule.encodeDraft(initialRule)) }
+    var patternText by rememberSaveable(formKey) {
+        mutableStateOf(initialPatternDueAt?.toString().orEmpty())
+    }
     var showDate by rememberSaveable(formKey) { mutableStateOf(false) }
     var showTime by rememberSaveable(formKey) { mutableStateOf(false) }
     var openTimeAfterDate by rememberSaveable(formKey) { mutableStateOf(false) }
     var saveAfterPermission by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showRepeatMenu by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showCustom by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showDuePrompt by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showPatternWarning by rememberSaveable(formKey) { mutableStateOf(false) }
     val is24Hour = rememberIs24Hour()
+    val locale = deviceLocale()
+    val draftRule = RepeatRule.decodeDraft(ruleText)
+    val patternDueAt = patternText.toLongOrNull()
 
     val dueAt = if (draftExact) draftDueAt else dueToSave(initialDueAt, draftDueAt)
+
+    fun moveDraftDue(newDue: Long, exact: Boolean) {
+        val zone = ZoneId.systemDefault()
+        if (initialDueAt == null && draftRule != null) {
+            val retargeted = RepeatPresets.retargetIfPreset(draftRule, draftDueAt, newDue, zone)
+            if (retargeted != null) {
+                ruleText = RepeatRule.encodeDraft(retargeted)
+                patternText = newDue.toString()
+            }
+        }
+        draftDueAt = newDue
+        draftExact = exact
+    }
 
     fun applyDate(dateMillis: Long) {
         val zone = ZoneId.systemDefault()
         val current = Instant.ofEpochMilli(draftDueAt).atZone(zone)
         val date = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
-        draftDueAt = ZonedDateTime.of(date, LocalTime.of(current.hour, current.minute), zone)
+        val next = ZonedDateTime.of(date, LocalTime.of(current.hour, current.minute), zone)
             .toInstant()
             .toEpochMilli()
-        draftExact = false
+        moveDraftDue(next, exact = false)
     }
 
     fun applyClock(hour: Int, minute: Int) {
         val zone = ZoneId.systemDefault()
         val date = Instant.ofEpochMilli(draftDueAt).atZone(zone).toLocalDate()
-        draftDueAt = ZonedDateTime.of(date, LocalTime.of(hour, minute), zone)
+        val next = ZonedDateTime.of(date, LocalTime.of(hour, minute), zone)
             .toInstant()
             .toEpochMilli()
-        draftExact = false
+        moveDraftDue(next, exact = false)
     }
 
     fun applyQuick(index: Int, base: QuickTimeBase?, day: QuickTimeDay?) {
         val slot = quickSlots.getOrNull(index) ?: return
-        draftDueAt = QuickTimes.apply(
+        val next = QuickTimes.apply(
             slot = slot,
             draftDueAt = draftDueAt,
             now = System.currentTimeMillis(),
@@ -487,15 +544,33 @@ private fun ReminderFormScreen(
             base = base,
             day = day,
         )
-        draftExact = true
+        moveDraftDue(next, exact = true)
     }
+
+    fun persist(shift: DueShiftMode?) {
+        onSave(title, dueAt, nagMinutes.takeIf { it != 0 }, draftRule, shift)
+    }
+
+    fun finishSave() {
+        if (title.isBlank()) return
+        if (saveNeedsPrompt(initialDueAt, dueAt, draftRule, promptMode() == RepeatPromptMode.PROMPT)) {
+            showDuePrompt = true
+            return
+        }
+        val shift = dueShiftForSave(
+            initialDueAt,
+            dueAt,
+            draftRule,
+            prompts = promptMode() == RepeatPromptMode.PROMPT,
+        )
+        persist(shift)
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
         onPermissionResult()
-        if (saveAfterPermission && title.isNotBlank()) {
-            onSave(title, dueAt, nagMinutes.takeIf { it != 0 })
-        }
+        if (saveAfterPermission) finishSave()
         saveAfterPermission = false
     }
 
@@ -506,8 +581,29 @@ private fun ReminderFormScreen(
             onNotificationPrompt()
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            onSave(title, dueAt, nagMinutes.takeIf { it != 0 })
+            finishSave()
         }
+    }
+
+    if (showCustom) {
+        CustomRepeatScreen(
+            initial = draftRule,
+            draftDueAt = draftDueAt,
+            patternDueAt = patternDueAt,
+            is24Hour = is24Hour,
+            weekStart = weekStart,
+            onAccept = { accepted ->
+                ruleText = RepeatRule.encodeDraft(accepted)
+                patternText = if (accepted.from == com.evansappstudio.doapp.data.RepeatFrom.COMPLETION) {
+                    ""
+                } else {
+                    patternText.ifBlank { draftDueAt.toString() }
+                }
+                showCustom = false
+            },
+            onBack = { showCustom = false },
+        )
+        return
     }
 
     Scaffold(
@@ -516,6 +612,19 @@ private fun ReminderFormScreen(
                 title = { Text(heading) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+                },
+                actions = {
+                    val repeating = draftRule != null
+                    TextButton(onClick = { showRepeatMenu = true }) {
+                        Text(
+                            text = stringResource(R.string.repeat_button),
+                            color = if (repeating) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outline
+                            },
+                        )
+                    }
                 },
             )
         },
@@ -539,14 +648,36 @@ private fun ReminderFormScreen(
                 text = stringResource(R.string.quick_times),
                 style = MaterialTheme.typography.titleSmall,
             )
-            QuickTimesBanner(
-                draftDueAt = draftDueAt,
-                is24Hour = is24Hour,
-                onClick = {
-                    openTimeAfterDate = true
-                    showDate = true
-                },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                QuickTimesBanner(
+                    draftDueAt = draftDueAt,
+                    is24Hour = is24Hour,
+                    onClick = {
+                        openTimeAfterDate = true
+                        showDate = true
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                val offPattern = draftRule?.from == com.evansappstudio.doapp.data.RepeatFrom.DUE_DATE &&
+                    patternDueAt != null &&
+                    patternDueAt != dueAt
+                if (offPattern) {
+                    TextButton(onClick = { showPatternWarning = true }) {
+                        Text(stringResource(R.string.repeat_warning))
+                    }
+                }
+            }
+            if (draftRule != null) {
+                Text(
+                    text = RepeatText.describe(
+                        draftRule,
+                        dueAt,
+                        ZoneId.systemDefault(),
+                        is24Hour,
+                        locale,
+                    ),
+                )
+            }
             QuickTimesGrid(
                 slots = quickSlots,
                 is24Hour = is24Hour,
@@ -638,6 +769,57 @@ private fun ReminderFormScreen(
                 TextButton(onClick = { showTime = false }) { Text(stringResource(R.string.cancel)) }
             },
             text = { TimePicker(state = state) },
+        )
+    }
+
+    if (showRepeatMenu) {
+        RepeatMenuDialog(
+            dueAt = draftDueAt,
+            rule = draftRule,
+            patternDueAt = patternDueAt,
+            is24Hour = is24Hour,
+            weekStart = weekStart,
+            onSelect = { choice ->
+                showRepeatMenu = false
+                if (choice == RepeatChoice.CUSTOM) {
+                    showCustom = true
+                } else if (choice == RepeatChoice.OFF) {
+                    ruleText = ""
+                    patternText = ""
+                } else {
+                    val selected = RepeatText.presetRule(choice, draftDueAt, ZoneId.systemDefault())
+                    ruleText = RepeatRule.encodeDraft(selected)
+                    patternText = draftDueAt.toString()
+                }
+            },
+            onDismiss = { showRepeatMenu = false },
+        )
+    }
+    if (showDuePrompt) {
+        DueShiftDialog(
+            onThis = {
+                showDuePrompt = false
+                persist(DueShiftMode.THIS)
+            },
+            onAll = {
+                showDuePrompt = false
+                persist(DueShiftMode.ALL)
+            },
+            onAlways = {
+                showDuePrompt = false
+                onPromptMode(RepeatPromptMode.ALWAYS_THIS)
+                persist(DueShiftMode.THIS)
+            },
+            onDismiss = { showDuePrompt = false },
+        )
+    }
+    if (showPatternWarning) {
+        PatternWarningDialog(
+            onApply = {
+                showPatternWarning = false
+                persist(DueShiftMode.ALL)
+            },
+            onDismiss = { showPatternWarning = false },
         )
     }
 }

@@ -289,8 +289,10 @@ object QuickTimes {
     private fun adjustmentLabel(amount: Int, unit: QuickTimeUnit): String {
         val count = abs(amount)
         val word = when (unit) {
-            QuickTimeUnit.MINUTE -> "min"
-            QuickTimeUnit.HOUR -> "hr"
+            // Due 26.6.1 writes the 10-minute slots as "min." and the 3-hour slots as "hrs".
+            // Other counts stay "min" and "hr" (+5 min, +2 hr).
+            QuickTimeUnit.MINUTE -> if (count == 10) "min." else "min"
+            QuickTimeUnit.HOUR -> if (count == 3) "hrs" else "hr"
             QuickTimeUnit.DAY -> if (count == 1) "day" else "days"
             QuickTimeUnit.WEEK -> if (count == 1) "week" else "weeks"
         }

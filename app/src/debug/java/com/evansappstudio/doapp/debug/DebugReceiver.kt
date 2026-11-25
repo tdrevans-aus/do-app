@@ -16,8 +16,16 @@ import com.evansappstudio.doapp.alarm.QuickTimeDay
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimeUnit
 import com.evansappstudio.doapp.alarm.QuickTimes
+import com.evansappstudio.doapp.alarm.RepeatMath
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.data.DueShiftMode
+import com.evansappstudio.doapp.data.MonthOn
+import com.evansappstudio.doapp.data.RepeatFrom
+import com.evansappstudio.doapp.data.RepeatPromptMode
+import com.evansappstudio.doapp.data.RepeatRule
+import com.evansappstudio.doapp.data.RepeatUnit
+import com.evansappstudio.doapp.data.WeekDay
 import kotlinx.coroutines.launch
 import java.time.ZoneId
 import java.util.Locale
@@ -37,6 +45,10 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_CONFIG_POSTPONE -> configPostpone(context, intent)
             ACTION_DUMP_QAT -> dumpQat(context)
             ACTION_APPLY_QAT -> applyQat(context, intent)
+            ACTION_SET_REPEAT -> setRepeat(context, intent)
+            ACTION_DUMP_REPEAT -> dumpRepeat(context, intent)
+            ACTION_SHIFT_DUE -> shiftDue(context, intent)
+            ACTION_CONFIG_REPEAT_PROMPT -> configRepeatPrompt(context, intent)
         }
     }
 
@@ -63,8 +75,24 @@ class DebugReceiver : BroadcastReceiver() {
         }
         app.container.scope.launch {
             try {
-                val id = app.container.scheduler.add(title, dueAt, nagMinutes)
+                val rule = repeatFromIntent(intent)
+                if (rule == null && !repeatUnitIsOff(intent)) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad repeat")
+                    return@launch
+                }
+                val id = app.container.scheduler.add(title, dueAt, nagMinutes, rule)
                 DoAlarmLog.debugAdd(id, dueAt, nagMinutes)
+                if (rule != null) {
+                    val stored = app.container.reminderDao().getById(id)
+                    DoAlarmLog.repeat(
+                        id = id,
+                        rule = rule.token(),
+                        from = rule.from.name,
+                        dueAt = stored?.dueAt ?: dueAt,
+                        patternDue = stored?.patternDueAt,
+                        next = null,
+                    )
+                }
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             } finally {
@@ -244,7 +272,22 @@ class DebugReceiver : BroadcastReceiver() {
                     base = from,
                     day = day,
                 )
-                app.container.scheduler.update(id, reminder.title, newDue, reminder.nagMinutes)
+                val rule = reminder.repeatRule()
+                val shift = if (
+                    newDue != reminder.dueAt && rule?.from == RepeatFrom.DUE_DATE
+                ) {
+                    DueShiftMode.THIS
+                } else {
+                    null
+                }
+                app.container.scheduler.update(
+                    id,
+                    reminder.title,
+                    newDue,
+                    reminder.nagMinutes,
+                    rule,
+                    shift,
+                )
                 DoAlarmLog.qat(id, newDue, slotIndex)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
@@ -252,6 +295,170 @@ class DebugReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+    }
+
+    private fun setRepeat(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        if (id == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat missing id")
+            return
+        }
+        val rule = repeatFromIntent(intent)
+        if (rule == null && !repeatUnitIsOff(intent)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat bad args")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat user locked")
+            pending.finish()
+            return
+        }
+        app.container.scope.launch {
+            try {
+                app.container.scheduler.setRepeat(id, rule)
+                val stored = app.container.reminderDao().getById(id)
+                if (stored == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat missing id=$id")
+                } else {
+                    DoAlarmLog.repeat(
+                        id = id,
+                        rule = stored.repeatRule()?.token() ?: "OFF",
+                        from = stored.repeatRule()?.from?.name ?: "none",
+                        dueAt = stored.dueAt,
+                        patternDue = stored.patternDueAt,
+                        next = null,
+                    )
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun dumpRepeat(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        if (id == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm dump-repeat missing id")
+            return
+        }
+        val count = if (intent.hasExtra(EXTRA_COUNT)) intent.getIntExtra(EXTRA_COUNT, 6) else 6
+        if (count !in 1..MAX_DUMP_COUNT) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm dump-repeat bad count")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm dump-repeat user locked")
+            pending.finish()
+            return
+        }
+        app.container.scope.launch {
+            try {
+                val reminder = app.container.reminderDao().getById(id)
+                if (reminder == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm dump-repeat missing id=$id")
+                    return@launch
+                }
+                val rule = reminder.repeatRule()
+                if (rule == null) {
+                    DoAlarmLog.repeat(id, "OFF", "none", reminder.dueAt, null, null)
+                    return@launch
+                }
+                if (rule.from == RepeatFrom.COMPLETION) {
+                    DoAlarmLog.repeat(
+                        id = id,
+                        rule = rule.token(),
+                        from = rule.from.name,
+                        dueAt = reminder.dueAt,
+                        patternDue = null,
+                        next = "completion",
+                    )
+                    return@launch
+                }
+                DoAlarmLog.repeat(
+                    id = id,
+                    rule = rule.token(),
+                    from = rule.from.name,
+                    dueAt = reminder.dueAt,
+                    patternDue = reminder.patternDueAt,
+                    next = null,
+                )
+                val sequence = RepeatMath.sequence(
+                    dueAt = reminder.dueAt,
+                    patternDueAt = reminder.patternDueAt,
+                    rule = rule,
+                    zone = ZoneId.systemDefault(),
+                    count = count,
+                    weekStart = app.container.settings.weekStart(),
+                )
+                sequence.forEachIndexed { index, at -> DoAlarmLog.repeatNext(id, index, at) }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun shiftDue(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        val mode = DueShiftMode.fromName(intent.getStringExtra(EXTRA_MODE))
+        if (id == null || mode == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm shift-due bad args")
+            return
+        }
+        val hasDue = intent.hasExtra(EXTRA_DUE_AT)
+        val hasIn = intent.hasExtra(EXTRA_IN_SECONDS)
+        if (!hasDue && !hasIn) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm shift-due bad args")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm shift-due user locked")
+            pending.finish()
+            return
+        }
+        val newDue = if (hasDue) {
+            intent.getLongExtra(EXTRA_DUE_AT, 0L)
+        } else {
+            System.currentTimeMillis() + intent.getIntExtra(EXTRA_IN_SECONDS, 0).toLong() * 1000L
+        }
+        app.container.scope.launch {
+            try {
+                val stored = app.container.scheduler.shiftDue(id, newDue, mode)
+                if (stored == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm shift-due missing id=$id")
+                } else {
+                    DoAlarmLog.shiftDue(id, stored.dueAt, mode.name, stored.patternDueAt)
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun configRepeatPrompt(context: Context, intent: Intent) {
+        val mode = RepeatPromptMode.fromName(intent.getStringExtra(EXTRA_VALUE))
+        if (mode == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-repeat-prompt bad args")
+            return
+        }
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-repeat-prompt user locked")
+            return
+        }
+        app.container.settings.setRepeatPromptMode(mode)
+        DoAlarmLog.configRepeatPrompt(mode.name)
     }
 
     companion object {
@@ -263,6 +470,10 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_CONFIG_POSTPONE = "com.evansappstudio.doapp.debug.CONFIG_POSTPONE"
         const val ACTION_DUMP_QAT = "com.evansappstudio.doapp.debug.DUMP_QAT"
         const val ACTION_APPLY_QAT = "com.evansappstudio.doapp.debug.APPLY_QAT"
+        const val ACTION_SET_REPEAT = "com.evansappstudio.doapp.debug.SET_REPEAT"
+        const val ACTION_DUMP_REPEAT = "com.evansappstudio.doapp.debug.DUMP_REPEAT"
+        const val ACTION_SHIFT_DUE = "com.evansappstudio.doapp.debug.SHIFT_DUE"
+        const val ACTION_CONFIG_REPEAT_PROMPT = "com.evansappstudio.doapp.debug.CONFIG_REPEAT_PROMPT"
         const val EXTRA_TITLE = "title"
         const val EXTRA_IN_SECONDS = "inSeconds"
         const val EXTRA_NAG_MINUTES = "nagMinutes"
@@ -275,6 +486,38 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_COUNT = "count"
         const val EXTRA_FROM = "from"
         const val EXTRA_DAY = "day"
+        const val EXTRA_INTERVAL = "interval"
+        const val EXTRA_WEEK_DAYS = "weekDays"
+        const val EXTRA_MONTH_ON = "monthOn"
+        const val EXTRA_DUE_AT = "dueAt"
+        const val EXTRA_MODE = "mode"
         private const val MAX_APPLY_COUNT = 1_000
+        private const val MAX_DUMP_COUNT = 24
     }
+}
+
+private fun repeatUnitIsOff(intent: Intent): Boolean {
+    val unit = intent.getStringExtra(DebugReceiver.EXTRA_UNIT)?.trim()
+    return unit.isNullOrEmpty() || unit.equals("OFF", ignoreCase = true)
+}
+
+private fun repeatFromIntent(intent: Intent): RepeatRule? {
+    if (repeatUnitIsOff(intent)) return null
+    val unit = RepeatUnit.fromName(intent.getStringExtra(DebugReceiver.EXTRA_UNIT)?.trim()?.uppercase())
+        ?: return null
+    val interval = if (intent.hasExtra(DebugReceiver.EXTRA_INTERVAL)) {
+        intent.getIntExtra(DebugReceiver.EXTRA_INTERVAL, 1)
+    } else {
+        1
+    }
+    val fromRaw = intent.getStringExtra(DebugReceiver.EXTRA_FROM)
+    val from = if (fromRaw.isNullOrBlank()) {
+        RepeatFrom.DUE_DATE
+    } else {
+        RepeatFrom.fromName(fromRaw.trim().uppercase()) ?: return null
+    }
+    val days = WeekDay.parseList(intent.getStringExtra(DebugReceiver.EXTRA_WEEK_DAYS)) ?: return null
+    val monthRaw = intent.getStringExtra(DebugReceiver.EXTRA_MONTH_ON)
+    val month = if (monthRaw.isNullOrBlank()) null else MonthOn.parse(monthRaw) ?: return null
+    return RepeatRule.of(interval, unit, from, days, month)
 }
