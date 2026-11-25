@@ -1,16 +1,11 @@
 package com.evansappstudio.doapp.data
 
-<<<<<<< HEAD
 import android.annotation.SuppressLint
 import android.content.Context
 import com.evansappstudio.doapp.alarm.NagSchedule
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
-=======
-import android.content.Context
-import com.evansappstudio.doapp.alarm.NagSchedule
->>>>>>> origin/main
 
 /**
  * App settings. The default nag for a new reminder is 5 minutes.
@@ -37,7 +32,6 @@ class SettingsStore(context: Context) {
         prefs.edit().putBoolean(KEY_ASKED_NOTIFICATIONS, true).apply()
     }
 
-<<<<<<< HEAD
     /** Three one-tap snoozes. Missing keys stay on the factory defaults. */
     fun snoozeOptions(): List<SnoozeOption> = List(SnoozeDue.DEFAULTS.size) { index ->
         val kind = SnoozeKind.fromName(prefs.getString(snoozeKindKey(index), null))
@@ -64,8 +58,6 @@ class SettingsStore(context: Context) {
 
     private fun snoozeValueKey(index: Int) = "snooze_${index}_value"
 
-=======
->>>>>>> origin/main
     private companion object {
         const val PREFS = "do_settings"
         const val KEY_DEFAULT_NAG = "default_nag_minutes"

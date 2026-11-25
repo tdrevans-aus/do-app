@@ -14,11 +14,8 @@ import java.io.File
  * as well as the spec's id, title and next fire time, so a fire before unlock
  * can post the notification and schedule the next anchored nag.
  * nextFireAt null means nag-off has already been delivered.
-<<<<<<< HEAD
  * pendingSnoozeDueAt is a snooze applied before unlock. rescheduleAll writes it
  * to Room. If pendingDone is also set, done wins and the snooze is dropped.
-=======
->>>>>>> origin/main
  */
 data class MirrorEntry(
     val id: Long,
@@ -27,10 +24,7 @@ data class MirrorEntry(
     val nagMinutes: Int?,
     val nextFireAt: Long?,
     val pendingDone: Boolean = false,
-<<<<<<< HEAD
     val pendingSnoozeDueAt: Long? = null,
-=======
->>>>>>> origin/main
 )
 
 class ReminderMirror(context: Context) {
@@ -79,7 +73,6 @@ class ReminderMirror(context: Context) {
                                 item.getLong("nextFireAt")
                             },
                             pendingDone = item.optBoolean("pendingDone", false),
-<<<<<<< HEAD
                             pendingSnoozeDueAt = if (
                                 !item.has("pendingSnoozeDueAt") || item.isNull("pendingSnoozeDueAt")
                             ) {
@@ -87,8 +80,6 @@ class ReminderMirror(context: Context) {
                             } else {
                                 item.getLong("pendingSnoozeDueAt")
                             },
-=======
->>>>>>> origin/main
                         ),
                     )
                 }
@@ -109,12 +100,8 @@ class ReminderMirror(context: Context) {
                     .put("dueAt", entry.dueAt)
                     .put("nagMinutes", entry.nagMinutes ?: JSONObject.NULL)
                     .put("nextFireAt", entry.nextFireAt ?: JSONObject.NULL)
-<<<<<<< HEAD
                     .put("pendingDone", entry.pendingDone)
                     .put("pendingSnoozeDueAt", entry.pendingSnoozeDueAt ?: JSONObject.NULL),
-=======
-                    .put("pendingDone", entry.pendingDone),
->>>>>>> origin/main
             )
         }
         val temp = File(file.parentFile, "$FILE_NAME.tmp")
@@ -130,23 +117,16 @@ class ReminderMirror(context: Context) {
     }
 }
 
-<<<<<<< HEAD
 fun Reminder.toMirror(
     nextFireAt: Long?,
     pendingDone: Boolean = false,
     pendingSnoozeDueAt: Long? = null,
 ): MirrorEntry = MirrorEntry(
-=======
-fun Reminder.toMirror(nextFireAt: Long?, pendingDone: Boolean = false): MirrorEntry = MirrorEntry(
->>>>>>> origin/main
     id = id,
     title = title,
     dueAt = dueAt,
     nagMinutes = nagMinutes,
     nextFireAt = nextFireAt,
     pendingDone = pendingDone,
-<<<<<<< HEAD
     pendingSnoozeDueAt = pendingSnoozeDueAt,
-=======
->>>>>>> origin/main
 )

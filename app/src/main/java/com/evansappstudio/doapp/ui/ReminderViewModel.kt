@@ -4,18 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
-<<<<<<< HEAD
 import com.evansappstudio.doapp.alarm.SnoozeOption
 import com.evansappstudio.doapp.data.Reminder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-=======
-import com.evansappstudio.doapp.data.Reminder
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
->>>>>>> origin/main
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -27,17 +21,13 @@ class ReminderViewModel(
     val reminders: StateFlow<List<Reminder>> = container.reminderDao().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-<<<<<<< HEAD
     private val snoozeOptionState = MutableStateFlow(container.settings.snoozeOptions())
     val snoozeOptions: StateFlow<List<SnoozeOption>> = snoozeOptionState.asStateFlow()
 
-=======
->>>>>>> origin/main
     fun add(title: String, dueAt: Long, nagMinutes: Int?) {
         viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes) }
     }
 
-<<<<<<< HEAD
     fun update(id: Long, title: String, dueAt: Long, nagMinutes: Int?) {
         viewModelScope.launch { container.scheduler.update(id, title, dueAt, nagMinutes) }
     }
@@ -52,8 +42,6 @@ class ReminderViewModel(
         }
     }
 
-=======
->>>>>>> origin/main
     fun markDone(id: Long) {
         viewModelScope.launch { container.scheduler.markDone(id) }
     }

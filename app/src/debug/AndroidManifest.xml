@@ -10,11 +10,8 @@
             <intent-filter>
                 <action android:name="com.evansappstudio.doapp.debug.ADD" />
                 <action android:name="com.evansappstudio.doapp.debug.DONE" />
-<<<<<<< HEAD
                 <action android:name="com.evansappstudio.doapp.debug.SNOOZE" />
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_SNOOZE" />
-=======
->>>>>>> origin/main
             </intent-filter>
         </receiver>
     </application>

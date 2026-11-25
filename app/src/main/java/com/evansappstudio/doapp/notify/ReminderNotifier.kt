@@ -8,13 +8,9 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.net.Uri
-<<<<<<< HEAD
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.RemoteViews
-=======
-import android.provider.Settings
->>>>>>> origin/main
 import androidx.core.app.NotificationCompat
 import com.evansappstudio.doapp.MainActivity
 import com.evansappstudio.doapp.R
@@ -22,30 +18,22 @@ import com.evansappstudio.doapp.UserUnlock
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.DoneReceiver
 import com.evansappstudio.doapp.alarm.ReminderIds
-<<<<<<< HEAD
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeLabels
 import com.evansappstudio.doapp.alarm.SnoozeOption
 import com.evansappstudio.doapp.alarm.SnoozeReceiver
-=======
->>>>>>> origin/main
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-<<<<<<< HEAD
 class ReminderNotifier(
     context: Context,
     private val optionsProvider: () -> List<SnoozeOption>,
 ) {
-=======
-class ReminderNotifier(context: Context) {
->>>>>>> origin/main
     private val appContext = context.applicationContext
 
     fun show(id: Long, title: String, dueAt: Long) {
         try {
-<<<<<<< HEAD
             val others = readPosted().filter { it.id != id }
             val grouped = others.isNotEmpty()
             post(id, title, dueAt, grouped = grouped, alert = true)
@@ -57,9 +45,6 @@ class ReminderNotifier(context: Context) {
             } else {
                 cancelSummary()
             }
-=======
-            showUnchecked(id, title, dueAt)
->>>>>>> origin/main
         } catch (error: Throwable) {
             DoAlarmLog.handlingFailed(id, error)
         }
@@ -68,7 +53,6 @@ class ReminderNotifier(context: Context) {
     fun dismiss(id: Long) {
         try {
             manager(notificationContext())?.cancel(ReminderIds.asInt(id))
-<<<<<<< HEAD
             val remaining = readPosted().filter { it.id != id }
             when {
                 remaining.size >= 2 -> postSummary(remaining.size)
@@ -79,14 +63,11 @@ class ReminderNotifier(context: Context) {
                 }
                 else -> cancelSummary()
             }
-=======
->>>>>>> origin/main
         } catch (error: Throwable) {
             DoAlarmLog.handlingFailed(id, error)
         }
     }
 
-<<<<<<< HEAD
     fun showingIds(): List<Long> {
         return try {
             readPosted().map { it.id }
@@ -136,13 +117,6 @@ class ReminderNotifier(context: Context) {
             )
         }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-=======
-    private fun showUnchecked(id: Long, title: String, dueAt: Long) {
-        val context = notificationContext()
-        val manager = manager(context) ?: return
-        ensureChannel(manager)
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
->>>>>>> origin/main
             .setSmallIcon(R.drawable.ic_stat_reminder)
             .setContentTitle(title)
             .setContentText(dueText(dueAt))
@@ -151,7 +125,6 @@ class ReminderNotifier(context: Context) {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-<<<<<<< HEAD
             .setOnlyAlertOnce(!alert)
             .setAutoCancel(false)
             .setContentIntent(contentIntent(id))
@@ -262,16 +235,6 @@ class ReminderNotifier(context: Context) {
                 dueAt = extras.getLong(EXTRA_DUE),
             )
         }
-=======
-            .setOnlyAlertOnce(false)
-            .setAutoCancel(false)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setContentIntent(contentIntent(id))
-            .addAction(doneAction(id))
-            .build()
-        notification.flags = notification.flags and Notification.FLAG_ONLY_ALERT_ONCE.inv()
-        manager.notify(ReminderIds.asInt(id), notification)
->>>>>>> origin/main
     }
 
     private fun notificationContext(): Context {
@@ -286,7 +249,6 @@ class ReminderNotifier(context: Context) {
         return context.getSystemService(NotificationManager::class.java)
     }
 
-<<<<<<< HEAD
     private fun ensureChannels(context: Context, manager: NotificationManager) {
         if (manager.getNotificationChannel(CHANNEL_ID) == null) {
             val channel = NotificationChannel(
@@ -317,36 +279,13 @@ class ReminderNotifier(context: Context) {
             }
             manager.createNotificationChannel(summary)
         }
-=======
-    private fun ensureChannel(manager: NotificationManager) {
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_HIGH,
-        ).apply {
-            description = "Reminders that keep alerting until they are marked done"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 250, 150, 250)
-            val attributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            setSound(Settings.System.DEFAULT_NOTIFICATION_URI, attributes)
-        }
-        manager.createNotificationChannel(channel)
->>>>>>> origin/main
     }
 
     private fun contentIntent(id: Long): PendingIntent {
         val intent = Intent(appContext, MainActivity::class.java).apply {
-<<<<<<< HEAD
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP
-=======
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
->>>>>>> origin/main
             data = Uri.parse("doapp://open/$id")
         }
         return PendingIntent.getActivity(
@@ -357,27 +296,18 @@ class ReminderNotifier(context: Context) {
         )
     }
 
-<<<<<<< HEAD
     private fun donePending(id: Long): PendingIntent {
-=======
-    private fun doneAction(id: Long): NotificationCompat.Action {
->>>>>>> origin/main
         val intent = Intent(appContext, DoneReceiver::class.java).apply {
             action = DoneReceiver.ACTION
             data = Uri.parse("doapp://done/$id")
             putExtra(DoneReceiver.EXTRA_ID, id)
         }
-<<<<<<< HEAD
         return PendingIntent.getBroadcast(
-=======
-        val pending = PendingIntent.getBroadcast(
->>>>>>> origin/main
             appContext,
             ReminderIds.asInt(id),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-<<<<<<< HEAD
     }
 
     private fun snoozePending(id: Long, optionIndex: Int, option: SnoozeOption): PendingIntent {
@@ -424,13 +354,6 @@ class ReminderNotifier(context: Context) {
             putString(EXTRA_TITLE, title)
             putLong(EXTRA_DUE, dueAt)
         }
-=======
-        return NotificationCompat.Action.Builder(
-            R.drawable.ic_stat_reminder,
-            appContext.getString(R.string.action_done),
-            pending,
-        ).build()
->>>>>>> origin/main
     }
 
     private fun dueText(dueAt: Long): String {
@@ -440,7 +363,6 @@ class ReminderNotifier(context: Context) {
         return appContext.getString(R.string.notification_due, formatted)
     }
 
-<<<<<<< HEAD
     private data class PostedReminder(val id: Long, val title: String, val dueAt: Long)
 
     private data class SnoozeAction(
@@ -457,10 +379,5 @@ class ReminderNotifier(context: Context) {
         private const val EXTRA_ID = "doapp_id"
         private const val EXTRA_TITLE = "doapp_title"
         private const val EXTRA_DUE = "doapp_due"
-=======
-    companion object {
-        const val CHANNEL_ID = "reminders"
-        const val CHANNEL_NAME = "Reminders"
->>>>>>> origin/main
     }
 }
