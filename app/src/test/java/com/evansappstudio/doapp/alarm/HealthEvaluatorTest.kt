@@ -10,6 +10,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HealthEvaluatorTest {
+    private companion object {
+        const val ONE_TAP_BATTERY_REQUEST = "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+    }
+
     @Test
     fun platformConstantsMatchTheEvaluatorThresholds() {
         assertEquals(NotificationManager.IMPORTANCE_NONE, HealthEvaluator.IMPORTANCE_NONE)
@@ -19,10 +23,6 @@ class HealthEvaluatorTest {
         assertEquals(
             Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
             HealthIntents.ACTION_BATTERY_LIST,
-        )
-        assertEquals(
-            "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-            HealthIntents.ACTION_BATTERY_REQUEST,
         )
     }
 
@@ -211,10 +211,34 @@ class HealthEvaluatorTest {
         )
         for (kind in HealthActionKind.entries) {
             org.junit.Assert.assertNotEquals(
-                HealthIntents.ACTION_BATTERY_REQUEST,
+                ONE_TAP_BATTERY_REQUEST,
                 HealthIntents.primaryAction(kind),
             )
         }
+    }
+
+    @Test
+    fun samsungBatteryChainTriesDeviceCareThenTheOptimisationList() {
+        val chain = HealthIntents.samsungBatteryTargets("com.evansappstudio.doapp")
+        assertEquals(
+            listOf(
+                "com.samsung.android.lool/com.samsung.android.sm.ui.battery.BatteryActivity",
+                "com.samsung.android.sm/com.samsung.android.sm.ui.battery.BatteryActivity",
+            ),
+            chain.take(2).map { "${it.componentPackage}/${it.componentClass}" },
+        )
+        assertEquals(
+            listOf(
+                "com.samsung.android.sm.ACTION_BATTERY",
+                Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
+                Settings.ACTION_BATTERY_SAVER_SETTINGS,
+                Settings.ACTION_SETTINGS,
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            ),
+            chain.drop(2).map { it.action },
+        )
+        assertEquals("package:com.evansappstudio.doapp", chain.last().data)
+        assertTrue(chain.none { it.action == ONE_TAP_BATTERY_REQUEST })
     }
 
     @Test

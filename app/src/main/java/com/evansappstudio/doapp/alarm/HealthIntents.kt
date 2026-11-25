@@ -12,7 +12,6 @@ import android.provider.Settings
  */
 object HealthIntents {
     const val ACTION_BATTERY_LIST = "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS"
-    const val ACTION_BATTERY_REQUEST = "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
     const val ACTION_EXACT_ALARM = "android.settings.REQUEST_SCHEDULE_EXACT_ALARM"
     const val ACTION_FULL_SCREEN = "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT"
     const val SAMSUNG_LEARN_MORE = "https://dontkillmyapp.com/samsung"
@@ -66,26 +65,29 @@ object HealthIntents {
         return chain
     }
 
-    private fun samsungBatteryChain(packageName: String): List<Intent> {
-        val deviceCare = listOf(
-            Intent().setComponent(
-                ComponentName(
-                    "com.samsung.android.lool",
-                    "com.samsung.android.sm.ui.battery.BatteryActivity",
-                ),
+    internal fun samsungBatteryTargets(packageName: String): List<HealthFixTarget> {
+        return listOf(
+            HealthFixTarget(
+                componentPackage = "com.samsung.android.lool",
+                componentClass = "com.samsung.android.sm.ui.battery.BatteryActivity",
             ),
-            Intent().setComponent(
-                ComponentName(
-                    "com.samsung.android.sm",
-                    "com.samsung.android.sm.ui.battery.BatteryActivity",
-                ),
+            HealthFixTarget(
+                componentPackage = "com.samsung.android.sm",
+                componentClass = "com.samsung.android.sm.ui.battery.BatteryActivity",
             ),
-            Intent("com.samsung.android.sm.ACTION_BATTERY"),
-            Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
-            Intent(Settings.ACTION_SETTINGS),
-            appDetails(packageName),
+            HealthFixTarget(action = "com.samsung.android.sm.ACTION_BATTERY"),
+            HealthFixTarget(action = Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            HealthFixTarget(action = Settings.ACTION_BATTERY_SAVER_SETTINGS),
+            HealthFixTarget(action = Settings.ACTION_SETTINGS),
+            HealthFixTarget(
+                action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                data = "package:$packageName",
+            ),
         )
-        return deviceCare
+    }
+
+    internal fun samsungBatteryChain(packageName: String): List<Intent> {
+        return samsungBatteryTargets(packageName).map { it.toIntent() }
     }
 
     private fun appNotificationSettings(packageName: String): Intent {
@@ -106,6 +108,16 @@ object HealthIntents {
         return Intent(ACTION_EXACT_ALARM).apply {
             data = Uri.parse("package:$packageName")
         }
+    }
+
+    private fun HealthFixTarget.toIntent(): Intent {
+        val intent = if (componentPackage != null && componentClass != null) {
+            Intent().setComponent(ComponentName(componentPackage, componentClass))
+        } else {
+            Intent(action)
+        }
+        if (data != null) intent.data = Uri.parse(data)
+        return intent
     }
 
     private fun appDetails(packageName: String): Intent {
@@ -135,3 +147,10 @@ object HealthIntents {
         DoAlarmLog.handlingFailed(id = -1, IllegalStateException("health fix intent did not resolve"))
     }
 }
+
+internal data class HealthFixTarget(
+    val action: String? = null,
+    val componentPackage: String? = null,
+    val componentClass: String? = null,
+    val data: String? = null,
+)
