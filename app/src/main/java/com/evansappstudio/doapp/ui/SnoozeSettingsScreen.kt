@@ -53,6 +53,7 @@ import com.evansappstudio.doapp.alarm.SnoozeOption
 fun SnoozeSettingsScreen(
     viewModel: ReminderViewModel,
     onBack: () -> Unit,
+    onOpenHealth: () -> Unit,
 ) {
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
@@ -173,6 +174,9 @@ fun SnoozeSettingsScreen(
                     TextButton(onClick = {
                         openSettings(context, AlertPermissions.dndSettings())
                     }) { Text(stringResource(R.string.alert_open)) }
+                    TextButton(onClick = onOpenHealth) {
+                        Text(stringResource(R.string.health_check))
+                    }
                 }
             }
             item {

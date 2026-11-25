@@ -83,6 +83,9 @@ import com.evansappstudio.doapp.alarm.AlertPolicy
 import com.evansappstudio.doapp.alarm.DateParser
 import com.evansappstudio.doapp.alarm.alert
 import com.evansappstudio.doapp.alarm.ExactAlarmPolicy
+import com.evansappstudio.doapp.alarm.HealthActionKind
+import com.evansappstudio.doapp.alarm.HealthFix
+import com.evansappstudio.doapp.alarm.HealthIntents
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeBase
@@ -112,6 +115,7 @@ private const val SCREEN_LIST = "list"
 private const val SCREEN_ADD = "add"
 private const val SCREEN_EDIT = "edit"
 private const val SCREEN_SNOOZE = "snooze"
+private const val SCREEN_HEALTH = "health"
 
 private val nagChoices = listOf(1, 5, 10, 15, 30, 60, 0)
 
@@ -127,13 +131,29 @@ fun ReminderApp(
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val quickTimes by viewModel.quickTimes.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_LIST) }
+    var healthFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var editId by rememberSaveable { mutableStateOf<Long?>(null) }
     var exactAllowed by remember { mutableStateOf(AlarmPermissions.canScheduleExact(context)) }
     var notificationsAllowed by remember { mutableStateOf(AlarmPermissions.canPostNotifications(context)) }
+    val health by container.health.snapshot.collectAsStateWithLifecycle()
 
     fun refreshPermissions() {
         exactAllowed = AlarmPermissions.canScheduleExact(context)
         notificationsAllowed = AlarmPermissions.canPostNotifications(context)
+    }
+
+    fun openHealth(from: String) {
+        healthFrom = from
+        screen = SCREEN_HEALTH
+    }
+
+    fun applyHealthFix(fix: HealthFix) {
+        when (fix.kind) {
+            HealthActionKind.RESTORE_ALARMS -> container.scope.launch { container.health.restoreAlarms() }
+            HealthActionKind.REENABLE_BOOT -> container.scope.launch { container.health.reenableBootReceiver() }
+            HealthActionKind.CLEAR_LATE -> container.scope.launch { container.health.clearLate() }
+            else -> HealthIntents.open(context, fix)
+        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -146,6 +166,7 @@ fun ReminderApp(
                     if (UserUnlock.isUnlocked(context)) {
                         container.scheduler.rescheduleAll()
                     }
+                    container.health.refresh()
                 }
             }
         }
@@ -227,6 +248,13 @@ fun ReminderApp(
         SCREEN_SNOOZE -> SnoozeSettingsScreen(
             viewModel = viewModel,
             onBack = { screen = SCREEN_LIST },
+            onOpenHealth = { openHealth(SCREEN_SNOOZE) },
+        )
+        SCREEN_HEALTH -> HealthCheckScreen(
+            report = health,
+            onBack = { screen = healthFrom },
+            onFix = ::applyHealthFix,
+            onTest = { container.scope.launch { container.health.armTest() } },
         )
         else -> ReminderListScreen(
             reminders = reminders,
@@ -248,6 +276,8 @@ fun ReminderApp(
                 screen = SCREEN_ADD
             },
             onSnoozeSettings = { screen = SCREEN_SNOOZE },
+            showHealthWarning = health.badge,
+            onHealth = { openHealth(SCREEN_LIST) },
             onAllowExactAlarms = { openExactAlarmSettings(context) },
             onOpenNotificationSettings = { openNotificationSettings(context) },
             onSetAlert = viewModel::setAlertLevel,
@@ -267,6 +297,8 @@ private fun ReminderListScreen(
     onOpen: (Long) -> Unit,
     onAdd: () -> Unit,
     onSnoozeSettings: () -> Unit,
+    showHealthWarning: Boolean,
+    onHealth: () -> Unit,
     onAllowExactAlarms: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onSetAlert: (Long, AlertLevel) -> Unit,
@@ -276,6 +308,9 @@ private fun ReminderListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
+                navigationIcon = {
+                    HealthMenuButton(warning = showHealthWarning, onHealth = onHealth)
+                },
                 actions = {
                     TextButton(onClick = onSnoozeSettings) {
                         Text(stringResource(R.string.snooze_settings_button))

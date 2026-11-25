@@ -41,6 +41,13 @@ class ReminderNotifier(
 
     fun decide(requested: AlertLevel): AlertDecision = prepare(requested)
 
+    /** Creates the reminder channels when they are missing. A muted channel stays muted. */
+    fun ensureChannelsCreated() {
+        val context = notificationContext()
+        val manager = manager(context) ?: return
+        ensureChannels(context, manager)
+    }
+
     /** Posts the fire. Prominent stays out of the quiet group summary. */
     fun show(id: Long, title: String, dueAt: Long, requested: AlertLevel = AlertLevel.STANDARD): AlertDecision {
         return try {

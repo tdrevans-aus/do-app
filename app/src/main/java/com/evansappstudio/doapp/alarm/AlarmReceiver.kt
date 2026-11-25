@@ -17,7 +17,10 @@ class AlarmReceiver : BroadcastReceiver() {
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
+                app.container.health.noteDelivery(id, scheduled, actual)
                 app.container.scheduler.onFire(id, actual)
+                app.container.health.finishTest(id, scheduled, actual)
+                app.container.health.refresh()
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {

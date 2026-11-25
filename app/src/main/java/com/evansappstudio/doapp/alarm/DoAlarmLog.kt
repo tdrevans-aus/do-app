@@ -112,4 +112,28 @@ object DoAlarmLog {
     fun handlingFailed(id: Long, error: Throwable) {
         Log.e(TAG, "DoAlarm handling failed id=$id", error)
     }
+
+    fun healthDump(body: String) {
+        Log.i(TAG, "DoAlarm health $body")
+    }
+
+    fun healthLate(id: Long, scheduled: Long, actual: Long, lagMs: Long) {
+        Log.i(TAG, "DoAlarm health-late id=$id scheduled=$scheduled actual=$actual lagMs=$lagMs")
+    }
+
+    fun healthLateSynthetic(lagMs: Long) {
+        Log.i(TAG, "DoAlarm health-late synthetic lagMs=$lagMs")
+    }
+
+    fun healthTestScheduled(scheduled: Long, id: Long) {
+        Log.i(TAG, "DoAlarm health-test scheduled=$scheduled id=$id")
+    }
+
+    fun healthTestFire(id: Long, scheduled: Long, actual: Long) {
+        Log.i(TAG, "DoAlarm health-test id=$id scheduled=$scheduled actual=$actual")
+    }
+
+    fun healthTestDone(id: Long) {
+        Log.i(TAG, "DoAlarm health-test done id=$id")
+    }
 }

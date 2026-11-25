@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.evansappstudio.doapp.alarm.AlarmScheduler
 import com.evansappstudio.doapp.alarm.DoAlarmLog
+import com.evansappstudio.doapp.alarm.HealthMonitor
 import com.evansappstudio.doapp.alarm.ReminderMirror
 import com.evansappstudio.doapp.alarm.Scheduler
 import com.evansappstudio.doapp.alarm.SnoozeConfig
@@ -29,6 +30,13 @@ class AppContainer(context: Context) {
     val notifications = ReminderNotifier(appContext, snoozeConfig::get)
     val settings = SettingsStore(appContext)
     val zones = ZoneMemory(appContext)
+    val health = HealthMonitor(
+        appContext,
+        mirror = mirror,
+        notifications = notifications,
+        scheduler = { scheduler },
+        dao = { reminderDao() },
+    )
 
     private val database: AppDatabase by lazy {
         check(UserUnlock.isUnlocked(appContext)) { "Room is unavailable before unlock" }
@@ -60,12 +68,14 @@ class AppContainer(context: Context) {
     fun start() {
         scope.launch {
             try {
+                health.observeClock()
                 if (UserUnlock.isUnlocked(appContext)) {
                     snoozeConfig.setAll(settings.snoozeOptions())
                     scheduler.rescheduleAll()
                 } else {
                     scheduler.rescheduleFromMirror()
                 }
+                health.refresh()
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             }

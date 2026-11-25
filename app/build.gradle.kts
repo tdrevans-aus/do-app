@@ -29,6 +29,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "EXACT_ALARM_MODE", "\"$exactAlarmMode\"")
     }
 
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -71,6 +72,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     lint {
@@ -144,7 +146,7 @@ dependencies {
 
 val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     group = "verification"
-    description = "Release manifest has no debug receiver, and the exact-alarm permission matches exactAlarmMode."
+    description = "Release manifest has no debug receiver, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption."
     dependsOn("processReleaseMainManifest", "processDebugMainManifest")
     val buildDirectory = layout.buildDirectory
     val mode = exactAlarmMode
@@ -176,6 +178,9 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         }
 
         for ((variant, text) in listOf("release" to release, "debug" to debug)) {
+            check(!text.contains("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")) {
+                "$variant manifest contains REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+            }
             val permissions = usesPermissions(text)
             val useExact = permissions.filter { it.name == "android.permission.USE_EXACT_ALARM" }
             val scheduleExact = permissions.filter { it.name == "android.permission.SCHEDULE_EXACT_ALARM" }
