@@ -12,6 +12,10 @@
                 <action android:name="com.evansappstudio.doapp.debug.DONE" />
                 <action android:name="com.evansappstudio.doapp.debug.SNOOZE" />
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_SNOOZE" />
+                <action android:name="com.evansappstudio.doapp.debug.CONFIG_QAT" />
+                <action android:name="com.evansappstudio.doapp.debug.CONFIG_POSTPONE" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_QAT" />
+                <action android:name="com.evansappstudio.doapp.debug.APPLY_QAT" />
             </intent-filter>
         </receiver>
     </application>

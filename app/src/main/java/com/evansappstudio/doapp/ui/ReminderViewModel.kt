@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
+import com.evansappstudio.doapp.alarm.PostponeMode
+import com.evansappstudio.doapp.alarm.QuickTimeSlot
+import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeOption
 import com.evansappstudio.doapp.data.Reminder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +26,27 @@ class ReminderViewModel(
 
     private val snoozeOptionState = MutableStateFlow(container.settings.snoozeOptions())
     val snoozeOptions: StateFlow<List<SnoozeOption>> = snoozeOptionState.asStateFlow()
+
+    private val quickTimesState = MutableStateFlow(container.settings.quickTimes())
+    val quickTimes: StateFlow<QuickTimesSettings> = quickTimesState.asStateFlow()
+
+    fun reloadQuickTimes() {
+        quickTimesState.value = container.settings.quickTimes()
+    }
+
+    fun setQuickTimeSlot(index: Int, slot: QuickTimeSlot) {
+        viewModelScope.launch {
+            container.settings.setQuickTimeSlot(index, slot)
+            reloadQuickTimes()
+        }
+    }
+
+    fun setPostponeMode(mode: PostponeMode) {
+        viewModelScope.launch {
+            container.settings.setPostponeMode(mode)
+            reloadQuickTimes()
+        }
+    }
 
     fun add(title: String, dueAt: Long, nagMinutes: Int?) {
         viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes) }

@@ -22,6 +22,14 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm config-snooze option=$option kind=$kind value=$value")
     }
 
+    fun qatConfig(message: String) {
+        Log.i(TAG, message)
+    }
+
+    fun qat(id: Long, newDue: Long, slot: Int) {
+        Log.i(TAG, "DoAlarm qat id=$id newDue=$newDue slot=$slot")
+    }
+
     fun snoozeSkipped(id: Long, reason: String) {
         Log.i(TAG, "DoAlarm snooze skipped id=$id reason=$reason")
     }
