@@ -9,6 +9,7 @@ import com.evansappstudio.doapp.data.RepeatPresets
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.RepeatUnit
 import com.evansappstudio.doapp.data.WeekDay
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -33,21 +34,18 @@ object RepeatText {
 
     fun menuLabel(choice: RepeatChoice, dueAt: Long, zone: ZoneId, is24Hour: Boolean, locale: Locale): String {
         val zoned = Instant.ofEpochMilli(dueAt).atZone(zone)
+        val time = formatTime(zoned.toLocalTime(), is24Hour, locale)
         return when (choice) {
             RepeatChoice.OFF -> "Repeat Off"
-            RepeatChoice.DAILY -> "Daily"
-            RepeatChoice.WEEKDAYS -> "Weekdays"
-            RepeatChoice.WEEKLY -> "Weekly (Every ${WeekDay.fromDayOfWeek(zoned.dayOfWeek).label()})"
-            RepeatChoice.MONTHLY -> {
-                val ordinal = ordinal(zoned.dayOfMonth)
-                val time = formatTime(zoned.toLocalTime(), is24Hour, locale)
-                "Monthly ($ordinal each month at $time)"
-            }
+            RepeatChoice.DAILY -> "Daily $time"
+            RepeatChoice.WEEKDAYS -> "Weekdays $time"
+            RepeatChoice.WEEKLY -> "${pluralWeekday(zoned.dayOfWeek)} $time"
+            RepeatChoice.MONTHLY -> "${ordinal(zoned.dayOfMonth)} each month at $time"
             RepeatChoice.YEARLY -> {
-                val date = DateTimeFormatter.ofPattern("d MMMM", locale).format(zoned)
-                "Yearly (Every $date)"
+                val date = DateTimeFormatter.ofPattern("d MMM", locale).format(zoned)
+                "Every $date at $time"
             }
-            RepeatChoice.CUSTOM -> "Custom…"
+            RepeatChoice.CUSTOM -> "Custom..."
         }
     }
 
@@ -140,6 +138,16 @@ object RepeatText {
             2 -> "${names[0]} and ${names[1]}"
             else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
         }
+    }
+
+    private fun pluralWeekday(day: DayOfWeek): String = when (day) {
+        DayOfWeek.MONDAY -> "Mondays"
+        DayOfWeek.TUESDAY -> "Tuesdays"
+        DayOfWeek.WEDNESDAY -> "Wednesdays"
+        DayOfWeek.THURSDAY -> "Thursdays"
+        DayOfWeek.FRIDAY -> "Fridays"
+        DayOfWeek.SATURDAY -> "Saturdays"
+        DayOfWeek.SUNDAY -> "Sundays"
     }
 
     fun ordinal(day: Int): String {

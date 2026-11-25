@@ -12,6 +12,7 @@ import com.evansappstudio.doapp.data.DueShiftMode
 import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.RepeatRule
+import com.evansappstudio.doapp.data.WeekStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,12 @@ class ReminderViewModel(
 
     fun setRepeatPromptMode(mode: RepeatPromptMode) {
         container.settings.setRepeatPromptMode(mode)
+    }
+
+    fun weekStart(): WeekStart = container.settings.weekStart()
+
+    fun setWeekStart(start: WeekStart) {
+        container.settings.setWeekStart(start)
     }
 
     suspend fun reminderOrNull(id: Long): Reminder? = container.reminderDao().getById(id)

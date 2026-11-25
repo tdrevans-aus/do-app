@@ -5,6 +5,7 @@ import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.data.RepeatFrom
 import com.evansappstudio.doapp.data.RepeatRule
+import com.evansappstudio.doapp.data.WeekStart
 import com.evansappstudio.doapp.data.updateDetails
 import com.evansappstudio.doapp.notify.ReminderNotifier
 import kotlinx.coroutines.sync.Mutex
@@ -26,6 +27,7 @@ class Scheduler(
     private val notifications: ReminderNotifier,
     private val unlocked: () -> Boolean,
     private val zones: ZoneMemory,
+    private val weekStart: () -> WeekStart,
 ) {
     private val gate = Mutex()
 
@@ -381,6 +383,7 @@ class Scheduler(
             rule = rule,
             completedAt = completedAt,
             zone = ZoneId.systemDefault(),
+            weekStart = weekStart(),
         )
         dao().advanceOccurrence(id, placed.dueAt, placed.patternDueAt)
         val now = System.currentTimeMillis()

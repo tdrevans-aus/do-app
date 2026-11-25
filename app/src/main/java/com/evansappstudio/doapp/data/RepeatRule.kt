@@ -32,7 +32,37 @@ enum class RepeatFrom {
     }
 }
 
-/** ISO weekdays, Monday first. Debug tokens are the three-letter names. */
+/**
+ * Which day begins the week. Factory is Monday.
+ * This orders the weekday picker and is the boundary for every-N-weeks.
+ */
+enum class WeekStart {
+    MONDAY,
+    SATURDAY,
+    SUNDAY,
+    ;
+
+    fun dayOfWeek(): DayOfWeek = when (this) {
+        MONDAY -> DayOfWeek.MONDAY
+        SATURDAY -> DayOfWeek.SATURDAY
+        SUNDAY -> DayOfWeek.SUNDAY
+    }
+
+    /** Weekdays in picker order, beginning on this start day. */
+    fun orderedDays(): List<WeekDay> {
+        val all = WeekDay.entries
+        val index = all.indexOf(WeekDay.fromDayOfWeek(dayOfWeek()))
+        return all.drop(index) + all.take(index)
+    }
+
+    companion object {
+        val DEFAULT: WeekStart = MONDAY
+
+        fun fromName(raw: String?): WeekStart? = entries.firstOrNull { it.name == raw }
+    }
+}
+
+/** ISO weekdays, Monday first in storage. Debug tokens are the three-letter names. */
 enum class WeekDay {
     MON,
     TUE,

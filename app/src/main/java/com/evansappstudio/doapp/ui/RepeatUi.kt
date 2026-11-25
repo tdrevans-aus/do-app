@@ -41,18 +41,19 @@ import com.evansappstudio.doapp.data.RepeatPresets
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.RepeatUnit
 import com.evansappstudio.doapp.data.WeekDay
+import com.evansappstudio.doapp.data.WeekStart
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 
 private val menuChoices = listOf(
+    RepeatChoice.OFF,
     RepeatChoice.DAILY,
     RepeatChoice.WEEKDAYS,
     RepeatChoice.WEEKLY,
     RepeatChoice.MONTHLY,
     RepeatChoice.YEARLY,
     RepeatChoice.CUSTOM,
-    RepeatChoice.OFF,
 )
 
 @Composable
@@ -61,6 +62,7 @@ fun RepeatMenuDialog(
     rule: RepeatRule?,
     patternDueAt: Long?,
     is24Hour: Boolean,
+    weekStart: WeekStart,
     onSelect: (RepeatChoice) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -73,11 +75,12 @@ fun RepeatMenuDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 menuChoices.forEach { choice ->
+                    val label = RepeatText.menuLabel(choice, dueAt, zone, is24Hour, locale)
                     TextButton(onClick = { onSelect(choice) }) {
-                        Text(RepeatText.menuLabel(choice, dueAt, zone, is24Hour, locale))
+                        Text(if (choice == selected) "✓ $label" else label)
                     }
                     if (choice == selected && choice != RepeatChoice.OFF) {
-                        val phrase = nextPhrase(rule, patternDueAt, dueAt, zone, is24Hour, locale)
+                        val phrase = nextPhrase(rule, patternDueAt, dueAt, zone, is24Hour, locale, weekStart)
                         if (phrase != null) {
                             Text(
                                 text = phrase,
@@ -143,6 +146,7 @@ fun CustomRepeatScreen(
     draftDueAt: Long,
     patternDueAt: Long?,
     is24Hour: Boolean,
+    weekStart: WeekStart,
     onAccept: (RepeatRule) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -258,7 +262,7 @@ fun CustomRepeatScreen(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    WeekDay.entries.forEach { day ->
+                    weekStart.orderedDays().forEach { day ->
                         FilterChip(
                             selected = day in weekDays,
                             onClick = {
@@ -277,12 +281,13 @@ fun CustomRepeatScreen(
                 Text(stringResource(R.string.repeat_on))
                 MonthOnEditor(
                     monthOn = monthOn,
+                    weekStart = weekStart,
                     onChange = { monthOn = it },
                 )
             }
             if (from == RepeatFrom.DUE_DATE && draft != null) {
                 val anchor = patternDueAt ?: draftDueAt
-                val next = RepeatMath.nextPattern(anchor, draft, zone)
+                val next = RepeatMath.nextPattern(anchor, draft, zone, weekStart)
                 Text(stringResource(R.string.repeat_next))
                 Text(RepeatText.nextLine(next, zone, is24Hour, locale))
             }
@@ -293,6 +298,7 @@ fun CustomRepeatScreen(
 @Composable
 private fun MonthOnEditor(
     monthOn: MonthOn,
+    weekStart: WeekStart,
     onChange: (MonthOn) -> Unit,
 ) {
     val style = when (monthOn) {
@@ -350,7 +356,7 @@ private fun MonthOnEditor(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        WeekDay.entries.forEach { day ->
+                        weekStart.orderedDays().forEach { day ->
                             val target = MonthTarget.fromWeekDay(day)
                             FilterChip(
                                 selected = current.target == target,
@@ -426,10 +432,11 @@ private fun nextPhrase(
     zone: ZoneId,
     is24Hour: Boolean,
     locale: Locale,
+    weekStart: WeekStart,
 ): String? {
     if (rule == null || rule.from != RepeatFrom.DUE_DATE) return null
     val anchor = patternDueAt ?: dueAt
-    val next = RepeatMath.nextPattern(anchor, rule, zone)
+    val next = RepeatMath.nextPattern(anchor, rule, zone, weekStart)
     return RepeatText.nextLine(next, zone, is24Hour, locale)
 }
 

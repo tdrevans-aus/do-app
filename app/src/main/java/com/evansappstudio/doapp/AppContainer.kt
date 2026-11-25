@@ -44,6 +44,7 @@ class AppContainer(context: Context) {
             notifications = notifications,
             unlocked = { UserUnlock.isUnlocked(appContext) },
             zones = zones,
+            weekStart = { settings.weekStart() },
         )
     }
 

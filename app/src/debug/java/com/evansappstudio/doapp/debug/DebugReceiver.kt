@@ -394,6 +394,7 @@ class DebugReceiver : BroadcastReceiver() {
                     rule = rule,
                     zone = ZoneId.systemDefault(),
                     count = count,
+                    weekStart = app.container.settings.weekStart(),
                 )
                 sequence.forEachIndexed { index, at -> DoAlarmLog.repeatNext(id, index, at) }
             } catch (error: Throwable) {

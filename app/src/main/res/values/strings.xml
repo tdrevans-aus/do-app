@@ -61,7 +61,11 @@
     <string name="banner_notifications_button">Notification settings</string>
     <string name="repeat_button">↻ Repeat</string>
     <string name="repeat_menu">Repeat</string>
-    <string name="repeat_custom">Custom…</string>
+    <string name="repeat_custom">Custom...</string>
+    <string name="week_starts_on">Week starts on</string>
+    <string name="week_start_monday">Monday</string>
+    <string name="week_start_saturday">Saturday</string>
+    <string name="week_start_sunday">Sunday</string>
     <string name="repeat_accept">✓</string>
     <string name="repeat_words">Repeat</string>
     <string name="repeat_how_often">How often</string>

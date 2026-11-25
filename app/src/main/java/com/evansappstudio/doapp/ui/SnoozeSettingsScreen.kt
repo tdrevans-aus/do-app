@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.data.RepeatPromptMode
+import com.evansappstudio.doapp.data.WeekStart
 import com.evansappstudio.doapp.alarm.SnoozeLabels
 import com.evansappstudio.doapp.alarm.SnoozeOption
 
@@ -45,6 +46,7 @@ fun SnoozeSettingsScreen(
 ) {
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
+    var weekStart by remember { mutableStateOf(viewModel.weekStart()) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,6 +79,31 @@ fun SnoozeSettingsScreen(
                             stringResource(R.string.snooze_at_time)
                         },
                     )
+                }
+            }
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(text = stringResource(R.string.week_starts_on))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WeekStart.entries.forEach { start ->
+                            FilterChip(
+                                selected = weekStart == start,
+                                onClick = {
+                                    viewModel.setWeekStart(start)
+                                    weekStart = start
+                                },
+                                label = {
+                                    Text(
+                                        when (start) {
+                                            WeekStart.MONDAY -> stringResource(R.string.week_start_monday)
+                                            WeekStart.SATURDAY -> stringResource(R.string.week_start_saturday)
+                                            WeekStart.SUNDAY -> stringResource(R.string.week_start_sunday)
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
             }
             item {

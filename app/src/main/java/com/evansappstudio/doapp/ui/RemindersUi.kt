@@ -79,6 +79,7 @@ import com.evansappstudio.doapp.data.RepeatChoice
 import com.evansappstudio.doapp.data.RepeatPresets
 import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.RepeatRule
+import com.evansappstudio.doapp.data.WeekStart
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalTime
@@ -180,6 +181,7 @@ fun ReminderApp(
             },
             promptMode = viewModel::repeatPromptMode,
             onPromptMode = viewModel::setRepeatPromptMode,
+            weekStart = viewModel.weekStart(),
             requestNotificationsFirst = {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     !AlarmPermissions.canPostNotifications(context) &&
@@ -418,6 +420,7 @@ private fun EditReminderScreen(
                 },
                 promptMode = viewModel::repeatPromptMode,
                 onPromptMode = viewModel::setRepeatPromptMode,
+                weekStart = viewModel.weekStart(),
                 requestNotificationsFirst = { false },
                 onNotificationPrompt = {},
                 onPermissionResult = {},
@@ -465,6 +468,7 @@ private fun ReminderFormScreen(
     onSave: (title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, shift: DueShiftMode?) -> Unit,
     promptMode: () -> RepeatPromptMode,
     onPromptMode: (RepeatPromptMode) -> Unit,
+    weekStart: WeekStart,
     requestNotificationsFirst: () -> Boolean,
     onNotificationPrompt: () -> Unit,
     onPermissionResult: () -> Unit,
@@ -587,6 +591,7 @@ private fun ReminderFormScreen(
             draftDueAt = draftDueAt,
             patternDueAt = patternDueAt,
             is24Hour = is24Hour,
+            weekStart = weekStart,
             onAccept = { accepted ->
                 ruleText = RepeatRule.encodeDraft(accepted)
                 patternText = if (accepted.from == com.evansappstudio.doapp.data.RepeatFrom.COMPLETION) {
@@ -773,6 +778,7 @@ private fun ReminderFormScreen(
             rule = draftRule,
             patternDueAt = patternDueAt,
             is24Hour = is24Hour,
+            weekStart = weekStart,
             onSelect = { choice ->
                 showRepeatMenu = false
                 if (choice == RepeatChoice.CUSTOM) {

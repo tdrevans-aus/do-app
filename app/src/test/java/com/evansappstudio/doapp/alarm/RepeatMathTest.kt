@@ -10,6 +10,7 @@ import com.evansappstudio.doapp.data.RepeatPresets
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.RepeatUnit
 import com.evansappstudio.doapp.data.WeekDay
+import com.evansappstudio.doapp.data.WeekStart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -129,7 +130,10 @@ class RepeatMathTest {
         )
         val sunday = at(perth, 2026, 11, 29, 19, 0)
         val everyOtherMonday = weeks(2, WeekDay.MON)
-        assertEquals(at(perth, 2026, 12, 7, 19, 0), RepeatMath.nextPattern(sunday, everyOtherMonday, perth))
+        assertEquals(
+            at(perth, 2026, 12, 7, 19, 0),
+            RepeatMath.nextPattern(sunday, everyOtherMonday, perth, WeekStart.MONDAY),
+        )
         val mondayOnly = weeks(1, WeekDay.MON)
         assertEquals(
             listOf(wednesday, at(perth, 2026, 11, 30, 8, 15)),
@@ -307,6 +311,52 @@ class RepeatMathTest {
     }
 
     @Test
+    fun everyNWeeksFollowsEachWeekStart() {
+        val sunday = at(perth, 2026, 11, 29, 19, 0)
+        val mondays = weeks(2, WeekDay.MON)
+        assertEquals(
+            at(perth, 2026, 12, 7, 19, 0),
+            RepeatMath.nextPattern(sunday, mondays, perth, WeekStart.MONDAY),
+        )
+        assertEquals(
+            at(perth, 2026, 11, 30, 19, 0),
+            RepeatMath.nextPattern(sunday, mondays, perth, WeekStart.SUNDAY),
+        )
+        assertEquals(
+            at(perth, 2026, 11, 30, 19, 0),
+            RepeatMath.nextPattern(sunday, mondays, perth, WeekStart.SATURDAY),
+        )
+
+        val friday = at(perth, 2026, 11, 27, 19, 0)
+        val saturdays = weeks(2, WeekDay.SAT)
+        assertEquals(
+            at(perth, 2026, 11, 28, 19, 0),
+            RepeatMath.nextPattern(friday, saturdays, perth, WeekStart.MONDAY),
+        )
+        assertEquals(
+            at(perth, 2026, 11, 28, 19, 0),
+            RepeatMath.nextPattern(friday, saturdays, perth, WeekStart.SUNDAY),
+        )
+        assertEquals(
+            at(perth, 2026, 12, 5, 19, 0),
+            RepeatMath.nextPattern(friday, saturdays, perth, WeekStart.SATURDAY),
+        )
+
+        assertEquals(
+            listOf(WeekDay.MON, WeekDay.TUE, WeekDay.WED, WeekDay.THU, WeekDay.FRI, WeekDay.SAT, WeekDay.SUN),
+            WeekStart.MONDAY.orderedDays(),
+        )
+        assertEquals(
+            listOf(WeekDay.SAT, WeekDay.SUN, WeekDay.MON, WeekDay.TUE, WeekDay.WED, WeekDay.THU, WeekDay.FRI),
+            WeekStart.SATURDAY.orderedDays(),
+        )
+        assertEquals(
+            listOf(WeekDay.SUN, WeekDay.MON, WeekDay.TUE, WeekDay.WED, WeekDay.THU, WeekDay.FRI, WeekDay.SAT),
+            WeekStart.SUNDAY.orderedDays(),
+        )
+    }
+
+    @Test
     fun phrasesMatchDueWording() {
         val due = at(perth, 2026, 11, 25, 17, 30)
         assertEquals("Every day", RepeatText.describe(RepeatPresets.daily(), due, perth, false, Locale.US))
@@ -328,9 +378,30 @@ class RepeatMathTest {
             "Repeat 3 months after completion",
             RepeatText.describe(completion, due, perth, false, Locale.US),
         )
-        assertTrue(
-            RepeatText.menuLabel(RepeatChoice.MONTHLY, due, perth, false, Locale.US)
-                .contains("25th each month at 5:30 pm"),
+        val menuDue = at(perth, 2026, 11, 25, 18, 4)
+        assertEquals("Repeat Off", RepeatText.menuLabel(RepeatChoice.OFF, menuDue, perth, false, Locale.US))
+        assertEquals("Daily 6:04 pm", RepeatText.menuLabel(RepeatChoice.DAILY, menuDue, perth, false, Locale.US))
+        assertEquals("Weekdays 6:04 pm", RepeatText.menuLabel(RepeatChoice.WEEKDAYS, menuDue, perth, false, Locale.US))
+        assertEquals("Wednesdays 6:04 pm", RepeatText.menuLabel(RepeatChoice.WEEKLY, menuDue, perth, false, Locale.US))
+        assertEquals(
+            "25th each month at 6:04 pm",
+            RepeatText.menuLabel(RepeatChoice.MONTHLY, menuDue, perth, false, Locale.US),
+        )
+        assertEquals(
+            "Every 25 Nov at 6:04 pm",
+            RepeatText.menuLabel(RepeatChoice.YEARLY, menuDue, perth, false, Locale.US),
+        )
+        assertEquals("Custom...", RepeatText.menuLabel(RepeatChoice.CUSTOM, menuDue, perth, false, Locale.US))
+        assertEquals("Daily 18:04", RepeatText.menuLabel(RepeatChoice.DAILY, menuDue, perth, true, Locale.US))
+        val thursday = at(perth, 2026, 11, 26, 9, 30)
+        assertEquals("Thursdays 9:30 am", RepeatText.menuLabel(RepeatChoice.WEEKLY, thursday, perth, false, Locale.US))
+        assertEquals(
+            "26th each month at 9:30 am",
+            RepeatText.menuLabel(RepeatChoice.MONTHLY, thursday, perth, false, Locale.US),
+        )
+        assertEquals(
+            "Every 26 Nov at 9:30 am",
+            RepeatText.menuLabel(RepeatChoice.YEARLY, thursday, perth, false, Locale.US),
         )
         val encoded = RepeatRule.encodeDraft(weeks(2, WeekDay.WED))
         assertEquals(weeks(2, WeekDay.WED), RepeatRule.decodeDraft(encoded))

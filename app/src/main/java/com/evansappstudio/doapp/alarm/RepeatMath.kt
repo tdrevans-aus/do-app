@@ -8,6 +8,7 @@ import com.evansappstudio.doapp.data.RepeatFrom
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.RepeatUnit
 import com.evansappstudio.doapp.data.WeekDay
+import com.evansappstudio.doapp.data.WeekStart
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
@@ -36,13 +37,18 @@ data class DuePlacement(
  * earlier offset.
  */
 object RepeatMath {
-    fun nextPattern(patternDueAt: Long, rule: RepeatRule, zone: ZoneId): Long {
+    fun nextPattern(
+        patternDueAt: Long,
+        rule: RepeatRule,
+        zone: ZoneId,
+        weekStart: WeekStart = WeekStart.DEFAULT,
+    ): Long {
         val zoned = Instant.ofEpochMilli(patternDueAt).atZone(zone)
         return when (rule.unit) {
             RepeatUnit.MINUTE -> plusElapsed(zoned, Duration.ofMinutes(rule.interval.toLong()))
             RepeatUnit.HOUR -> plusElapsed(zoned, Duration.ofHours(rule.interval.toLong()))
             RepeatUnit.DAY -> zoned.plusDays(rule.interval.toLong()).toInstant().toEpochMilli()
-            RepeatUnit.WEEK -> nextWeek(zoned, rule.interval, rule.weekDays, zone)
+            RepeatUnit.WEEK -> nextWeek(zoned, rule.interval, rule.weekDays, zone, weekStart)
             RepeatUnit.MONTH -> nextMonth(zoned, rule.interval, rule.monthOn, zone)
             RepeatUnit.YEAR -> zoned.plusYears(rule.interval.toLong()).toInstant().toEpochMilli()
         }
@@ -59,6 +65,7 @@ object RepeatMath {
         rule: RepeatRule,
         zone: ZoneId,
         count: Int,
+        weekStart: WeekStart = WeekStart.DEFAULT,
     ): List<Long> {
         require(count >= 1) { "count must be at least 1" }
         if (rule.from == RepeatFrom.COMPLETION) return listOf(dueAt)
@@ -66,7 +73,7 @@ object RepeatMath {
         out.add(dueAt)
         var cursor = patternDueAt ?: dueAt
         while (out.size < count) {
-            val next = nextPattern(cursor, rule, zone)
+            val next = nextPattern(cursor, rule, zone, weekStart)
             out.add(next)
             cursor = next
         }
@@ -84,6 +91,7 @@ object RepeatMath {
         rule: RepeatRule,
         completedAt: Long,
         zone: ZoneId,
+        weekStart: WeekStart = WeekStart.DEFAULT,
     ): DuePlacement = when (rule.from) {
         RepeatFrom.COMPLETION -> {
             val next = afterCompletion(completedAt, dueAt, rule, zone)
@@ -91,7 +99,7 @@ object RepeatMath {
         }
         RepeatFrom.DUE_DATE -> {
             val anchor = patternDueAt ?: dueAt
-            val next = nextPattern(anchor, rule, zone)
+            val next = nextPattern(anchor, rule, zone, weekStart)
             DuePlacement(rule, next, next)
         }
     }
@@ -215,15 +223,17 @@ object RepeatMath {
         interval: Int,
         days: List<WeekDay>,
         zone: ZoneId,
+        weekStart: WeekStart,
     ): Long {
         val selected = days.map { it.dayOfWeek() }.toSet()
         val time = pattern.toLocalTime()
-        val anchorMonday = pattern.toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val startDay = weekStart.dayOfWeek()
+        val anchorWeek = pattern.toLocalDate().with(TemporalAdjusters.previousOrSame(startDay))
         var date = pattern.toLocalDate().plusDays(1)
-        val last = anchorMonday.plusWeeks(interval.toLong() + 2L)
+        val last = anchorWeek.plusWeeks(interval.toLong() + 2L)
         while (!date.isAfter(last)) {
-            val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val weeks = ChronoUnit.WEEKS.between(anchorMonday, monday)
+            val week = date.with(TemporalAdjusters.previousOrSame(startDay))
+            val weeks = ChronoUnit.WEEKS.between(anchorWeek, week)
             if (weeks % interval.toLong() == 0L && date.dayOfWeek in selected) {
                 return resolve(date, time, zone)
             }

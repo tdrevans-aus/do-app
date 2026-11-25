@@ -28,13 +28,13 @@ class QuickTimesTest {
                 "12:00 pm",
                 "6:30 pm",
                 "10:00 pm",
-                "+10 min",
+                "+10 min.",
                 "+1 hr",
-                "+3 hr",
+                "+3 hrs",
                 "+1 day",
-                "-10 min",
+                "-10 min.",
                 "-1 hr",
-                "-3 hr",
+                "-3 hrs",
                 "-1 day",
             ),
             QuickTimes.FACTORY.map { QuickTimes.label(it, is24Hour = false, Locale.US) },
@@ -313,7 +313,7 @@ class QuickTimesTest {
             line,
         )
         assertEquals(
-            "DoAlarm qat-config postpone=FROM_NOW slot=4 kind=FROM_NOW amount=10 unit=MINUTE label=+10 min",
+            "DoAlarm qat-config postpone=FROM_NOW slot=4 kind=FROM_NOW amount=10 unit=MINUTE label=+10 min.",
             QuickTimes.dumpLine(PostponeMode.FROM_NOW, 4, QuickTimes.FACTORY[4], true, Locale.US),
         )
     }
