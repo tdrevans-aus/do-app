@@ -3,4 +3,5 @@
     <color name="ic_launcher_background">#1B4D3E</color>
     <color name="notification_action_text">#FF174EA6</color>
     <color name="notification_action_bg">#FFE8F0FE</color>
+    <color name="critical_label">#FFB00020</color>
 </resources>

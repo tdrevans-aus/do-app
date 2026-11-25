@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
@@ -125,11 +126,18 @@ fun QuickTimesBanner(
     }
 }
 
+data class SlotZero(
+    val label: String,
+    val detail: String,
+    val onClick: () -> Unit,
+)
+
 @Composable
 fun QuickTimesGrid(
     slots: List<QuickTimeSlot>,
     is24Hour: Boolean,
     onApply: (index: Int, base: QuickTimeBase?, day: QuickTimeDay?) -> Unit,
+    slotZero: SlotZero? = null,
 ) {
     var menuIndex by remember { mutableStateOf<Int?>(null) }
     val locale = deviceLocale()
@@ -142,6 +150,33 @@ fun QuickTimesGrid(
             ) {
                 row.forEachIndexed { column, slot ->
                     val index = rowIndex * 4 + column
+                    val override = if (index == 0) slotZero else null
+                    if (override != null) {
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = override.onClick, role = Role.Button),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.small,
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = override.label,
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                                Text(
+                                    text = override.detail,
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
+                        return@forEachIndexed
+                    }
                     Surface(
                         modifier = Modifier
                             .weight(1f)

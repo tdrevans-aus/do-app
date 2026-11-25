@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
+import com.evansappstudio.doapp.alarm.AlertLevel
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimesSettings
@@ -52,8 +53,8 @@ class ReminderViewModel(
         }
     }
 
-    fun add(title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?) {
-        viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes, rule) }
+    fun add(title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, alert: AlertLevel) {
+        viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes, rule, alert) }
     }
 
     fun update(
@@ -63,10 +64,33 @@ class ReminderViewModel(
         nagMinutes: Int?,
         rule: RepeatRule?,
         dueShift: DueShiftMode?,
+        alert: AlertLevel,
     ) {
         viewModelScope.launch {
-            container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift)
+            container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alert)
         }
+    }
+
+    fun setAlertLevel(id: Long, level: AlertLevel) {
+        viewModelScope.launch { container.scheduler.setAlertLevel(id, level) }
+    }
+
+    fun parseDatesEnabled(): Boolean = container.settings.parseDatesEnabled()
+
+    fun setParseDatesEnabled(enabled: Boolean) {
+        container.settings.setParseDatesEnabled(enabled)
+    }
+
+    fun defaultAlertLevel(): AlertLevel = container.settings.defaultAlertLevel()
+
+    fun setDefaultAlertLevel(level: AlertLevel) {
+        container.settings.setDefaultAlertLevel(level)
+    }
+
+    fun hasExplainedAlert(level: AlertLevel): Boolean = container.settings.hasExplainedAlert(level)
+
+    fun markAlertExplained(level: AlertLevel) {
+        container.settings.markAlertExplained(level)
     }
 
     fun repeatPromptMode(): RepeatPromptMode = container.settings.repeatPromptMode()

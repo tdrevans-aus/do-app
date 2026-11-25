@@ -2,6 +2,7 @@ package com.evansappstudio.doapp.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import com.evansappstudio.doapp.alarm.AlertLevel
 import com.evansappstudio.doapp.alarm.NagSchedule
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
@@ -102,6 +103,31 @@ class SettingsStore(context: Context) {
         prefs.edit().putString(KEY_REPEAT_PROMPT, mode.name).commit()
     }
 
+    /** Factory is on. Due's Reminder Editor toggle, stored with commit like the other QA settings. */
+    fun parseDatesEnabled(): Boolean = prefs.getBoolean(KEY_PARSE_DATES, true)
+
+    @SuppressLint("ApplySharedPref")
+    fun setParseDatesEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PARSE_DATES, enabled).commit()
+    }
+
+    /** Factory is Standard. Changing it does not rewrite reminders that already exist. */
+    fun defaultAlertLevel(): AlertLevel =
+        AlertLevel.fromName(prefs.getString(KEY_ALERT_DEFAULT, null)) ?: AlertLevel.DEFAULT
+
+    @SuppressLint("ApplySharedPref")
+    fun setDefaultAlertLevel(level: AlertLevel) {
+        prefs.edit().putString(KEY_ALERT_DEFAULT, level.name).commit()
+    }
+
+    fun hasExplainedAlert(level: AlertLevel): Boolean =
+        prefs.getBoolean(explainedKey(level), false)
+
+    @SuppressLint("ApplySharedPref")
+    fun markAlertExplained(level: AlertLevel) {
+        prefs.edit().putBoolean(explainedKey(level), true).commit()
+    }
+
     @SuppressLint("ApplySharedPref")
     fun setPostponeMode(mode: PostponeMode) {
         // commit, not apply: QA kills the process immediately after CONFIG_POSTPONE.
@@ -132,6 +158,8 @@ class SettingsStore(context: Context) {
 
     private fun qatUnitKey(index: Int) = "qat_${index}_unit"
 
+    private fun explainedKey(level: AlertLevel) = "explained_alert_${level.name}"
+
     private companion object {
         const val PREFS = "do_settings"
         const val KEY_DEFAULT_NAG = "default_nag_minutes"
@@ -139,6 +167,8 @@ class SettingsStore(context: Context) {
         const val KEY_QAT_POSTPONE = "qat_postpone"
         const val KEY_REPEAT_PROMPT = "repeat_prompt"
         const val KEY_WEEK_START = "week_start"
+        const val KEY_PARSE_DATES = "parse_dates"
+        const val KEY_ALERT_DEFAULT = "alert_default"
         const val DEFAULT_NAG_MINUTES = 5
     }
 }

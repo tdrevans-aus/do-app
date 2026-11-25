@@ -1,5 +1,6 @@
 package com.evansappstudio.doapp.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -18,6 +19,8 @@ data class Reminder(
     val repeatWeekDays: String? = null,
     val repeatMonthOn: String? = null,
     val patternDueAt: Long? = null,
+    @ColumnInfo(defaultValue = "STANDARD")
+    val alertLevel: String = "STANDARD",
 ) {
     fun repeatRule(): RepeatRule? = RepeatRule.fromColumns(
         interval = repeatInterval,

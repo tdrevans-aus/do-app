@@ -27,6 +27,8 @@ data class MirrorEntry(
     val pendingSnoozeDueAt: Long? = null,
     val pendingDoneAt: Long? = null,
     val wallClock: Boolean = false,
+    val alertLevel: String = "STANDARD",
+    val awaitingAttend: Boolean = false,
 )
 
 class ReminderMirror(context: Context) {
@@ -88,6 +90,8 @@ class ReminderMirror(context: Context) {
                                 item.getLong("pendingDoneAt")
                             },
                             wallClock = item.optBoolean("wallClock", false),
+                            alertLevel = item.optString("alertLevel", "STANDARD").ifBlank { "STANDARD" },
+                            awaitingAttend = item.optBoolean("awaitingAttend", false),
                         ),
                     )
                 }
@@ -111,7 +115,9 @@ class ReminderMirror(context: Context) {
                     .put("pendingDone", entry.pendingDone)
                     .put("pendingSnoozeDueAt", entry.pendingSnoozeDueAt ?: JSONObject.NULL)
                     .put("pendingDoneAt", entry.pendingDoneAt ?: JSONObject.NULL)
-                    .put("wallClock", entry.wallClock),
+                    .put("wallClock", entry.wallClock)
+                    .put("alertLevel", entry.alertLevel)
+                    .put("awaitingAttend", entry.awaitingAttend),
             )
         }
         val temp = File(file.parentFile, "$FILE_NAME.tmp")
@@ -132,6 +138,7 @@ fun Reminder.toMirror(
     pendingDone: Boolean = false,
     pendingSnoozeDueAt: Long? = null,
     pendingDoneAt: Long? = null,
+    awaitingAttend: Boolean = false,
 ): MirrorEntry = MirrorEntry(
     id = id,
     title = title,
@@ -142,4 +149,6 @@ fun Reminder.toMirror(
     pendingSnoozeDueAt = pendingSnoozeDueAt,
     pendingDoneAt = pendingDoneAt,
     wallClock = repeatRule()?.keepsWallClock() == true,
+    alertLevel = alertLevel.ifBlank { "STANDARD" },
+    awaitingAttend = awaitingAttend,
 )

@@ -7,7 +7,12 @@ import android.util.Log
 import com.evansappstudio.doapp.DoApp
 import com.evansappstudio.doapp.UserUnlock
 import android.text.format.DateFormat
+import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.AlertPermissions
+import com.evansappstudio.doapp.alarm.AlertPolicy
+import com.evansappstudio.doapp.alarm.DateParser
 import com.evansappstudio.doapp.alarm.DoAlarmLog
+import com.evansappstudio.doapp.alarm.alert
 import com.evansappstudio.doapp.alarm.DoneReceiver
 import com.evansappstudio.doapp.alarm.NagSchedule
 import com.evansappstudio.doapp.alarm.PostponeMode
@@ -49,6 +54,11 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_DUMP_REPEAT -> dumpRepeat(context, intent)
             ACTION_SHIFT_DUE -> shiftDue(context, intent)
             ACTION_CONFIG_REPEAT_PROMPT -> configRepeatPrompt(context, intent)
+            ACTION_PARSE -> parse(context, intent)
+            ACTION_SET_ALERT_LEVEL -> setAlertLevel(context, intent)
+            ACTION_CONFIG_PARSE -> configParse(context, intent)
+            ACTION_CONFIG_ALERT_DEFAULT -> configAlertDefault(context, intent)
+            ACTION_DUMP_ALERT -> dumpAlert(context, intent)
         }
     }
 
@@ -65,7 +75,27 @@ class DebugReceiver : BroadcastReceiver() {
             0
         }
         val nagMinutes = NagSchedule.normalize(nagRaw)
-        val dueAt = System.currentTimeMillis() + inSeconds.toLong() * 1000L
+        val now = System.currentTimeMillis()
+        var dueAt = now + inSeconds.toLong() * 1000L
+        var storedTitle = title
+        val parseRequested = boolExtra(intent, EXTRA_PARSE)
+        var parsed: DateParser.Match? = null
+        if (parseRequested) {
+            parsed = DateParser.parse(storedTitle, now, dueAt, java.time.ZoneId.systemDefault())
+            if (parsed != null) {
+                if (parsed.title.isBlank()) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm debug-add empty title after parse")
+                    return
+                }
+                storedTitle = parsed.title
+                dueAt = parsed.dueAt
+            }
+        }
+        val explicitAlert = explicitAlert(intent)
+        if (intent.hasExtra(EXTRA_ALERT) && explicitAlert == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad alert")
+            return
+        }
         val pending = goAsync()
         val app = context.applicationContext as DoApp
         if (!UserUnlock.isUnlocked(app)) {
@@ -75,13 +105,25 @@ class DebugReceiver : BroadcastReceiver() {
         }
         app.container.scope.launch {
             try {
-                val rule = repeatFromIntent(intent)
-                if (rule == null && !repeatUnitIsOff(intent)) {
+                val rule = if (parsed != null) parsed.rule else repeatFromIntent(intent)
+                if (parsed == null && rule == null && !repeatUnitIsOff(intent)) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad repeat")
                     return@launch
                 }
-                val id = app.container.scheduler.add(title, dueAt, nagMinutes, rule)
+                val alert = explicitAlert ?: app.container.settings.defaultAlertLevel()
+                val id = app.container.scheduler.add(storedTitle, dueAt, nagMinutes, rule, alert)
                 DoAlarmLog.debugAdd(id, dueAt, nagMinutes)
+                parsed?.let { match ->
+                    DoAlarmLog.parseMatch(
+                        match.matched,
+                        match.title,
+                        match.dueAt,
+                        DateParser.debugRule(match.rule),
+                        match.start,
+                        match.end,
+                    )
+                }
+                DoAlarmLog.alert(id, alert.name)
                 if (rule != null) {
                     val stored = app.container.reminderDao().getById(id)
                     DoAlarmLog.repeat(
@@ -287,6 +329,7 @@ class DebugReceiver : BroadcastReceiver() {
                     reminder.nagMinutes,
                     rule,
                     shift,
+                    reminder.alert(),
                 )
                 DoAlarmLog.qat(id, newDue, slotIndex)
             } catch (error: Throwable) {
@@ -461,6 +504,134 @@ class DebugReceiver : BroadcastReceiver() {
         DoAlarmLog.configRepeatPrompt(mode.name)
     }
 
+    private fun parse(context: Context, intent: Intent) {
+        val text = intent.getStringExtra(EXTRA_TEXT)
+        if (text == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm parse missing text")
+            return
+        }
+        val now = if (intent.hasExtra(EXTRA_NOW)) intent.getLongExtra(EXTRA_NOW, 0L) else System.currentTimeMillis()
+        val draft = if (intent.hasExtra(EXTRA_DRAFT_DUE)) {
+            intent.getLongExtra(EXTRA_DRAFT_DUE, now)
+        } else {
+            now + 5L * 60L * 1000L
+        }
+        val match = DateParser.parse(text, now, draft, java.time.ZoneId.systemDefault())
+        if (match == null) {
+            DoAlarmLog.parseNone(text)
+        } else {
+            DoAlarmLog.parseMatch(
+                match.matched,
+                match.title,
+                match.dueAt,
+                DateParser.debugRule(match.rule),
+                match.start,
+                match.end,
+            )
+        }
+    }
+
+    private fun setAlertLevel(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        val level = AlertLevel.fromName(intent.getStringExtra(EXTRA_LEVEL))
+        if (id == null || level == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm alert bad args")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm alert user locked")
+            pending.finish()
+            return
+        }
+        app.container.scope.launch {
+            try {
+                val existing = app.container.reminderDao().getById(id)
+                if (existing == null || existing.isDone) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm alert missing id=$id")
+                } else {
+                    app.container.scheduler.setAlertLevel(id, level)
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun configParse(context: Context, intent: Intent) {
+        val value = intent.getStringExtra(EXTRA_VALUE)?.trim()?.uppercase()
+        if (value != "ON" && value != "OFF") {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-parse bad args")
+            return
+        }
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-parse user locked")
+            return
+        }
+        app.container.settings.setParseDatesEnabled(value == "ON")
+        DoAlarmLog.configParse(value)
+    }
+
+    private fun configAlertDefault(context: Context, intent: Intent) {
+        val level = AlertLevel.fromName(intent.getStringExtra(EXTRA_LEVEL))
+        if (level == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-alert-default bad args")
+            return
+        }
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm config-alert-default user locked")
+            return
+        }
+        app.container.settings.setDefaultAlertLevel(level)
+        DoAlarmLog.configAlertDefault(level.name)
+    }
+
+    private fun dumpAlert(context: Context, intent: Intent) {
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm alert user locked")
+            return
+        }
+        val pending = goAsync()
+        app.container.scope.launch {
+            try {
+                val defaultLevel = app.container.settings.defaultAlertLevel()
+                val fullScreen = AlertPermissions.canUseFullScreenIntent(app)
+                val dnd = AlertPermissions.hasDndAccess(app)
+                val parse = if (app.container.settings.parseDatesEnabled()) "ON" else "OFF"
+                if (!intent.hasExtra(DoneReceiver.EXTRA_ID)) {
+                    DoAlarmLog.alertDump(null, null, defaultLevel.name, fullScreen, dnd, null, parse)
+                    return@launch
+                }
+                val id = DoneReceiver.longExtra(intent)
+                val reminder = if (id == null) null else app.container.reminderDao().getById(id)
+                if (id == null || reminder == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm alert missing id=${id ?: -1}")
+                    return@launch
+                }
+                val decision = AlertPolicy.decide(reminder.alert(), fullScreen, dnd)
+                DoAlarmLog.alertDump(
+                    id,
+                    reminder.alert().name,
+                    defaultLevel.name,
+                    fullScreen,
+                    dnd,
+                    decision.effective.name,
+                    parse,
+                )
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     companion object {
         const val ACTION_ADD = "com.evansappstudio.doapp.debug.ADD"
         const val ACTION_DONE = "com.evansappstudio.doapp.debug.DONE"
@@ -474,6 +645,11 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_DUMP_REPEAT = "com.evansappstudio.doapp.debug.DUMP_REPEAT"
         const val ACTION_SHIFT_DUE = "com.evansappstudio.doapp.debug.SHIFT_DUE"
         const val ACTION_CONFIG_REPEAT_PROMPT = "com.evansappstudio.doapp.debug.CONFIG_REPEAT_PROMPT"
+        const val ACTION_PARSE = "com.evansappstudio.doapp.debug.PARSE"
+        const val ACTION_SET_ALERT_LEVEL = "com.evansappstudio.doapp.debug.SET_ALERT_LEVEL"
+        const val ACTION_CONFIG_PARSE = "com.evansappstudio.doapp.debug.CONFIG_PARSE"
+        const val ACTION_CONFIG_ALERT_DEFAULT = "com.evansappstudio.doapp.debug.CONFIG_ALERT_DEFAULT"
+        const val ACTION_DUMP_ALERT = "com.evansappstudio.doapp.debug.DUMP_ALERT"
         const val EXTRA_TITLE = "title"
         const val EXTRA_IN_SECONDS = "inSeconds"
         const val EXTRA_NAG_MINUTES = "nagMinutes"
@@ -491,9 +667,27 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_MONTH_ON = "monthOn"
         const val EXTRA_DUE_AT = "dueAt"
         const val EXTRA_MODE = "mode"
+        const val EXTRA_TEXT = "text"
+        const val EXTRA_NOW = "now"
+        const val EXTRA_DRAFT_DUE = "draftDue"
+        const val EXTRA_PARSE = "parse"
+        const val EXTRA_ALERT = "alert"
+        const val EXTRA_LEVEL = "level"
         private const val MAX_APPLY_COUNT = 1_000
         private const val MAX_DUMP_COUNT = 24
     }
+}
+
+private fun boolExtra(intent: Intent, name: String): Boolean {
+    if (!intent.hasExtra(name)) return false
+    val text = intent.getStringExtra(name)
+    if (text != null) return text.equals("true", ignoreCase = true) || text == "1"
+    return intent.getBooleanExtra(name, false)
+}
+
+private fun explicitAlert(intent: Intent): AlertLevel? {
+    if (!intent.hasExtra(DebugReceiver.EXTRA_ALERT)) return null
+    return AlertLevel.fromName(intent.getStringExtra(DebugReceiver.EXTRA_ALERT))
 }
 
 private fun repeatUnitIsOff(intent: Intent): Boolean {
