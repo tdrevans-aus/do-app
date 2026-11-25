@@ -31,7 +31,13 @@ class Scheduler(
 ) {
     private val gate = Mutex()
 
-    suspend fun add(title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule? = null): Long = guarded {
+    suspend fun add(
+        title: String,
+        dueAt: Long,
+        nagMinutes: Int?,
+        rule: RepeatRule? = null,
+        alertLevel: AlertLevel = AlertLevel.STANDARD,
+    ): Long = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(ZoneId.systemDefault())
         val cleanTitle = title.trim()
@@ -47,6 +53,7 @@ class Scheduler(
                 isDone = false,
                 doneAt = null,
                 createdAt = now,
+                alertLevel = alertLevel.name,
             ).withRepeat(rule, pattern),
         )
         val stored = dao().getById(id) ?: error("Inserted reminder $id was not readable")
@@ -56,9 +63,49 @@ class Scheduler(
         id
     }
 
+    suspend fun stopAlert(id: Long) = guarded {
+        alarms.cancel(id)
+        notifications.dismiss(id)
+        AlertSession.attended(id)
+        val now = System.currentTimeMillis()
+        if (!unlocked()) {
+            val entry = mirror.get(id) ?: return@guarded
+            val next = nextAfterAttend(entry.nagMinutes, now)
+            mirror.upsert(entry.copy(awaitingAttend = false, nextFireAt = next))
+            if (next != null) alarms.schedule(id, next)
+            DoAlarmLog.alertStop(id, next)
+            return@guarded
+        }
+        alignRoomLocked(ZoneId.systemDefault())
+        val reminder = dao().getById(id)
+        if (reminder == null || reminder.isDone) {
+            mirror.remove(id)
+            DoAlarmLog.alertStop(id, null)
+            return@guarded
+        }
+        val next = nextAfterAttend(reminder.nagMinutes, now)
+        mirror.upsert(reminder.toMirror(nextFireAt = next))
+        if (next != null) alarms.schedule(id, next)
+        DoAlarmLog.alertStop(id, next)
+    }
+
+    suspend fun setAlertLevel(id: Long, level: AlertLevel) = guarded {
+        check(unlocked()) { "Cannot save a reminder before unlock" }
+        alignRoomLocked(ZoneId.systemDefault())
+        val existing = dao().getById(id) ?: return@guarded
+        if (existing.isDone) return@guarded
+        val stored = existing.copy(alertLevel = level.name)
+        if (stored.alertLevel != existing.alertLevel) {
+            dao().updateDetails(stored)
+            applyLevelOnly(stored)
+        }
+        DoAlarmLog.alert(id, level.name)
+    }
+
     suspend fun markDone(id: Long) = guarded {
         alarms.cancel(id)
         notifications.dismiss(id)
+        AlertSession.attended(id)
         if (!unlocked()) {
             val existing = mirror.get(id)
             val tappedAt = System.currentTimeMillis()
@@ -112,6 +159,7 @@ class Scheduler(
         nagMinutes: Int?,
         rule: RepeatRule?,
         dueShift: DueShiftMode? = null,
+        alertLevel: AlertLevel = AlertLevel.STANDARD,
     ) = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(ZoneId.systemDefault())
@@ -149,13 +197,20 @@ class Scheduler(
                 else -> existing.patternDueAt
             }
         }
-        val stored = existing.copy(title = cleanTitle, dueAt = finalDue, nagMinutes = nag)
-            .withRepeat(finalRule, finalPattern)
+        val stored = existing.copy(
+            title = cleanTitle,
+            dueAt = finalDue,
+            nagMinutes = nag,
+            alertLevel = alertLevel.name,
+        ).withRepeat(finalRule, finalPattern)
         dao().updateDetails(stored)
         val nagChanged = nag != existing.nagMinutes
         val titleChanged = cleanTitle != existing.title
         val scheduleChanged = finalDue != existing.dueAt
-        if (!scheduleChanged && !nagChanged && !titleChanged && sameSeries(existing, stored)) return@guarded
+        val levelChanged = stored.alertLevel != existing.alertLevel
+        if (!scheduleChanged && !nagChanged && !titleChanged && !levelChanged && sameSeries(existing, stored)) {
+            return@guarded
+        }
         if (scheduleChanged) {
             armDue(stored, System.currentTimeMillis(), dismiss = true)
             return@guarded
@@ -166,6 +221,8 @@ class Scheduler(
             alarms.cancel(id)
             mirror.upsert(stored.toMirror(nextFireAt = next))
             if (next != null) alarms.schedule(id, next)
+        } else if (levelChanged) {
+            applyLevelOnly(stored)
         } else {
             val entry = mirror.get(id)
             if (entry != null) {
@@ -174,11 +231,14 @@ class Scheduler(
                         title = cleanTitle,
                         nagMinutes = nag,
                         wallClock = stored.repeatRule()?.keepsWallClock() == true,
+                        alertLevel = stored.alertLevel,
                     ),
                 )
             }
         }
-        if (titleChanged) notifications.refreshIfShowing(id, cleanTitle, stored.dueAt)
+        if (titleChanged && !levelChanged) {
+            notifications.refreshIfShowing(id, cleanTitle, stored.dueAt, stored.alert())
+        }
     }
 
     /**
@@ -252,15 +312,28 @@ class Scheduler(
                 mirror.remove(id)
                 return@guarded
             }
-            notifications.show(reminder.id, reminder.title, reminder.dueAt)
-            scheduleAfterDelivery(
-                reminder.id,
-                reminder.dueAt,
-                reminder.nagMinutes,
-                reminder.title,
-                actual,
-                reminder.repeatRule()?.keepsWallClock() == true,
-            )
+            val decision = notifications.show(reminder.id, reminder.title, reminder.dueAt, reminder.alert())
+            logFallback(reminder.id, decision)
+            if (decision.loopUntilAttended) {
+                holdUntilAttended(
+                    reminder.id,
+                    reminder.dueAt,
+                    reminder.nagMinutes,
+                    reminder.title,
+                    reminder.repeatRule()?.keepsWallClock() == true,
+                    reminder.alertLevel,
+                )
+            } else {
+                scheduleAfterDelivery(
+                    reminder.id,
+                    reminder.dueAt,
+                    reminder.nagMinutes,
+                    reminder.title,
+                    actual,
+                    reminder.repeatRule()?.keepsWallClock() == true,
+                    reminder.alertLevel,
+                )
+            }
         } else {
             val entry = mirror.get(id)
             if (entry == null || entry.pendingDone) {
@@ -268,15 +341,22 @@ class Scheduler(
                 notifications.dismiss(id)
                 return@guarded
             }
-            notifications.show(entry.id, entry.title, entry.dueAt)
-            scheduleAfterDelivery(
-                entry.id,
-                entry.dueAt,
-                entry.nagMinutes,
-                entry.title,
-                actual,
-                entry.wallClock,
-            )
+            val level = AlertLevel.fromName(entry.alertLevel) ?: AlertLevel.STANDARD
+            val decision = notifications.show(entry.id, entry.title, entry.dueAt, level)
+            logFallback(entry.id, decision)
+            if (decision.loopUntilAttended) {
+                holdUntilAttended(entry.id, entry.dueAt, entry.nagMinutes, entry.title, entry.wallClock, level.name)
+            } else {
+                scheduleAfterDelivery(
+                    entry.id,
+                    entry.dueAt,
+                    entry.nagMinutes,
+                    entry.title,
+                    actual,
+                    entry.wallClock,
+                    level.name,
+                )
+            }
         }
     }
 
@@ -406,6 +486,7 @@ class Scheduler(
         DoAlarmLog.snooze(id, newDue, optionIndex)
         alarms.cancel(id)
         notifications.dismiss(id)
+        AlertSession.attended(id)
         if (!unlocked()) {
             val existing = mirror.get(id)
             if (existing?.pendingDone == true) {
@@ -449,6 +530,7 @@ class Scheduler(
         title: String,
         actual: Long,
         wallClock: Boolean,
+        alertLevel: String,
     ) {
         val next = NagSchedule.afterDelivery(dueAt, nagMinutes, actual)
         val existing = mirror.get(id)
@@ -463,6 +545,8 @@ class Scheduler(
                 pendingSnoozeDueAt = existing?.pendingSnoozeDueAt,
                 pendingDoneAt = existing?.pendingDoneAt,
                 wallClock = wallClock,
+                alertLevel = alertLevel,
+                awaitingAttend = false,
             ),
         )
         if (next == null) {
@@ -472,10 +556,75 @@ class Scheduler(
         }
     }
 
+    private fun holdUntilAttended(
+        id: Long,
+        dueAt: Long,
+        nagMinutes: Int?,
+        title: String,
+        wallClock: Boolean,
+        alertLevel: String,
+    ) {
+        alarms.cancel(id)
+        val existing = mirror.get(id)
+        mirror.upsert(
+            MirrorEntry(
+                id = id,
+                title = title,
+                dueAt = dueAt,
+                nagMinutes = nagMinutes,
+                nextFireAt = null,
+                pendingDone = existing?.pendingDone ?: false,
+                pendingSnoozeDueAt = existing?.pendingSnoozeDueAt,
+                pendingDoneAt = existing?.pendingDoneAt,
+                wallClock = wallClock,
+                alertLevel = alertLevel,
+                awaitingAttend = true,
+            ),
+        )
+    }
+
+    private fun applyLevelOnly(stored: Reminder) {
+        val now = System.currentTimeMillis()
+        val decision = notifications.decide(stored.alert())
+        val entry = mirror.get(stored.id)
+        if (entry?.awaitingAttend == true && !decision.loopUntilAttended) {
+            AlertSession.attended(stored.id)
+            notifications.dismiss(stored.id)
+            val next = nextAfterAttend(stored.nagMinutes, now)
+            mirror.upsert(stored.toMirror(nextFireAt = next))
+            alarms.cancel(stored.id)
+            if (next != null) alarms.schedule(stored.id, next)
+            return
+        }
+        if (entry != null) {
+            mirror.upsert(
+                entry.copy(
+                    title = stored.title,
+                    nagMinutes = stored.nagMinutes,
+                    alertLevel = stored.alertLevel,
+                    wallClock = stored.repeatRule()?.keepsWallClock() == true,
+                ),
+            )
+        }
+        notifications.refreshIfShowing(stored.id, stored.title, stored.dueAt, stored.alert())
+    }
+
+    private fun nextAfterAttend(nagMinutes: Int?, now: Long): Long? {
+        val nag = NagSchedule.normalize(nagMinutes) ?: return null
+        return now + NagSchedule.intervalMillis(nag)
+    }
+
+    private fun logFallback(id: Long, decision: AlertDecision) {
+        decision.reasons.forEach { reason ->
+            DoAlarmLog.alertFallback(id, decision.requested.name, decision.effective.name, reason.name)
+        }
+    }
+
     private fun armDue(reminder: Reminder, now: Long, dismiss: Boolean) {
         if (dismiss) {
             alarms.cancel(reminder.id)
             notifications.dismiss(reminder.id)
+            AlertSession.attended(reminder.id)
         }
         val next = SnoozeDue.nextFire(reminder.dueAt, now)
         mirror.upsert(reminder.toMirror(nextFireAt = next))

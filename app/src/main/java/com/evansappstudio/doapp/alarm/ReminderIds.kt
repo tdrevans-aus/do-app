@@ -17,9 +17,21 @@ object ReminderIds {
      * Distinct from [asInt] and from the other two options of the same reminder.
      * The low 28 bits hold the reminder id; the option lives in the bits above that.
      */
+    fun stopRequestCode(id: Long): Int = tagged(id, STOP_TAG)
+
+    fun fullScreenRequestCode(id: Long): Int = tagged(id, FULL_SCREEN_TAG)
+
     fun snoozeRequestCode(id: Long, option: Int): Int {
         require(option in 0..2) { "option must be 0, 1 or 2" }
         val base = asInt(id) and 0x0FFF_FFFF
         return base or ((option + 1) shl 28)
     }
+
+    private fun tagged(id: Long, tag: Int): Int {
+        val base = asInt(id) and 0x0FFF_FFFF
+        return base or (tag shl 28)
+    }
+
+    private const val STOP_TAG = 4
+    private const val FULL_SCREEN_TAG = 5
 }

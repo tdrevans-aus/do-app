@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,7 +65,23 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.evansappstudio.doapp.AppContainer
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.UserUnlock
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Switch
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import com.evansappstudio.doapp.alarm.AlarmPermissions
+import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.AlertPermissions
+import com.evansappstudio.doapp.alarm.AlertPolicy
+import com.evansappstudio.doapp.alarm.DateParser
+import com.evansappstudio.doapp.alarm.alert
 import com.evansappstudio.doapp.alarm.ExactAlarmPolicy
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.PostponeMode
@@ -106,6 +123,7 @@ fun ReminderApp(
 ) {
     val context = LocalContext.current
     val viewModel: ReminderViewModel = viewModel(factory = ReminderViewModelFactory(container))
+    val chooseAlert = rememberAlertChoice(viewModel)
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val quickTimes by viewModel.quickTimes.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_LIST) }
@@ -175,8 +193,11 @@ fun ReminderApp(
             initialNagMinutes = viewModel.defaultNagMinutes,
             saveEnabled = true,
             onBack = { screen = SCREEN_LIST },
-            onSave = { title, dueAt, nagMinutes, rule, _ ->
-                viewModel.add(title, dueAt, nagMinutes, rule)
+            initialAlert = viewModel.defaultAlertLevel(),
+            parseDates = viewModel.parseDatesEnabled(),
+            onParseDates = viewModel::setParseDatesEnabled,
+            onSave = { title, dueAt, nagMinutes, rule, _, alert ->
+                viewModel.add(title, dueAt, nagMinutes, rule, alert)
                 screen = SCREEN_LIST
             },
             promptMode = viewModel::repeatPromptMode,
@@ -229,6 +250,8 @@ fun ReminderApp(
             onSnoozeSettings = { screen = SCREEN_SNOOZE },
             onAllowExactAlarms = { openExactAlarmSettings(context) },
             onOpenNotificationSettings = { openNotificationSettings(context) },
+            onSetAlert = viewModel::setAlertLevel,
+            chooseAlert = chooseAlert,
         )
     }
 }
@@ -246,6 +269,8 @@ private fun ReminderListScreen(
     onSnoozeSettings: () -> Unit,
     onAllowExactAlarms: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onSetAlert: (Long, AlertLevel) -> Unit,
+    chooseAlert: (AlertLevel, () -> Unit) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -309,6 +334,9 @@ private fun ReminderListScreen(
                     onOpen = { onOpen(reminder.id) },
                     onDone = { onDone(reminder.id) },
                     onDelete = { onDelete(reminder.id) },
+                    onSetAlert = { level ->
+                        chooseAlert(level) { onSetAlert(reminder.id, level) }
+                    },
                 )
             }
         }
@@ -337,7 +365,10 @@ private fun ReminderRow(
     onOpen: () -> Unit,
     onDone: () -> Unit,
     onDelete: () -> Unit,
+    onSetAlert: (AlertLevel) -> Unit,
 ) {
+    var menu by remember { mutableStateOf(false) }
+    val level = reminder.alert()
     val is24Hour = rememberIs24Hour()
     Row(
         modifier = Modifier
@@ -348,7 +379,7 @@ private fun ReminderRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = reminder.title,
+                text = reminderTitle(reminder.title, level),
                 style = MaterialTheme.typography.titleMedium,
                 textDecoration = if (reminder.isDone) TextDecoration.LineThrough else null,
             )
@@ -379,6 +410,21 @@ private fun ReminderRow(
             },
             enabled = !reminder.isDone,
         )
+        TextButton(onClick = { menu = true }) { Text(stringResource(R.string.alert_button)) }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            AlertLevel.entries.forEach { choice ->
+                DropdownMenuItem(
+                    text = {
+                        val mark = if (choice == level) "✓ " else ""
+                        Text(mark + alertName(choice))
+                    },
+                    onClick = {
+                        menu = false
+                        if (choice != level) onSetAlert(choice)
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -412,10 +458,13 @@ private fun EditReminderScreen(
                 initialNagMinutes = current.nagMinutes ?: 0,
                 initialRule = current.repeatRule(),
                 initialPatternDueAt = current.patternDueAt,
+                initialAlert = current.alert(),
+                parseDates = viewModel.parseDatesEnabled(),
+                onParseDates = viewModel::setParseDatesEnabled,
                 saveEnabled = !current.isDone,
                 onBack = onBack,
-                onSave = { title, dueAt, nagMinutes, rule, shift ->
-                    viewModel.update(current.id, title, dueAt, nagMinutes, rule, shift)
+                onSave = { title, dueAt, nagMinutes, rule, shift, alert ->
+                    viewModel.update(current.id, title, dueAt, nagMinutes, rule, shift, alert)
                     onBack()
                 },
                 promptMode = viewModel::repeatPromptMode,
@@ -463,9 +512,12 @@ private fun ReminderFormScreen(
     initialNagMinutes: Int,
     initialRule: RepeatRule? = null,
     initialPatternDueAt: Long? = null,
+    initialAlert: AlertLevel = AlertLevel.STANDARD,
+    parseDates: Boolean = true,
+    onParseDates: (Boolean) -> Unit = {},
     saveEnabled: Boolean,
     onBack: () -> Unit,
-    onSave: (title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, shift: DueShiftMode?) -> Unit,
+    onSave: (title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, shift: DueShiftMode?, alert: AlertLevel) -> Unit,
     promptMode: () -> RepeatPromptMode,
     onPromptMode: (RepeatPromptMode) -> Unit,
     weekStart: WeekStart,
@@ -494,6 +546,15 @@ private fun ReminderFormScreen(
     var showCustom by rememberSaveable(formKey) { mutableStateOf(false) }
     var showDuePrompt by rememberSaveable(formKey) { mutableStateOf(false) }
     var showPatternWarning by rememberSaveable(formKey) { mutableStateOf(false) }
+    var parseOn by rememberSaveable(formKey) { mutableStateOf(parseDates) }
+    var alertName by rememberSaveable(formKey) { mutableStateOf(initialAlert.name) }
+    var keepSource by rememberSaveable(formKey) { mutableStateOf<String?>(null) }
+    var showSpanMenu by rememberSaveable(formKey) { mutableStateOf(false) }
+    var showAlertMenu by rememberSaveable(formKey) { mutableStateOf(false) }
+    var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val chooseAlert = rememberAlertChoice(viewModel = viewModel(factory = ReminderViewModelFactory(
+        (LocalContext.current.applicationContext as com.evansappstudio.doapp.DoApp).container,
+    )))
     val is24Hour = rememberIs24Hour()
     val locale = deviceLocale()
     val draftRule = RepeatRule.decodeDraft(ruleText)
@@ -548,7 +609,36 @@ private fun ReminderFormScreen(
     }
 
     fun persist(shift: DueShiftMode?) {
-        onSave(title, dueAt, nagMinutes.takeIf { it != 0 }, draftRule, shift)
+        val level = AlertLevel.fromName(alertName) ?: AlertLevel.STANDARD
+        onSave(title, dueAt, nagMinutes.takeIf { it != 0 }, draftRule, shift, level)
+    }
+
+    val parsed = if (parseOn) {
+        DateParser.parse(title, clock, draftDueAt, ZoneId.systemDefault())
+    } else {
+        null
+    }
+    LaunchedEffect(title, draftDueAt, parseOn) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            clock = System.currentTimeMillis()
+        }
+    }
+
+    fun acceptParse(strip: Boolean) {
+        val match = parsed ?: return
+        if (strip) {
+            keepSource = title
+            title = match.title
+        }
+        draftDueAt = match.dueAt
+        draftExact = true
+        ruleText = RepeatRule.encodeDraft(match.rule)
+        patternText = if (match.rule == null || match.rule.from == com.evansappstudio.doapp.data.RepeatFrom.COMPLETION) {
+            ""
+        } else {
+            match.dueAt.toString()
+        }
     }
 
     fun finishSave() {
@@ -625,6 +715,9 @@ private fun ReminderFormScreen(
                             },
                         )
                     }
+                    TextButton(onClick = { showAlertMenu = true }) {
+                        Text(stringResource(R.string.alert_button))
+                    }
                 },
             )
         },
@@ -639,11 +732,41 @@ private fun ReminderFormScreen(
         ) {
             OutlinedTextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = {
+                    title = it
+                    if (keepSource != null) keepSource = null
+                },
                 label = { Text(stringResource(R.string.title_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                visualTransformation = underlineMatch(parsed),
             )
+            if (keepSource != null) {
+                TextButton(onClick = {
+                    title = keepSource.orEmpty()
+                    keepSource = null
+                }) { Text(stringResource(R.string.keep_words)) }
+            }
+            val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            if (parsed != null && !imeOpen) {
+                TextButton(onClick = { showSpanMenu = true }) {
+                    Text(buildAnnotatedString {
+                        append(title)
+                        if (parsed.start < parsed.end && parsed.end <= title.length) {
+                            addStyle(SpanStyle(textDecoration = TextDecoration.Underline), parsed.start, parsed.end)
+                        }
+                    })
+                }
+                TextButton(onClick = { acceptParse(strip = false) }) { Text(stringResource(R.string.set_words)) }
+                TextButton(onClick = { acceptParse(strip = true) }) { Text(stringResource(R.string.set_and_remove)) }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.parse_dates), modifier = Modifier.weight(1f))
+                Switch(checked = parseOn, onCheckedChange = {
+                    parseOn = it
+                    onParseDates(it)
+                })
+            }
             Text(
                 text = stringResource(R.string.quick_times),
                 style = MaterialTheme.typography.titleSmall,
@@ -678,10 +801,33 @@ private fun ReminderFormScreen(
                     ),
                 )
             }
+            val setLabel = if (parsed == null) null else stringResource(R.string.set_to, parsed.matched)
+            val setDetail = parsed?.let { match ->
+                buildString {
+                    append(QuickTimes.formatDateTime(match.dueAt, ZoneId.systemDefault(), is24Hour, locale))
+                    if (match.rule != null) {
+                        append(" ")
+                        append(
+                            RepeatText.describe(
+                                match.rule,
+                                match.dueAt,
+                                ZoneId.systemDefault(),
+                                is24Hour,
+                                locale,
+                            ),
+                        )
+                    }
+                }
+            }
             QuickTimesGrid(
                 slots = quickSlots,
                 is24Hour = is24Hour,
                 onApply = { index, base, day -> applyQuick(index, base, day) },
+                slotZero = if (setLabel == null || setDetail == null) {
+                    null
+                } else {
+                    SlotZero(label = setLabel, detail = setDetail, onClick = { acceptParse(strip = true) })
+                },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
@@ -772,6 +918,59 @@ private fun ReminderFormScreen(
         )
     }
 
+    if (showAlertMenu) {
+        AlertDialog(
+            onDismissRequest = { showAlertMenu = false },
+            title = { Text(stringResource(R.string.alert_button)) },
+            text = {
+                val context = LocalContext.current
+                Column {
+                    val current = AlertLevel.fromName(alertName) ?: AlertLevel.STANDARD
+                    val decision = AlertPolicy.decide(
+                        current,
+                        AlertPermissions.canUseFullScreenIntent(context),
+                        AlertPermissions.hasDndAccess(context),
+                    )
+                    if (decision.reasons.isNotEmpty()) {
+                        Text(stringResource(R.string.alert_fallback, decision.effective.name))
+                        TextButton(onClick = {
+                            openMissingPermission(context, current)
+                        }) { Text(stringResource(R.string.alert_open)) }
+                    }
+                    AlertLevel.entries.forEach { choice ->
+                        TextButton(onClick = {
+                            showAlertMenu = false
+                            chooseAlert(choice) { alertName = choice.name }
+                        }) {
+                            Text((if (choice.name == alertName) "✓ " else "") + alertName(choice))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAlertMenu = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+    if (showSpanMenu) {
+        AlertDialog(
+            onDismissRequest = { showSpanMenu = false },
+            title = { Text(stringResource(R.string.set_words)) },
+            text = { Text(stringResource(R.string.set_and_remove)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSpanMenu = false
+                    acceptParse(strip = false)
+                }) { Text(stringResource(R.string.set_words)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showSpanMenu = false
+                    acceptParse(strip = true)
+                }) { Text(stringResource(R.string.set_and_remove)) }
+            },
+        )
+    }
     if (showRepeatMenu) {
         RepeatMenuDialog(
             dueAt = draftDueAt,
@@ -875,6 +1074,27 @@ private fun openExactAlarmSettings(context: Context) {
         context.startActivity(intent)
     } catch (error: Exception) {
         DoAlarmLog.handlingFailed(id = -1, error)
+    }
+}
+
+private fun reminderTitle(title: String, level: AlertLevel): String {
+    val mark = when (level) {
+        AlertLevel.CRITICAL -> " !!!"
+        AlertLevel.PROMINENT -> " ⏰"
+        AlertLevel.STANDARD -> ""
+    }
+    return title + mark
+}
+
+private fun underlineMatch(match: DateParser.Match?): VisualTransformation {
+    if (match == null) return VisualTransformation.None
+    return VisualTransformation { text ->
+        val annotated = androidx.compose.ui.text.AnnotatedString.Builder(text.text).apply {
+            if (match.start < match.end && match.end <= text.text.length) {
+                addStyle(SpanStyle(textDecoration = TextDecoration.Underline), match.start, match.end)
+            }
+        }.toAnnotatedString()
+        TransformedText(annotated, OffsetMapping.Identity)
     }
 }
 

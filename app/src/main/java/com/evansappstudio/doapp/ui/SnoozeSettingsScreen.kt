@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -31,7 +32,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.Intent
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.evansappstudio.doapp.R
+import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.AlertPermissions
+import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.WeekStart
@@ -47,6 +57,23 @@ fun SnoozeSettingsScreen(
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
     var weekStart by remember { mutableStateOf(viewModel.weekStart()) }
+    var parseDates by remember { mutableStateOf(viewModel.parseDatesEnabled()) }
+    var alertDefault by remember { mutableStateOf(viewModel.defaultAlertLevel()) }
+    var permissionTick by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val chooseAlert = rememberAlertChoice(viewModel)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                parseDates = viewModel.parseDatesEnabled()
+                alertDefault = viewModel.defaultAlertLevel()
+                permissionTick++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,6 +131,48 @@ fun SnoozeSettingsScreen(
                             )
                         }
                     }
+                }
+            }
+            item {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(stringResource(R.string.parse_dates), modifier = Modifier.weight(1f))
+                        Switch(checked = parseDates, onCheckedChange = {
+                            viewModel.setParseDatesEnabled(it)
+                            parseDates = it
+                        })
+                    }
+                    Text(stringResource(R.string.alert_default))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AlertLevel.entries.forEach { level ->
+                            FilterChip(
+                                selected = alertDefault == level,
+                                onClick = {
+                                    chooseAlert(level) {
+                                        viewModel.setDefaultAlertLevel(level)
+                                        alertDefault = level
+                                    }
+                                },
+                                label = { Text(alertName(level)) },
+                            )
+                        }
+                    }
+                    val fsi = permissionTick >= 0 && AlertPermissions.canUseFullScreenIntent(context)
+                    val dnd = AlertPermissions.hasDndAccess(context)
+                    Text(
+                        stringResource(R.string.alert_fsi) + ": " +
+                            stringResource(if (fsi) R.string.alert_allowed else R.string.alert_missing),
+                    )
+                    TextButton(onClick = {
+                        openSettings(context, AlertPermissions.fullScreenSettings(context))
+                    }) { Text(stringResource(R.string.alert_open)) }
+                    Text(
+                        stringResource(R.string.alert_dnd) + ": " +
+                            stringResource(if (dnd) R.string.alert_allowed else R.string.alert_missing),
+                    )
+                    TextButton(onClick = {
+                        openSettings(context, AlertPermissions.dndSettings())
+                    }) { Text(stringResource(R.string.alert_open)) }
                 }
             }
             item {
@@ -212,5 +281,14 @@ private fun SnoozeOptionDialog(
             },
             text = { TimePicker(state = state) },
         )
+    }
+}
+
+private fun openSettings(context: android.content.Context, intent: Intent) {
+    try {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (error: Exception) {
+        DoAlarmLog.handlingFailed(id = -1, error)
     }
 }

@@ -40,7 +40,7 @@ interface ReminderDao {
         "UPDATE reminder SET title = :title, dueAt = :dueAt, nagMinutes = :nagMinutes, " +
             "repeatInterval = :repeatInterval, repeatUnit = :repeatUnit, repeatFrom = :repeatFrom, " +
             "repeatWeekDays = :repeatWeekDays, repeatMonthOn = :repeatMonthOn, " +
-            "patternDueAt = :patternDueAt " +
+            "patternDueAt = :patternDueAt, alertLevel = :alertLevel " +
             "WHERE id = :id AND isDone = 0",
     )
     suspend fun updateDetails(
@@ -54,6 +54,7 @@ interface ReminderDao {
         repeatWeekDays: String?,
         repeatMonthOn: String?,
         patternDueAt: Long?,
+        alertLevel: String,
     )
 
     @Query("DELETE FROM reminder WHERE id = :id")
@@ -72,5 +73,6 @@ suspend fun ReminderDao.updateDetails(reminder: Reminder) {
         repeatWeekDays = reminder.repeatWeekDays,
         repeatMonthOn = reminder.repeatMonthOn,
         patternDueAt = reminder.patternDueAt,
+        alertLevel = reminder.alertLevel,
     )
 }

@@ -20,6 +20,11 @@
                 <action android:name="com.evansappstudio.doapp.debug.DUMP_REPEAT" />
                 <action android:name="com.evansappstudio.doapp.debug.SHIFT_DUE" />
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_REPEAT_PROMPT" />
+                <action android:name="com.evansappstudio.doapp.debug.PARSE" />
+                <action android:name="com.evansappstudio.doapp.debug.SET_ALERT_LEVEL" />
+                <action android:name="com.evansappstudio.doapp.debug.CONFIG_PARSE" />
+                <action android:name="com.evansappstudio.doapp.debug.CONFIG_ALERT_DEFAULT" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_ALERT" />
             </intent-filter>
         </receiver>
     </application>

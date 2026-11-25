@@ -5,6 +5,15 @@
     android:orientation="vertical">
 
     <TextView
+        android:id="@+id/notification_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/critical_label"
+        android:textColor="@color/critical_label"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/notification_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -106,4 +115,17 @@
             android:textColor="@color/notification_action_text"
             android:textSize="12sp" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/action_stop"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/notification_action_bg"
+        android:gravity="center"
+        android:minHeight="48dp"
+        android:text="@string/action_stop"
+        android:textColor="@color/notification_action_text"
+        android:textSize="12sp"
+        android:visibility="gone" />
 </LinearLayout>

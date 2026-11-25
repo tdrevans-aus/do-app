@@ -70,6 +70,45 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm config-repeat-prompt value=$value")
     }
 
+    fun parseMatch(matched: String, title: String, dueAt: Long, rule: String, start: Int, end: Int) {
+        Log.i(TAG, "DoAlarm parse match=\"$matched\" title=\"$title\" dueAt=$dueAt rule=$rule span=$start,$end")
+    }
+
+    fun parseNone(text: String) {
+        Log.i(TAG, "DoAlarm parse none text=\"$text\"")
+    }
+
+    fun alert(id: Long, level: String) {
+        Log.i(TAG, "DoAlarm alert id=$id level=$level")
+    }
+
+    fun alertDump(id: Long?, level: String?, defaultLevel: String, fullScreen: Boolean, dnd: Boolean, effective: String?, parse: String) {
+        if (id == null || level == null || effective == null) {
+            Log.i(TAG, "DoAlarm alert default=$defaultLevel fsi=$fullScreen dnd=$dnd parse=$parse")
+        } else {
+            Log.i(
+                TAG,
+                "DoAlarm alert id=$id level=$level default=$defaultLevel fsi=$fullScreen dnd=$dnd effective=$effective",
+            )
+        }
+    }
+
+    fun alertFallback(id: Long, requested: String, effective: String, reason: String) {
+        Log.i(TAG, "DoAlarm alert-fallback id=$id requested=$requested effective=$effective reason=$reason")
+    }
+
+    fun alertStop(id: Long, next: Long?) {
+        Log.i(TAG, "DoAlarm alert-stop id=$id next=${next?.toString() ?: "none"}")
+    }
+
+    fun configParse(value: String) {
+        Log.i(TAG, "DoAlarm config-parse value=$value")
+    }
+
+    fun configAlertDefault(level: String) {
+        Log.i(TAG, "DoAlarm config-alert-default level=$level")
+    }
+
     fun handlingFailed(id: Long, error: Throwable) {
         Log.e(TAG, "DoAlarm handling failed id=$id", error)
     }
