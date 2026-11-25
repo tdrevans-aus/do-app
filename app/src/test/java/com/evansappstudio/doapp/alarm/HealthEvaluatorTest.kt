@@ -575,6 +575,7 @@ class HealthEvaluatorTest {
             "lastLate=none",
             "test=none",
             "late=OK",
+            "backup=OK",
         )) {
             assertTrue("missing $key in $dump", dump.contains(key))
         }
@@ -589,9 +590,32 @@ class HealthEvaluatorTest {
                 HealthIds.BACKGROUND,
                 HealthIds.STANDBY,
                 HealthIds.BOOT,
+                HealthIds.BACKUP,
             ),
             report.items.map { it.id },
         )
+    }
+
+    @Test
+    fun backupWarnsUntilAUserBackupSucceedsAndThenShowsTheTime() {
+        val missing = evaluate(healthy().copy(backupOk = false, backupSuccessText = ""))
+        val row = missing.item(HealthIds.BACKUP)
+        assertEquals(HealthStatus.WARN, row.status)
+        assertEquals("Reminders Not Backed Up", row.title)
+        assertEquals(HealthActionKind.BACKUP, row.fixes.single().kind)
+        assertTrue(missing.badge)
+        assertTrue(missing.dump.contains("backup=WARN"))
+
+        val failed = evaluate(healthy().copy(backupOk = false, backupFailed = true, backupSuccessText = ""))
+        assertEquals("The last backup did not succeed.", failed.item(HealthIds.BACKUP).explanation)
+
+        val ok = evaluate(healthy().copy(backupOk = true, backupSuccessText = "25 Nov 2026, 3:45 pm"))
+        val okRow = ok.item(HealthIds.BACKUP)
+        assertEquals(HealthStatus.OK, okRow.status)
+        assertEquals("Backup", okRow.title)
+        assertTrue(okRow.explanation.contains("25 Nov 2026, 3:45 pm"))
+        assertEquals(HealthActionKind.BACKUP, okRow.fixes.single().kind)
+        assertTrue(ok.dump.contains("backup=OK"))
     }
 
     @Test
@@ -623,7 +647,11 @@ class HealthEvaluatorTest {
 
     private fun HealthReport.item(id: String) = items.first { it.id == id }
 
-    private fun healthy(): HealthFacts = HealthFacts(channels = healthyChannels())
+    private fun healthy(): HealthFacts = HealthFacts(
+        channels = healthyChannels(),
+        backupOk = true,
+        backupSuccessText = "1 Jan 2026, 9:00 am",
+    )
 
     private fun healthyChannels(): List<ChannelFact> = listOf(
         healthyChannel("reminders", "Reminders"),

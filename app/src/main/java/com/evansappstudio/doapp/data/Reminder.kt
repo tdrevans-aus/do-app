@@ -7,6 +7,9 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "reminder")
 data class Reminder(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Stable across export and import. Local [id] is not portable. */
+    @ColumnInfo(defaultValue = "''")
+    val uuid: String = "",
     val title: String,
     val dueAt: Long,
     val nagMinutes: Int?,

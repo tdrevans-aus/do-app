@@ -136,4 +136,65 @@ object DoAlarmLog {
     fun healthTestDone(id: Long) {
         Log.i(TAG, "DoAlarm health-test done id=$id")
     }
+
+    fun unlockBlocked(active: Int, cap: String) {
+        Log.i(TAG, "DoAlarm unlock blocked active=$active cap=$cap")
+    }
+
+    fun unlockFake(state: String, active: Int, cap: String) {
+        Log.i(TAG, "DoAlarm unlock state=$state source=fake active=$active cap=$cap")
+    }
+
+    fun unlockDump(
+        state: String,
+        source: String,
+        pending: Boolean,
+        price: String,
+        active: Int,
+        cap: String,
+    ) {
+        Log.i(
+            TAG,
+            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap",
+        )
+    }
+
+    fun unlockAckFailed(responseCode: Int) {
+        Log.i(TAG, "DoAlarm unlock ack failed code=$responseCode")
+    }
+
+    fun backupExport(path: String, reminders: Int) {
+        Log.i(TAG, "DoAlarm backup export path=$path reminders=$reminders schema=1")
+    }
+
+    fun backupImport(mode: String, reminders: Int, ids: List<Long>) {
+        val suffix = if (ids.isEmpty()) "" else " ids=${ids.joinToString(",")}"
+        Log.i(TAG, "DoAlarm backup import mode=$mode reminders=$reminders schema=1$suffix")
+    }
+
+    fun backupImportError(reason: String) {
+        Log.i(TAG, "DoAlarm backup import error reason=$reason")
+    }
+
+    fun backupFolder(set: Boolean) {
+        Log.i(TAG, "DoAlarm backup folder=${if (set) "set" else "none"}")
+    }
+
+    fun backupDump(folderSet: Boolean, lastSuccessAt: Long, health: String) {
+        val success = if (lastSuccessAt > 0L) lastSuccessAt.toString() else "none"
+        val folder = if (folderSet) "set" else "none"
+        Log.i(TAG, "DoAlarm backup folder=$folder lastSuccess=$success health=$health")
+    }
+
+    fun backupAuto(path: String, reminders: Int) {
+        Log.i(TAG, "DoAlarm backup auto path=$path reminders=$reminders schema=1")
+    }
+
+    fun backupAutoSkipped(reason: String) {
+        Log.i(TAG, "DoAlarm backup auto skipped reason=$reason")
+    }
+
+    fun backupAutoError(reason: String) {
+        Log.i(TAG, "DoAlarm backup auto error reason=$reason")
+    }
 }

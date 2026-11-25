@@ -12,6 +12,7 @@ import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.backup.PortableSettings
 
 /**
  * App settings. The default nag for a new reminder is 5 minutes.
@@ -29,6 +30,48 @@ class SettingsStore(context: Context) {
         }
         val stored = prefs.getInt(KEY_DEFAULT_NAG, DEFAULT_NAG_MINUTES)
         return NagSchedule.normalize(stored) ?: DEFAULT_NAG_MINUTES
+    }
+
+    /** Keys that travel in a backup. Entitlement, purchase tokens and one-shot flags stay out. */
+    fun portable(): PortableSettings = PortableSettings(
+        defaultNagMinutes = defaultNagMinutes(),
+        snooze = snoozeOptions(),
+        quickTimes = quickTimes(),
+        weekStart = weekStart(),
+        parseDates = parseDatesEnabled(),
+        defaultAlertLevel = defaultAlertLevel(),
+        repeatPromptMode = repeatPromptMode(),
+    )
+
+    @SuppressLint("ApplySharedPref")
+    fun replacePortable(portable: PortableSettings) {
+        require(portable.snooze.size == SnoozeDue.DEFAULTS.size) { "snooze options" }
+        require(portable.quickTimes.slots.size == QuickTimes.SLOT_COUNT) { "quick times" }
+        val editor = prefs.edit()
+        val nag = NagSchedule.normalize(portable.defaultNagMinutes) ?: DEFAULT_NAG_MINUTES
+        editor.putInt(KEY_DEFAULT_NAG, nag)
+        portable.snooze.forEachIndexed { index, option ->
+            val stored = SnoozeOption.orNull(option.kind, option.value) ?: SnoozeDue.DEFAULTS[index]
+            editor.putString(snoozeKindKey(index), stored.kind.name)
+            editor.putInt(snoozeValueKey(index), stored.value)
+        }
+        editor.putString(KEY_QAT_POSTPONE, portable.quickTimes.postpone.name)
+        portable.quickTimes.slots.forEachIndexed { index, slot ->
+            val stored = QuickTimeSlot.orNull(slot.kind, slot.amount, slot.unit) ?: QuickTimes.FACTORY[index]
+            val normalized = if (stored.kind == SnoozeKind.AT_TIME) {
+                stored.copy(unit = QuickTimeUnit.MINUTE)
+            } else {
+                stored
+            }
+            editor.putString(qatKindKey(index), normalized.kind.name)
+            editor.putInt(qatAmountKey(index), normalized.amount)
+            editor.putString(qatUnitKey(index), normalized.unit.name)
+        }
+        editor.putString(KEY_WEEK_START, portable.weekStart.name)
+        editor.putBoolean(KEY_PARSE_DATES, portable.parseDates)
+        editor.putString(KEY_ALERT_DEFAULT, portable.defaultAlertLevel.name)
+        editor.putString(KEY_REPEAT_PROMPT, portable.repeatPromptMode.name)
+        editor.commit()
     }
 
     fun hasRequestedNotificationPermission(): Boolean =

@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.app.usage.UsageStatsManager
 import com.evansappstudio.doapp.BuildConfig
 import com.evansappstudio.doapp.UserUnlock
+import com.evansappstudio.doapp.backup.BackupHealth
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.notify.ReminderNotifier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,9 @@ class HealthMonitor(
     private val dao: () -> ReminderDao,
     private val unlocked: () -> Boolean = { UserUnlock.isUnlocked(context) },
     private val exactMode: String = BuildConfig.EXACT_ALARM_MODE,
+    private val backupHealth: () -> BackupHealth = {
+        BackupHealth(ok = false, successAt = null, failed = false)
+    },
 ) {
     private val appContext = context.applicationContext
     private val store = HealthStore(appContext)
@@ -116,6 +120,13 @@ class HealthMonitor(
                 rule = null,
                 alertLevel = AlertLevel.STANDARD,
             )
+            if (id == null) {
+                DoAlarmLog.handlingFailed(
+                    id = -1,
+                    IllegalStateException("health test blocked by the free cap"),
+                )
+                return@withLock 0L
+            }
             store.setTestArmed(id, whenAt)
             DoAlarmLog.healthTestScheduled(whenAt, id)
             whenAt
@@ -180,6 +191,7 @@ class HealthMonitor(
         val storedBoot = store.bootSnapshot()
         val active = readActiveMirror()
         val generation = storedBoot.generation
+        val backup = backupHealth()
         val facts = HealthFacts(
             sdkInt = Build.VERSION.SDK_INT,
             notificationsGranted = AlarmPermissions.canPostNotifications(appContext),
@@ -206,6 +218,9 @@ class HealthMonitor(
             testResult = store.testResult(),
             testPending = store.testId()?.let { testStillActive(it) } == true,
             testEarly = store.testEarly(),
+            backupOk = backup.ok,
+            backupFailed = backup.failed,
+            backupSuccessText = backup.successAt?.let { formatBackupTime(it) }.orEmpty(),
         )
         return HealthEvaluator.evaluate(facts)
     }
@@ -308,6 +323,14 @@ class HealthMonitor(
         } catch (error: Throwable) {
             false
         }
+    }
+
+    private fun formatBackupTime(epochMs: Long): String {
+        val formatter = java.text.DateFormat.getDateTimeInstance(
+            java.text.DateFormat.MEDIUM,
+            java.text.DateFormat.SHORT,
+        )
+        return formatter.format(java.util.Date(epochMs))
     }
 
     private fun readBootCount(): Int? {

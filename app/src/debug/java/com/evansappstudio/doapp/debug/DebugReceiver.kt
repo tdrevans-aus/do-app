@@ -6,6 +6,9 @@ import android.content.Intent
 import android.util.Log
 import com.evansappstudio.doapp.DoApp
 import com.evansappstudio.doapp.UserUnlock
+import com.evansappstudio.doapp.backup.BackupMode
+import com.evansappstudio.doapp.billing.FakeUnlockBilling
+import com.evansappstudio.doapp.billing.FreeTier
 import android.text.format.DateFormat
 import com.evansappstudio.doapp.alarm.AlertLevel
 import com.evansappstudio.doapp.alarm.AlertPermissions
@@ -62,6 +65,14 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_DUMP_HEALTH -> dumpHealth(context)
             ACTION_TEST_HEALTH -> testHealth(context)
             ACTION_NOTE_LATE -> noteLate(context, intent)
+            ACTION_FAKE_PURCHASE -> fakePurchase(context, intent)
+            ACTION_DUMP_UNLOCK -> dumpUnlock(context)
+            ACTION_EXPORT -> exportBackup(context, intent)
+            ACTION_IMPORT -> importBackup(context, intent)
+            ACTION_DUMP_BACKUP -> dumpBackup(context)
+            ACTION_CONFIG_BACKUP_FOLDER -> configBackupFolder(context, intent)
+            ACTION_AUTO_BACKUP -> autoBackup(context)
+            ACTION_SET_TITLE -> setTitle(context, intent)
         }
     }
 
@@ -115,6 +126,7 @@ class DebugReceiver : BroadcastReceiver() {
                 }
                 val alert = explicitAlert ?: app.container.settings.defaultAlertLevel()
                 val id = app.container.scheduler.add(storedTitle, dueAt, nagMinutes, rule, alert)
+                if (id == null) return@launch
                 DoAlarmLog.debugAdd(id, dueAt, nagMinutes)
                 parsed?.let { match ->
                     DoAlarmLog.parseMatch(
@@ -683,6 +695,178 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun fakePurchase(context: Context, intent: Intent) {
+        val state = intent.getStringExtra(EXTRA_STATE)?.trim()?.lowercase().orEmpty().ifBlank { "unlocked" }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                val billing = app.container.billing
+                if (billing !is FakeUnlockBilling) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm unlock fake unavailable")
+                    return@launch
+                }
+                val record = billing.applyState(state)
+                if (record == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm unlock bad state")
+                    return@launch
+                }
+                val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
+                DoAlarmLog.unlockFake(state, active, FreeTier.capLabel())
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun dumpUnlock(context: Context) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                val record = app.container.entitlement.read()
+                val billing = app.container.billing
+                val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
+                val state = if (record.unlocked) "unlocked" else "locked"
+                DoAlarmLog.unlockDump(
+                    state = state,
+                    source = billing.dumpSource(),
+                    pending = record.pending,
+                    price = billing.formattedPrice() ?: "none",
+                    active = active,
+                    cap = FreeTier.capLabel(),
+                )
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun exportBackup(context: Context, intent: Intent) {
+        val path = intent.getStringExtra(EXTRA_PATH)?.trim().orEmpty()
+        if (path.isEmpty()) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm backup export missing path")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.backup.exportToFile(path)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun importBackup(context: Context, intent: Intent) {
+        val path = intent.getStringExtra(EXTRA_PATH)?.trim().orEmpty()
+        val mode = BackupMode.fromName(intent.getStringExtra(EXTRA_MODE))
+        val uuids = intent.getStringExtra(EXTRA_UUIDS)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.toSet()
+        if (path.isEmpty()) {
+            DoAlarmLog.backupImportError("corrupt")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.backup.importPath(path, mode, if (intent.hasExtra(EXTRA_UUIDS)) uuids else null)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+                DoAlarmLog.backupImportError("corrupt")
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun dumpBackup(context: Context) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.health.refresh()
+                val store = app.container.backupStore
+                val health = if (store.health().ok) "OK" else "WARN"
+                DoAlarmLog.backupDump(store.folderSet(), store.lastSuccessAt(), health)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun configBackupFolder(context: Context, intent: Intent) {
+        val path = if (intent.hasExtra(EXTRA_PATH)) intent.getStringExtra(EXTRA_PATH) else null
+        val clearSuccess = boolExtra(intent, EXTRA_CLEAR_SUCCESS)
+        if (path == null && !clearSuccess) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm backup folder missing path")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.backup.configureFolder(path, clearSuccess)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun autoBackup(context: Context) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                app.container.backup.maybeAutoBackup(announceSkip = true)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun setTitle(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        val title = intent.getStringExtra(EXTRA_TITLE)?.trim().orEmpty()
+        if (id == null || title.isEmpty()) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm set-title bad args")
+            return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                val stored = app.container.scheduler.setTitle(id, title)
+                if (stored == null) {
+                    Log.e(DoAlarmLog.TAG, "DoAlarm set-title missing id=$id")
+                } else {
+                    Log.i(DoAlarmLog.TAG, "DoAlarm set-title id=${stored.id} uuid=${stored.uuid} title=${stored.title}")
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     companion object {
         const val ACTION_ADD = "com.evansappstudio.doapp.debug.ADD"
         const val ACTION_DONE = "com.evansappstudio.doapp.debug.DONE"
@@ -704,6 +888,18 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_DUMP_HEALTH = "com.evansappstudio.doapp.debug.DUMP_HEALTH"
         const val ACTION_TEST_HEALTH = "com.evansappstudio.doapp.debug.TEST_HEALTH"
         const val ACTION_NOTE_LATE = "com.evansappstudio.doapp.debug.NOTE_LATE"
+        const val ACTION_FAKE_PURCHASE = "com.evansappstudio.doapp.debug.FAKE_PURCHASE"
+        const val ACTION_DUMP_UNLOCK = "com.evansappstudio.doapp.debug.DUMP_UNLOCK"
+        const val ACTION_EXPORT = "com.evansappstudio.doapp.debug.EXPORT"
+        const val ACTION_IMPORT = "com.evansappstudio.doapp.debug.IMPORT"
+        const val ACTION_DUMP_BACKUP = "com.evansappstudio.doapp.debug.DUMP_BACKUP"
+        const val ACTION_CONFIG_BACKUP_FOLDER = "com.evansappstudio.doapp.debug.CONFIG_BACKUP_FOLDER"
+        const val ACTION_AUTO_BACKUP = "com.evansappstudio.doapp.debug.AUTO_BACKUP"
+        const val ACTION_SET_TITLE = "com.evansappstudio.doapp.debug.SET_TITLE"
+        const val EXTRA_PATH = "path"
+        const val EXTRA_UUIDS = "uuids"
+        const val EXTRA_STATE = "state"
+        const val EXTRA_CLEAR_SUCCESS = "clearSuccess"
         const val EXTRA_TITLE = "title"
         const val EXTRA_IN_SECONDS = "inSeconds"
         const val EXTRA_NAG_MINUTES = "nagMinutes"

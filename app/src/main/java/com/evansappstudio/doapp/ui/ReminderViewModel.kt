@@ -43,6 +43,7 @@ class ReminderViewModel(
         viewModelScope.launch {
             container.settings.setQuickTimeSlot(index, slot)
             reloadQuickTimes()
+            container.backup.noteChange()
         }
     }
 
@@ -50,11 +51,22 @@ class ReminderViewModel(
         viewModelScope.launch {
             container.settings.setPostponeMode(mode)
             reloadQuickTimes()
+            container.backup.noteChange()
         }
     }
 
-    fun add(title: String, dueAt: Long, nagMinutes: Int?, rule: RepeatRule?, alert: AlertLevel) {
-        viewModelScope.launch { container.scheduler.add(title, dueAt, nagMinutes, rule, alert) }
+    fun add(
+        title: String,
+        dueAt: Long,
+        nagMinutes: Int?,
+        rule: RepeatRule?,
+        alert: AlertLevel,
+        onResult: (created: Boolean) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            val created = container.scheduler.add(title, dueAt, nagMinutes, rule, alert) != null
+            onResult(created)
+        }
     }
 
     fun update(
@@ -79,12 +91,14 @@ class ReminderViewModel(
 
     fun setParseDatesEnabled(enabled: Boolean) {
         container.settings.setParseDatesEnabled(enabled)
+        container.backup.noteChange()
     }
 
     fun defaultAlertLevel(): AlertLevel = container.settings.defaultAlertLevel()
 
     fun setDefaultAlertLevel(level: AlertLevel) {
         container.settings.setDefaultAlertLevel(level)
+        container.backup.noteChange()
     }
 
     fun hasExplainedAlert(level: AlertLevel): Boolean = container.settings.hasExplainedAlert(level)
@@ -97,12 +111,14 @@ class ReminderViewModel(
 
     fun setRepeatPromptMode(mode: RepeatPromptMode) {
         container.settings.setRepeatPromptMode(mode)
+        container.backup.noteChange()
     }
 
     fun weekStart(): WeekStart = container.settings.weekStart()
 
     fun setWeekStart(start: WeekStart) {
         container.settings.setWeekStart(start)
+        container.backup.noteChange()
     }
 
     suspend fun reminderOrNull(id: Long): Reminder? = container.reminderDao().getById(id)
@@ -112,6 +128,7 @@ class ReminderViewModel(
             container.saveSnoozeOption(index, option)
             snoozeOptionState.value = container.settings.snoozeOptions()
             container.scheduler.rebuildShowingNotifications()
+            container.backup.noteChange()
         }
     }
 

@@ -3,6 +3,7 @@ package com.evansappstudio.doapp.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,11 +14,26 @@ interface ReminderDao {
     @Query("SELECT * FROM reminder WHERE isDone = 0 ORDER BY dueAt ASC, id ASC")
     suspend fun active(): List<Reminder>
 
+    @Query("SELECT COUNT(*) FROM reminder WHERE isDone = 0")
+    suspend fun activeCount(): Int
+
+    @Query("SELECT * FROM reminder")
+    suspend fun all(): List<Reminder>
+
     @Query("SELECT * FROM reminder WHERE id = :id")
     suspend fun getById(id: Long): Reminder?
 
+    @Query("SELECT * FROM reminder WHERE uuid = :uuid LIMIT 1")
+    suspend fun getByUuid(uuid: String): Reminder?
+
     @Insert
     suspend fun insert(reminder: Reminder): Long
+
+    @Update
+    suspend fun update(reminder: Reminder)
+
+    @Query("DELETE FROM reminder")
+    suspend fun deleteAll()
 
     @Query("UPDATE reminder SET isDone = 1, doneAt = :doneAt WHERE id = :id AND isDone = 0")
     suspend fun markDone(id: Long, doneAt: Long)

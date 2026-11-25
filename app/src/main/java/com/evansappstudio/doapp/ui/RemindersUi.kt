@@ -76,6 +76,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import com.evansappstudio.doapp.backup.BackupNames
 import com.evansappstudio.doapp.alarm.AlarmPermissions
 import com.evansappstudio.doapp.alarm.AlertLevel
 import com.evansappstudio.doapp.alarm.AlertPermissions
@@ -116,6 +117,8 @@ private const val SCREEN_ADD = "add"
 private const val SCREEN_EDIT = "edit"
 private const val SCREEN_SNOOZE = "snooze"
 private const val SCREEN_HEALTH = "health"
+private const val SCREEN_UNLOCK = "unlock"
+private const val SCREEN_BACKUP = "backup"
 
 private val nagChoices = listOf(1, 5, 10, 15, 30, 60, 0)
 
@@ -136,6 +139,59 @@ fun ReminderApp(
     var exactAllowed by remember { mutableStateOf(AlarmPermissions.canScheduleExact(context)) }
     var notificationsAllowed by remember { mutableStateOf(AlarmPermissions.canPostNotifications(context)) }
     val health by container.health.snapshot.collectAsStateWithLifecycle()
+    val unlock by container.billing.ui.collectAsStateWithLifecycle()
+    val backupUi by container.backup.ui.collectAsStateWithLifecycle()
+    var unlockFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
+    var backupFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
+    var replaceCount by remember { mutableIntStateOf(0) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        container.scope.launch { container.backup.exportToUri(uri) }
+    }
+    val openLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        container.scope.launch {
+            val bytes = try {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            } catch (error: Throwable) {
+                null
+            }
+            if (bytes == null) {
+                container.backup.preview(byteArrayOf())
+            } else {
+                container.backup.preview(bytes)
+            }
+        }
+    }
+    val treeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        container.scope.launch { container.backup.rememberTree(uri) }
+    }
+
+    LaunchedEffect(backupUi.preview?.exportedAt) {
+        if (backupUi.preview != null) {
+            replaceCount = container.backup.reminderCount()
+        }
+    }
+
+    fun suggestedExportName(): String = BackupNames.suggested(System.currentTimeMillis(), ZoneId.systemDefault())
+
+    fun openBackup(from: String) {
+        backupFrom = from
+        screen = SCREEN_BACKUP
+    }
+
+    fun openUnlock(from: String) {
+        unlockFrom = from
+        screen = SCREEN_UNLOCK
+    }
 
     fun refreshPermissions() {
         exactAllowed = AlarmPermissions.canScheduleExact(context)
@@ -152,6 +208,7 @@ fun ReminderApp(
             HealthActionKind.RESTORE_ALARMS -> container.scope.launch { container.health.restoreAlarms() }
             HealthActionKind.REENABLE_BOOT -> container.scope.launch { container.health.reenableBootReceiver() }
             HealthActionKind.CLEAR_LATE -> container.scope.launch { container.health.clearLate() }
+            HealthActionKind.BACKUP -> openBackup(screen)
             else -> HealthIntents.open(context, fix)
         }
     }
@@ -205,6 +262,18 @@ fun ReminderApp(
         onOpenRequestConsumed()
     }
 
+    if (unlock.celebrate) {
+        AlertDialog(
+            onDismissRequest = { container.billing.clearCelebrate() },
+            text = { Text(stringResource(R.string.unlock_success)) },
+            confirmButton = {
+                TextButton(onClick = { container.billing.clearCelebrate() }) {
+                    Text(stringResource(R.string.ok))
+                }
+            },
+        )
+    }
+
     when (screen) {
         SCREEN_ADD -> ReminderFormScreen(
             heading = stringResource(R.string.add_reminder),
@@ -218,8 +287,9 @@ fun ReminderApp(
             parseDates = viewModel.parseDatesEnabled(),
             onParseDates = viewModel::setParseDatesEnabled,
             onSave = { title, dueAt, nagMinutes, rule, _, alert ->
-                viewModel.add(title, dueAt, nagMinutes, rule, alert)
-                screen = SCREEN_LIST
+                viewModel.add(title, dueAt, nagMinutes, rule, alert) { created ->
+                    screen = if (created) SCREEN_LIST else SCREEN_UNLOCK.also { unlockFrom = SCREEN_ADD }
+                }
             },
             promptMode = viewModel::repeatPromptMode,
             onPromptMode = viewModel::setRepeatPromptMode,
@@ -247,8 +317,41 @@ fun ReminderApp(
         )
         SCREEN_SNOOZE -> SnoozeSettingsScreen(
             viewModel = viewModel,
+            unlock = unlock,
             onBack = { screen = SCREEN_LIST },
             onOpenHealth = { openHealth(SCREEN_SNOOZE) },
+            onUnlock = { openUnlock(SCREEN_SNOOZE) },
+        )
+        SCREEN_UNLOCK -> {
+            val activity = context as? android.app.Activity
+            UnlockScreen(
+                state = unlock,
+                onBack = { screen = unlockFrom },
+                onBuy = { if (activity != null) container.billing.buy(activity) },
+                onRestore = { container.billing.restore() },
+            )
+        }
+        SCREEN_BACKUP -> BackupScreen(
+            ui = backupUi,
+            currentCount = replaceCount,
+            onBack = { screen = backupFrom },
+            onBackupNow = {
+                if (!backupUi.folderSet) {
+                    exportLauncher.launch(suggestedExportName())
+                } else {
+                    container.scope.launch { container.backup.backupNow() }
+                }
+            },
+            onChooseFolder = { treeLauncher.launch(null) },
+            onStopFolder = { container.scope.launch { container.backup.configureFolder("", clearSuccess = false) } },
+            onRestore = { openLauncher.launch(arrayOf("application/json", "*/*")) },
+            onApply = { mode, uuids ->
+                container.scope.launch {
+                    container.backup.applyPreview(mode, uuids)
+                }
+            },
+            onDismissPreview = { container.backup.clearPreview() },
+            onDismissError = { container.backup.clearError() },
         )
         SCREEN_HEALTH -> HealthCheckScreen(
             report = health,
@@ -278,6 +381,8 @@ fun ReminderApp(
             onSnoozeSettings = { screen = SCREEN_SNOOZE },
             showHealthWarning = health.badge,
             onHealth = { openHealth(SCREEN_LIST) },
+            onExport = { exportLauncher.launch(suggestedExportName()) },
+            onBackup = { openBackup(SCREEN_LIST) },
             onAllowExactAlarms = { openExactAlarmSettings(context) },
             onOpenNotificationSettings = { openNotificationSettings(context) },
             onSetAlert = viewModel::setAlertLevel,
@@ -299,6 +404,8 @@ private fun ReminderListScreen(
     onSnoozeSettings: () -> Unit,
     showHealthWarning: Boolean,
     onHealth: () -> Unit,
+    onExport: () -> Unit,
+    onBackup: () -> Unit,
     onAllowExactAlarms: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onSetAlert: (Long, AlertLevel) -> Unit,
@@ -309,7 +416,12 @@ private fun ReminderListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 navigationIcon = {
-                    HealthMenuButton(warning = showHealthWarning, onHealth = onHealth)
+                    HealthMenuButton(
+                        warning = showHealthWarning,
+                        onHealth = onHealth,
+                        onExport = onExport,
+                        onBackup = onBackup,
+                    )
                 },
                 actions = {
                     TextButton(onClick = onSnoozeSettings) {

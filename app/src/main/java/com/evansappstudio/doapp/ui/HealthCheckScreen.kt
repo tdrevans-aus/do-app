@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,8 @@ private val HealthWarningYellow = Color(0xFFF5C400)
 fun HealthMenuButton(
     warning: Boolean,
     onHealth: () -> Unit,
+    onExport: () -> Unit,
+    onBackup: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     val description = stringResource(if (warning) R.string.health_menu_warning else R.string.health_menu)
@@ -75,6 +78,26 @@ fun HealthMenuButton(
                 onClick = {
                     open = false
                     onHealth()
+                },
+            )
+            HorizontalDivider()
+            Text(
+                text = stringResource(R.string.tools),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.export)) },
+                onClick = {
+                    open = false
+                    onExport()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.backup)) },
+                onClick = {
+                    open = false
+                    onBackup()
                 },
             )
         }
