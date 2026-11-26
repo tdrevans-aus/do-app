@@ -6,4 +6,6 @@
     <include domain="database" path="do.db-shm" />
     <include domain="sharedpref" path="do_settings.xml" />
     <include domain="sharedpref" path="do_entitlement.xml" />
+    <!-- Device-protected prefs. sharedpref would miss this file. -->
+    <include domain="device_sharedpref" path="do_quiet.xml" />
 </full-backup-content>

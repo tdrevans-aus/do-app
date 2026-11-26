@@ -8,10 +8,16 @@ import com.evansappstudio.doapp.data.RepeatFrom
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.WeekStart
 import com.evansappstudio.doapp.data.updateDetails
-import com.evansappstudio.doapp.notify.ReminderNotifier
 import kotlinx.coroutines.sync.Mutex
 import java.time.ZoneId
 import java.util.UUID
+
+/** What an editor save did. A blocked repeat writes nothing. */
+enum class EditResult {
+    SAVED,
+    UNCHANGED,
+    BLOCKED_REPEAT,
+}
 
 /**
  * Arms, cancels and rebuilds the single alarm for every active reminder.
@@ -25,14 +31,18 @@ import java.util.UUID
 class Scheduler(
     private val daoProvider: () -> ReminderDao,
     private val mirror: ReminderMirror,
-    private val alarms: AlarmScheduler,
-    private val notifications: ReminderNotifier,
+    private val alarms: AlarmArm,
+    private val notifications: ReminderAlerts,
     private val unlocked: () -> Boolean,
     private val zones: ZoneMemory,
     private val weekStart: () -> WeekStart,
     private val paidUnlocked: () -> Boolean,
     private val inTransaction: suspend (suspend () -> Unit) -> Unit,
     private val onCommitted: () -> Unit,
+    private val quietConfig: () -> QuietConfig,
+    private val dndActive: () -> Boolean,
+    private val zone: () -> ZoneId = { ZoneId.systemDefault() },
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private val gate = Mutex()
 
@@ -44,7 +54,7 @@ class Scheduler(
         alertLevel: AlertLevel = AlertLevel.STANDARD,
     ): Long? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val cleanTitle = title.trim()
         require(cleanTitle.isNotEmpty()) { "title is required" }
         val active = dao().activeCount()
@@ -52,8 +62,15 @@ class Scheduler(
             DoAlarmLog.unlockBlocked(active, FreeTier.capLabel())
             return@guarded null
         }
+        if (rule != null) {
+            val repeating = dao().repeatingActiveCount()
+            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
+                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
+                return@guarded null
+            }
+        }
         val nag = NagSchedule.normalize(nagMinutes)
-        val now = System.currentTimeMillis()
+        val now = clock()
         val pattern = if (rule?.from == RepeatFrom.DUE_DATE) dueAt else null
         val id = dao().insert(
             Reminder(
@@ -79,23 +96,23 @@ class Scheduler(
         alarms.cancel(id)
         notifications.dismiss(id)
         AlertSession.attended(id)
-        val now = System.currentTimeMillis()
+        val now = clock()
         if (!unlocked()) {
             val entry = mirror.get(id) ?: return@guarded
-            val next = nextAfterAttend(entry.nagMinutes, now)
-            mirror.upsert(entry.copy(awaitingAttend = false, nextFireAt = next))
+            val next = deferIfNag(id, entry.dueAt, nextAfterAttend(entry.nagMinutes, now), entry.alertLevel)
+            mirror.upsert(entry.copy(awaitingAttend = false, nextFireAt = next, dndHeld = false))
             if (next != null) alarms.schedule(id, next)
             DoAlarmLog.alertStop(id, next)
             return@guarded
         }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val reminder = dao().getById(id)
         if (reminder == null || reminder.isDone) {
             mirror.remove(id)
             DoAlarmLog.alertStop(id, null)
             return@guarded
         }
-        val next = nextAfterAttend(reminder.nagMinutes, now)
+        val next = deferIfNag(id, reminder.dueAt, nextAfterAttend(reminder.nagMinutes, now), reminder.alertLevel)
         mirror.upsert(reminder.toMirror(nextFireAt = next))
         if (next != null) alarms.schedule(id, next)
         DoAlarmLog.alertStop(id, next)
@@ -103,7 +120,7 @@ class Scheduler(
 
     suspend fun setAlertLevel(id: Long, level: AlertLevel) = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val existing = dao().getById(id) ?: return@guarded
         if (existing.isDone) return@guarded
         val stored = existing.copy(alertLevel = level.name)
@@ -121,7 +138,7 @@ class Scheduler(
         AlertSession.attended(id)
         if (!unlocked()) {
             val existing = mirror.get(id)
-            val tappedAt = System.currentTimeMillis()
+            val tappedAt = clock()
             mirror.upsert(
                 (existing ?: MirrorEntry(
                     id = id,
@@ -133,13 +150,14 @@ class Scheduler(
                     pendingDone = true,
                     nextFireAt = null,
                     pendingDoneAt = existing?.pendingDoneAt ?: tappedAt,
+                    dndHeld = false,
                 ),
             )
             changed()
             return@guarded
         }
-        alignRoomLocked(ZoneId.systemDefault())
-        finishDoneLocked(id, System.currentTimeMillis())
+        alignRoomLocked(zone())
+        finishDoneLocked(id, clock())
         changed()
     }
 
@@ -177,15 +195,15 @@ class Scheduler(
         rule: RepeatRule?,
         dueShift: DueShiftMode? = null,
         alertLevel: AlertLevel = AlertLevel.STANDARD,
-    ) = guarded {
+    ): EditResult = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val cleanTitle = title.trim()
         require(cleanTitle.isNotEmpty()) { "title is required" }
         val nag = NagSchedule.normalize(nagMinutes)
-        val existing = dao().getById(id) ?: return@guarded
-        if (existing.isDone) return@guarded
-        val zone = ZoneId.systemDefault()
+        val existing = dao().getById(id) ?: return@guarded EditResult.UNCHANGED
+        if (existing.isDone) return@guarded EditResult.UNCHANGED
+        val deviceZone = zone()
         val dueChanged = dueAt != existing.dueAt
         val finalDue: Long
         val finalPattern: Long?
@@ -198,7 +216,7 @@ class Scheduler(
                 draftRule = dueDateRule,
                 newDue = dueAt,
                 mode = dueShift ?: DueShiftMode.THIS,
-                zone = zone,
+                zone = deviceZone,
             )
             finalDue = placed.dueAt
             finalPattern = placed.patternDueAt
@@ -214,6 +232,13 @@ class Scheduler(
                 else -> existing.patternDueAt
             }
         }
+        if (existing.repeatRule() == null && finalRule != null) {
+            val repeating = dao().repeatingActiveCount()
+            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
+                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
+                return@guarded EditResult.BLOCKED_REPEAT
+            }
+        }
         val stored = existing.copy(
             title = cleanTitle,
             dueAt = finalDue,
@@ -226,15 +251,20 @@ class Scheduler(
         val scheduleChanged = finalDue != existing.dueAt
         val levelChanged = stored.alertLevel != existing.alertLevel
         if (!scheduleChanged && !nagChanged && !titleChanged && !levelChanged && sameSeries(existing, stored)) {
-            return@guarded
+            return@guarded EditResult.UNCHANGED
         }
         if (scheduleChanged) {
-            armDue(stored, System.currentTimeMillis(), dismiss = true)
-            return@guarded
+            armDue(stored, clock(), dismiss = true)
+            return@guarded EditResult.SAVED
         }
         if (nagChanged) {
-            val now = System.currentTimeMillis()
-            val next = SnoozeDue.nextFireAfterNagChange(stored.dueAt, nag, now)
+            val now = clock()
+            val next = deferIfNag(
+                id,
+                stored.dueAt,
+                SnoozeDue.nextFireAfterNagChange(stored.dueAt, nag, now),
+                stored.alertLevel,
+            )
             alarms.cancel(id)
             mirror.upsert(stored.toMirror(nextFireAt = next))
             if (next != null) alarms.schedule(id, next)
@@ -257,6 +287,7 @@ class Scheduler(
             notifications.refreshIfShowing(id, cleanTitle, stored.dueAt, stored.alert())
         }
         changed()
+        EditResult.SAVED
     }
 
     /**
@@ -264,11 +295,18 @@ class Scheduler(
      * rule copies the current due into [Reminder.patternDueAt] when that
      * anchor is still null. Repeat Off clears the anchor.
      */
-    suspend fun setRepeat(id: Long, rule: RepeatRule?) = guarded {
+    suspend fun setRepeat(id: Long, rule: RepeatRule?): Boolean = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
-        val existing = dao().getById(id) ?: return@guarded
-        if (existing.isDone) return@guarded
+        alignRoomLocked(zone())
+        val existing = dao().getById(id) ?: return@guarded true
+        if (existing.isDone) return@guarded true
+        if (existing.repeatRule() == null && rule != null) {
+            val repeating = dao().repeatingActiveCount()
+            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
+                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
+                return@guarded false
+            }
+        }
         val pattern = when {
             rule == null -> null
             rule.from == RepeatFrom.COMPLETION -> null
@@ -282,12 +320,13 @@ class Scheduler(
             mirror.upsert(entry.copy(wallClock = rule?.keepsWallClock() == true))
         }
         changed()
+        true
     }
 
     /** Debug SHIFT_DUE and the warning-icon apply. Returns the stored placement. */
     suspend fun shiftDue(id: Long, newDue: Long, mode: DueShiftMode): Reminder? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val existing = dao().getById(id) ?: return@guarded null
         if (existing.isDone) return@guarded null
         val rule = existing.repeatRule()
@@ -298,7 +337,7 @@ class Scheduler(
                 draftRule = rule,
                 newDue = newDue,
                 mode = mode,
-                zone = ZoneId.systemDefault(),
+                zone = zone(),
             )
             existing.copy(dueAt = placed.dueAt).withRepeat(placed.rule, placed.patternDueAt)
         } else {
@@ -306,7 +345,7 @@ class Scheduler(
         }
         dao().updateDetails(stored)
         if (stored.dueAt != existing.dueAt || stored.patternDueAt != existing.patternDueAt) {
-            armDue(stored, System.currentTimeMillis(), dismiss = true)
+            armDue(stored, clock(), dismiss = true)
         }
         changed()
         stored
@@ -343,7 +382,7 @@ class Scheduler(
     /** Replace every reminder. Callers cancel alarms before the insert. Reschedules afterwards. */
     suspend fun replaceAll(reminders: List<Reminder>): List<Long> = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         for (row in dao().all()) {
             alarms.cancel(row.id)
             notifications.dismiss(row.id)
@@ -357,6 +396,7 @@ class Scheduler(
             }
         }
         rescheduleAllLocked()
+        reconcileQuietLocked()
         changed()
         dao().all().map { it.id }
     }
@@ -364,7 +404,7 @@ class Scheduler(
     /** Upsert by uuid. Local-only rows stay. Imported fields win. */
     suspend fun mergeAll(reminders: List<Reminder>): List<Long> = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val ids = ArrayList<Long>()
         inTransaction {
             for (row in reminders) {
@@ -379,17 +419,31 @@ class Scheduler(
             }
         }
         rescheduleAllLocked()
+        reconcileQuietLocked()
         changed()
         ids
     }
 
-    suspend fun onFire(id: Long, actual: Long) = guarded {
+    suspend fun onFire(id: Long, actual: Long, scheduled: Long = actual) = guarded {
         if (unlocked()) {
             val reminder = dao().getById(id)
             if (reminder == null || reminder.isDone) {
                 alarms.cancel(id)
                 notifications.dismiss(id)
                 mirror.remove(id)
+                return@guarded
+            }
+            if (holdNagIfNeeded(
+                    id = reminder.id,
+                    dueAt = reminder.dueAt,
+                    nagMinutes = reminder.nagMinutes,
+                    title = reminder.title,
+                    wallClock = reminder.repeatRule()?.keepsWallClock() == true,
+                    alertLevel = reminder.alertLevel,
+                    scheduled = scheduled,
+                    actual = actual,
+                )
+            ) {
                 return@guarded
             }
             val decision = notifications.show(reminder.id, reminder.title, reminder.dueAt, reminder.alert())
@@ -421,6 +475,19 @@ class Scheduler(
                 notifications.dismiss(id)
                 return@guarded
             }
+            if (holdNagIfNeeded(
+                    id = entry.id,
+                    dueAt = entry.dueAt,
+                    nagMinutes = entry.nagMinutes,
+                    title = entry.title,
+                    wallClock = entry.wallClock,
+                    alertLevel = entry.alertLevel,
+                    scheduled = scheduled,
+                    actual = actual,
+                )
+            ) {
+                return@guarded
+            }
             val level = AlertLevel.fromName(entry.alertLevel) ?: AlertLevel.STANDARD
             val decision = notifications.show(entry.id, entry.title, entry.dueAt, level)
             logFallback(entry.id, decision)
@@ -440,9 +507,14 @@ class Scheduler(
         }
     }
 
+    /** Re-places pending nags after a quiet-hours or Do Not Disturb change. */
+    suspend fun reconcileQuietHours() = guarded {
+        reconcileQuietLocked()
+    }
+
     suspend fun rescheduleAll() = guarded {
         check(unlocked()) { "Cannot reconcile from Room before unlock" }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         rescheduleAllLocked()
     }
 
@@ -453,12 +525,13 @@ class Scheduler(
     suspend fun onExternalClock(zoneChanged: Boolean) = guarded {
         val open = unlocked()
         if (!open) {
-            if (zoneChanged) alignMirrorLocked(ZoneId.systemDefault())
+            if (zoneChanged) alignMirrorLocked(zone())
             rescheduleFromMirrorLocked()
-            return@guarded
+        } else {
+            if (zoneChanged) alignRoomLocked(zone())
+            rescheduleAllLocked()
         }
-        if (zoneChanged) alignRoomLocked(ZoneId.systemDefault())
-        rescheduleAllLocked()
+        reconcileQuietLocked()
     }
 
     /** Direct-boot path. Does not open Room. */
@@ -467,7 +540,7 @@ class Scheduler(
     }
 
     private suspend fun rescheduleAllLocked() {
-        val now = System.currentTimeMillis()
+        val now = clock()
         val pending = mirror.all().filter { it.pendingDone }
         for (entry in pending) {
             finishDoneLocked(entry.id, entry.pendingDoneAt ?: now)
@@ -496,28 +569,42 @@ class Scheduler(
         }
         for (reminder in active) {
             val entry = mirror.get(reminder.id)
-            val next = ScheduleResolver.resolve(
+            val resolved = ScheduleResolver.resolve(
                 dueAt = reminder.dueAt,
                 now = now,
                 hasMirror = entry != null,
                 mirroredNext = entry?.nextFireAt,
             )
+            val isNag = entry?.pendingNag() == true
+            val next = if (isNag) {
+                deferIfNag(reminder.id, reminder.dueAt, resolved, reminder.alertLevel)
+            } else {
+                resolved
+            }
             alarms.cancel(reminder.id)
-            mirror.upsert(reminder.toMirror(nextFireAt = next))
+            val stillHeld = entry != null && isNag && entry.dndHeld
+            mirror.upsert(reminder.toMirror(nextFireAt = next, dndHeld = stillHeld))
             if (next != null) alarms.schedule(reminder.id, next)
         }
     }
 
     private fun rescheduleFromMirrorLocked() {
-        val now = System.currentTimeMillis()
+        val now = clock()
         for (entry in mirror.all()) {
             val nextFireAt = entry.nextFireAt
             if (entry.pendingDone || nextFireAt == null) {
                 alarms.cancel(entry.id)
                 continue
             }
-            val whenAt = if (nextFireAt > now) nextFireAt else now
-            if (whenAt != nextFireAt) {
+            val isNag = entry.pendingNag()
+            val caughtUp = if (nextFireAt > now) nextFireAt else now
+            val whenAt = if (isNag) {
+                deferIfNag(entry.id, entry.dueAt, caughtUp, entry.alertLevel) ?: caughtUp
+            } else {
+                caughtUp
+            }
+            // A missed first fire stays nextFireAt == dueAt so the catch-up still alerts.
+            if (isNag && whenAt != nextFireAt) {
                 mirror.upsert(entry.copy(nextFireAt = whenAt))
             }
             alarms.cancel(entry.id)
@@ -542,11 +629,11 @@ class Scheduler(
             patternDueAt = reminder.patternDueAt,
             rule = rule,
             completedAt = completedAt,
-            zone = ZoneId.systemDefault(),
+            zone = zone(),
             weekStart = weekStart(),
         )
         dao().advanceOccurrence(id, placed.dueAt, placed.patternDueAt)
-        val now = System.currentTimeMillis()
+        val now = clock()
         val next = NagSchedule.catchUp(placed.dueAt, now)
         val stored = reminder.copy(
             dueAt = placed.dueAt,
@@ -560,8 +647,8 @@ class Scheduler(
     }
 
     private suspend fun applySnooze(id: Long, optionIndex: Int, option: SnoozeOption) {
-        val now = System.currentTimeMillis()
-        val newDue = SnoozeDue.compute(option, now, ZoneId.systemDefault())
+        val now = clock()
+        val newDue = SnoozeDue.compute(option, now, zone())
         val nextFire = SnoozeDue.nextFire(newDue, now)
         DoAlarmLog.snooze(id, newDue, optionIndex)
         alarms.cancel(id)
@@ -586,12 +673,13 @@ class Scheduler(
                     nextFireAt = nextFire,
                     pendingDone = false,
                     pendingSnoozeDueAt = newDue,
+                    dndHeld = false,
                 ),
             )
             alarms.schedule(id, nextFire)
             return
         }
-        alignRoomLocked(ZoneId.systemDefault())
+        alignRoomLocked(zone())
         val reminder = dao().getById(id)
         if (reminder == null || reminder.isDone) {
             mirror.remove(id)
@@ -612,7 +700,7 @@ class Scheduler(
         wallClock: Boolean,
         alertLevel: String,
     ) {
-        val next = NagSchedule.afterDelivery(dueAt, nagMinutes, actual)
+        val next = deferIfNag(id, dueAt, NagSchedule.afterDelivery(dueAt, nagMinutes, actual), alertLevel)
         val existing = mirror.get(id)
         mirror.upsert(
             MirrorEntry(
@@ -664,13 +752,13 @@ class Scheduler(
     }
 
     private fun applyLevelOnly(stored: Reminder) {
-        val now = System.currentTimeMillis()
+        val now = clock()
         val decision = notifications.decide(stored.alert())
         val entry = mirror.get(stored.id)
         if (entry?.awaitingAttend == true && !decision.loopUntilAttended) {
             AlertSession.attended(stored.id)
             notifications.dismiss(stored.id)
-            val next = nextAfterAttend(stored.nagMinutes, now)
+            val next = deferIfNag(stored.id, stored.dueAt, nextAfterAttend(stored.nagMinutes, now), stored.alertLevel)
             mirror.upsert(stored.toMirror(nextFireAt = next))
             alarms.cancel(stored.id)
             if (next != null) alarms.schedule(stored.id, next)
@@ -687,6 +775,86 @@ class Scheduler(
             )
         }
         notifications.refreshIfShowing(stored.id, stored.title, stored.dueAt, stored.alert())
+    }
+
+    private fun reconcileQuietLocked() {
+        val config = quietConfig()
+        val active = dndActive()
+        val deviceZone = zone()
+        val now = clock()
+        for (entry in mirror.all()) {
+            if (entry.pendingDone || entry.awaitingAttend || !entry.pendingNag()) continue
+            val minutes = NagSchedule.normalize(entry.nagMinutes) ?: continue
+            val level = AlertLevel.fromName(entry.alertLevel) ?: AlertLevel.STANDARD
+            val stored = entry.nextFireAt ?: continue
+            if (entry.dndHeld && QuietHours.holdForDnd(level, config, active)) continue
+            val raw: Long
+            val held = false
+            if (entry.dndHeld) {
+                raw = now
+                DoAlarmLog.dndRelease(entry.id, now)
+            } else {
+                raw = NagSchedule.nextAnchorStrictlyAfter(entry.dueAt, minutes, now)
+            }
+            val placed = if (raw <= entry.dueAt) raw else deferNag(entry.id, raw, level, stored)
+            if (placed == stored && held == entry.dndHeld) continue
+            if (placed != stored) {
+                alarms.cancel(entry.id)
+                alarms.schedule(entry.id, placed)
+            }
+            mirror.upsert(entry.copy(nextFireAt = placed, dndHeld = held))
+        }
+    }
+
+    /**
+     * A nag whose stored next fire is after the due. First fires (next == due,
+     * including a catch-up that kept that marker) always alert.
+     */
+    private fun holdNagIfNeeded(
+        id: Long,
+        dueAt: Long,
+        nagMinutes: Int?,
+        title: String,
+        wallClock: Boolean,
+        alertLevel: String,
+        scheduled: Long,
+        actual: Long,
+    ): Boolean {
+        val entry = mirror.get(id) ?: return false
+        if (!entry.pendingNag()) return false
+        val level = AlertLevel.fromName(alertLevel) ?: AlertLevel.STANDARD
+        if (!QuietHours.holdForDnd(level, quietConfig(), dndActive())) return false
+        val minutes = NagSchedule.normalize(nagMinutes) ?: return false
+        val raw = NagSchedule.nextAnchorStrictlyAfter(dueAt, minutes, actual)
+        val next = deferNag(id, raw, level)
+        alarms.cancel(id)
+        mirror.upsert(
+            (mirror.get(id) ?: entry).copy(
+                title = title,
+                dueAt = dueAt,
+                nagMinutes = nagMinutes,
+                nextFireAt = next,
+                wallClock = wallClock,
+                alertLevel = alertLevel,
+                awaitingAttend = false,
+                dndHeld = true,
+            ),
+        )
+        alarms.schedule(id, next)
+        DoAlarmLog.dndHold(id, scheduled, next)
+        return true
+    }
+
+    private fun deferIfNag(id: Long, dueAt: Long, planned: Long?, levelName: String): Long? {
+        if (planned == null || planned <= dueAt) return planned
+        val level = AlertLevel.fromName(levelName) ?: AlertLevel.STANDARD
+        return deferNag(id, planned, level)
+    }
+
+    private fun deferNag(id: Long, planned: Long, level: AlertLevel, previous: Long? = null): Long {
+        val placed = QuietHours.placeNag(planned, level, quietConfig(), zone())
+        if (placed != planned && placed != previous) DoAlarmLog.quietDefer(id, planned, placed)
+        return placed
     }
 
     private fun nextAfterAttend(nagMinutes: Int?, now: Long): Long? {

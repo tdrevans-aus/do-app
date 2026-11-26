@@ -29,13 +29,24 @@ data class MirrorEntry(
     val wallClock: Boolean = false,
     val alertLevel: String = "STANDARD",
     val awaitingAttend: Boolean = false,
-)
+    val dndHeld: Boolean = false,
+) {
+    /** A pending nag is a later fire for this due. nextFireAt == dueAt is a first fire. */
+    fun pendingNag(): Boolean {
+        val next = nextFireAt ?: return false
+        return next > dueAt
+    }
+}
 
-class ReminderMirror(context: Context) {
-    private val file: File = File(
-        context.createDeviceProtectedStorageContext().filesDir,
-        FILE_NAME,
-    ).also { it.parentFile?.mkdirs() }
+class ReminderMirror internal constructor(
+    private val file: File,
+) {
+    constructor(context: Context) : this(
+        File(
+            context.createDeviceProtectedStorageContext().filesDir,
+            FILE_NAME,
+        ).also { it.parentFile?.mkdirs() },
+    )
 
     private val lock = Any()
 
@@ -92,6 +103,7 @@ class ReminderMirror(context: Context) {
                             wallClock = item.optBoolean("wallClock", false),
                             alertLevel = item.optString("alertLevel", "STANDARD").ifBlank { "STANDARD" },
                             awaitingAttend = item.optBoolean("awaitingAttend", false),
+                            dndHeld = item.optBoolean("dndHeld", false),
                         ),
                     )
                 }
@@ -117,7 +129,8 @@ class ReminderMirror(context: Context) {
                     .put("pendingDoneAt", entry.pendingDoneAt ?: JSONObject.NULL)
                     .put("wallClock", entry.wallClock)
                     .put("alertLevel", entry.alertLevel)
-                    .put("awaitingAttend", entry.awaitingAttend),
+                    .put("awaitingAttend", entry.awaitingAttend)
+                    .put("dndHeld", entry.dndHeld),
             )
         }
         val temp = File(file.parentFile, "$FILE_NAME.tmp")
@@ -139,6 +152,7 @@ fun Reminder.toMirror(
     pendingSnoozeDueAt: Long? = null,
     pendingDoneAt: Long? = null,
     awaitingAttend: Boolean = false,
+    dndHeld: Boolean = false,
 ): MirrorEntry = MirrorEntry(
     id = id,
     title = title,
@@ -151,4 +165,5 @@ fun Reminder.toMirror(
     wallClock = repeatRule()?.keepsWallClock() == true,
     alertLevel = alertLevel.ifBlank { "STANDARD" },
     awaitingAttend = awaitingAttend,
+    dndHeld = dndHeld,
 )

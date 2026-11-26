@@ -36,6 +36,8 @@
                 <action android:name="com.evansappstudio.doapp.debug.CONFIG_BACKUP_FOLDER" />
                 <action android:name="com.evansappstudio.doapp.debug.AUTO_BACKUP" />
                 <action android:name="com.evansappstudio.doapp.debug.SET_TITLE" />
+                <action android:name="com.evansappstudio.doapp.debug.SET_QUIET_HOURS" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_QUIET" />
             </intent-filter>
         </receiver>
     </application>

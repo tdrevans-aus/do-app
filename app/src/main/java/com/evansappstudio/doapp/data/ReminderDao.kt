@@ -17,6 +17,10 @@ interface ReminderDao {
     @Query("SELECT COUNT(*) FROM reminder WHERE isDone = 0")
     suspend fun activeCount(): Int
 
+    /** Not-done reminders with Repeat not Off. Off is stored as null columns. */
+    @Query("SELECT COUNT(*) FROM reminder WHERE isDone = 0 AND repeatUnit IS NOT NULL")
+    suspend fun repeatingActiveCount(): Int
+
     @Query("SELECT * FROM reminder")
     suspend fun all(): List<Reminder>
 

@@ -18,7 +18,7 @@ class AlarmReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 app.container.health.noteDelivery(id, scheduled, actual)
-                app.container.scheduler.onFire(id, actual)
+                app.container.scheduler.onFire(id, actual, scheduled)
                 app.container.health.finishTest(id, scheduled, actual)
                 app.container.health.refresh()
             } catch (error: Throwable) {

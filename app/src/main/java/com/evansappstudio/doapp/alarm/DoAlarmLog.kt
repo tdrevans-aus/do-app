@@ -141,8 +141,15 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm unlock blocked active=$active cap=$cap")
     }
 
-    fun unlockFake(state: String, active: Int, cap: String) {
-        Log.i(TAG, "DoAlarm unlock state=$state source=fake active=$active cap=$cap")
+    fun unlockBlockedRepeat(repeating: Int, cap: String) {
+        Log.i(TAG, "DoAlarm unlock blocked repeating=$repeating repeatCap=$cap")
+    }
+
+    fun unlockFake(state: String, active: Int, cap: String, repeating: Int, repeatCap: String) {
+        Log.i(
+            TAG,
+            "DoAlarm unlock state=$state source=fake active=$active cap=$cap repeating=$repeating repeatCap=$repeatCap",
+        )
     }
 
     fun unlockDump(
@@ -152,11 +159,55 @@ object DoAlarmLog {
         price: String,
         active: Int,
         cap: String,
+        repeating: Int,
+        repeatCap: String,
     ) {
         Log.i(
             TAG,
-            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap",
+            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap repeating=$repeating repeatCap=$repeatCap",
         )
+    }
+
+    fun quietDefer(id: Long, planned: Long, at: Long) {
+        Log.i(TAG, "DoAlarm quiet-defer id=$id planned=$planned at=$at")
+    }
+
+    fun dndHold(id: Long, scheduled: Long, next: Long) {
+        Log.i(TAG, "DoAlarm dnd-hold id=$id scheduled=$scheduled next=$next")
+    }
+
+    fun dndRelease(id: Long, at: Long) {
+        Log.i(TAG, "DoAlarm dnd-release id=$id at=$at")
+    }
+
+    fun dndFilter(filter: Int, active: Boolean) {
+        Log.i(TAG, "DoAlarm dnd filter=$filter active=$active")
+    }
+
+    fun quietSet(
+        enabled: Boolean,
+        start: String,
+        end: String,
+        followDnd: Boolean,
+        criticalPauses: Boolean,
+        simDnd: String,
+    ) {
+        Log.i(
+            TAG,
+            "DoAlarm quiet set enabled=$enabled start=$start end=$end followDnd=$followDnd criticalPauses=$criticalPauses simDnd=$simDnd",
+        )
+    }
+
+    fun quietBadArgs() {
+        Log.i(TAG, "DoAlarm quiet bad args")
+    }
+
+    fun quietDump(body: String) {
+        Log.i(TAG, "DoAlarm quiet $body")
+    }
+
+    fun quietId(body: String) {
+        Log.i(TAG, "DoAlarm quiet $body")
     }
 
     fun unlockAckFailed(responseCode: Int) {
