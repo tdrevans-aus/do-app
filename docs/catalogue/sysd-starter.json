@@ -1,0 +1,1220 @@
+[
+  {
+    "id": "home-smoke-alarm-test",
+    "category": "home",
+    "title": "Test the smoke alarms",
+    "why": "A working alarm gives you early warning of a fire. Rules on alarm type and placement vary, so check your state's.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "home-smoke-alarm-expiry",
+    "category": "home",
+    "title": "Check smoke alarm expiry dates",
+    "why": "Alarms lose sensitivity with age and are usually replaced after 10 years. Check your state's rules.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "home-safety-switch-test",
+    "category": "home",
+    "title": "Test the safety switches",
+    "why": "Pressing the test button confirms the switch will cut power in a fault. Check your state's recommended interval.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "home-gutters-clean",
+    "category": "home",
+    "title": "Clean out the gutters",
+    "why": "Blocked gutters can overflow into the house and add fuel in bushfire season.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "home-aircon-filter-clean",
+    "category": "home",
+    "title": "Clean the air-con filters",
+    "why": "Clean filters help the unit run efficiently. Check your manual for how often.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "home-aircon-service",
+    "category": "home",
+    "title": "Book an air-con service",
+    "why": "A regular service can catch faults early and keep the system running well.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "home-hot-water-check",
+    "category": "home",
+    "title": "Check the hot water system",
+    "why": "A quick check for leaks and the relief valve can catch problems early. Follow the maker's guide.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "home-termite-inspection",
+    "category": "home",
+    "title": "Book a termite inspection",
+    "why": "Termite damage can go unseen for a long time, and a yearly inspection is the common advice.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "home-dryer-vent-clean",
+    "category": "home",
+    "title": "Clean the dryer vent and duct",
+    "why": "Lint build-up is a fire risk and makes the dryer work harder. Clear the lint filter every load too.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "home-roof-check",
+    "category": "home",
+    "title": "Check the roof for damage",
+    "why": "Spotting a loose tile or rusted sheet early can prevent leaks and bigger repairs.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "renter-inspection-prep",
+    "category": "renter",
+    "title": "Get ready for the rental inspection",
+    "why": "A tidy home and a list of issues makes inspections easier. How often they happen varies by state.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "renter-lease-end-check",
+    "category": "renter",
+    "title": "Check when your lease ends",
+    "why": "Knowing the end date gives you time to renew, negotiate or plan a move. Notice rules vary by state.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "renter-contents-insurance",
+    "category": "renter",
+    "title": "Review your contents insurance",
+    "why": "Your landlord's insurance usually won't cover your belongings, so check your cover still fits.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "renter-smoke-alarm-test",
+    "category": "renter",
+    "title": "Test the smoke alarms",
+    "why": "Report a faulty alarm to your agent quickly. Who tests and replaces them varies by state.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "renter-repairs-list",
+    "category": "renter",
+    "title": "Send your repairs list to the agent",
+    "why": "Reporting issues in writing keeps a record and gets small problems fixed before they grow.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "renter-condition-photos",
+    "category": "renter",
+    "title": "Take dated photos of the rental",
+    "why": "Photos of the condition can help if there is a dispute about your bond later.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "car-rego-renewal",
+    "category": "car",
+    "title": "Renew the car registration",
+    "why": "Driving unregistered can mean fines and no compulsory third party cover. Check your state's rules.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "CRITICAL",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "car-service",
+    "category": "car",
+    "title": "Book the car service",
+    "why": "Regular servicing keeps the car safe and may protect your warranty. Follow your logbook.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "car-tyre-pressure",
+    "category": "car",
+    "title": "Check the tyre pressures",
+    "why": "Correct pressure helps braking, handling and fuel use. Check when cold, spare included.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "car-tyre-rotation",
+    "category": "car",
+    "title": "Check tread and rotate the tyres",
+    "why": "Rotating tyres helps them wear evenly. Your manual or tyre shop can say how often.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "car-wiper-blades",
+    "category": "car",
+    "title": "Check the wiper blades",
+    "why": "Worn blades smear the windscreen and make it hard to see in rain.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "car-fluids-check",
+    "category": "car",
+    "title": "Check oil, coolant and washer fluid",
+    "why": "Low fluids can damage the engine or leave you stranded. Your manual shows how.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "car-insurance-renewal",
+    "category": "car",
+    "title": "Review your car insurance",
+    "why": "Renewal is a good time to compare cover and price before it rolls over.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "kids-health-check",
+    "category": "kids",
+    "title": "Book a health check for the kids",
+    "why": "Regular checks help spot issues early. Ask your GP or child health nurse how often.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "kids-dentist",
+    "category": "kids",
+    "title": "Book the kids' dental check-up",
+    "why": "Regular check-ups catch problems early. Your dentist can advise how often.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "kids-immunisation-check",
+    "category": "kids",
+    "title": "Check the kids' immunisations",
+    "why": "Make sure they are up to date. Your GP can check their record and the schedule.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "kids-school-forms",
+    "category": "kids",
+    "title": "Sort out school and care forms",
+    "why": "New school years bring permission, medical and contact forms that are easy to miss.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": 1,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "kids-emergency-contacts",
+    "category": "kids",
+    "title": "Update emergency contacts at school",
+    "why": "Schools and carers need current numbers and medical details if something happens.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "kids-car-seat-check",
+    "category": "kids",
+    "title": "Check the kids' car seats",
+    "why": "Restraints should be checked often to make sure they are fitted and adjusted correctly.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "kids-clothes-shoes-sizes",
+    "category": "kids",
+    "title": "Check shoe and clothing sizes",
+    "why": "Kids grow fast, and shoes that are too small can be uncomfortable.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "pets-worming",
+    "category": "pets",
+    "title": "Worm the pets",
+    "why": "Regular worming protects your pet and your family. Ask your vet which product and how often.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "18:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "pets-flea-tick",
+    "category": "pets",
+    "title": "Give flea and tick treatment",
+    "why": "Fleas and ticks can make pets very sick. How often depends on the product, so check the label.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "18:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "pets-vaccinations",
+    "category": "pets",
+    "title": "Check the pets' vaccinations",
+    "why": "Vaccines protect against serious disease. Your vet will say when boosters are due.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "pets-vet-check",
+    "category": "pets",
+    "title": "Book the yearly vet check",
+    "why": "A regular check-up can find problems before they become serious.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "pets-microchip-details",
+    "category": "pets",
+    "title": "Check microchip contact details",
+    "why": "An up-to-date chip record is how a lost pet gets back to you.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "pets-council-registration",
+    "category": "pets",
+    "title": "Renew pet registration",
+    "why": "Many councils require cats and dogs to be registered. Rules and renewal dates vary by state.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "health-dentist",
+    "category": "health",
+    "title": "Book a dental check-up",
+    "why": "Regular check-ups catch problems early. Your dentist can tell you how often you need one.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "health-skin-check",
+    "category": "health",
+    "title": "Book a skin check",
+    "why": "Skin cancer is common in Australia. Ask your GP how often you should have a check.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "health-eye-test",
+    "category": "health",
+    "title": "Book an eye test",
+    "why": "Eye tests check your vision and eye health. Ask your optometrist how often.",
+    "interval": {
+      "every": 2,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "health-gp-checkup",
+    "category": "health",
+    "title": "Book a GP check-up",
+    "why": "A regular check-up is a chance to review your health. Ask your GP how often is right for you.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "health-flu-vaccine",
+    "category": "health",
+    "title": "Get your flu vaccine",
+    "why": "The vaccine is updated each year for new strains. Talk to your GP or pharmacist.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": 4,
+    "suggestedTime": "10:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "health-prescriptions-check",
+    "category": "health",
+    "title": "Check your prescriptions and repeats",
+    "why": "Checking early means you won't run out. Ask your GP or pharmacist about your medicines.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "health-first-aid-kit",
+    "category": "health",
+    "title": "Check the first aid kit and medicines",
+    "why": "Replace used items and take expired medicines to a pharmacy for safe disposal.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "09:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": true,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-tax-return",
+    "category": "money",
+    "title": "Do your tax return",
+    "why": "Tax time runs from 1 July, and returns you lodge yourself are due by 31 October.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": 7,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "high"
+  },
+  {
+    "id": "money-insurance-renewals",
+    "category": "money",
+    "title": "Review your insurance renewals",
+    "why": "Renewal is the time to check your cover still fits and compare prices.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-health-insurance-review",
+    "category": "money",
+    "title": "Review your health insurance",
+    "why": "Your needs and the policies on offer change, so check you have the cover you want.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "DUE_DATE",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-drivers-licence",
+    "category": "money",
+    "title": "Check your driver's licence expiry",
+    "why": "Driving on an expired licence can mean fines. Renewal periods vary by state, so check yours.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-passport-expiry",
+    "category": "money",
+    "title": "Check your passport expiry",
+    "why": "Some countries need months left on your passport, and processing takes time.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-subscriptions-review",
+    "category": "money",
+    "title": "Review your subscriptions",
+    "why": "Small recurring charges add up. Cancel the ones you no longer use.",
+    "interval": {
+      "every": 3,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-super-check",
+    "category": "money",
+    "title": "Check your super",
+    "why": "Checking your balance, fees and insurance, and finding lost super, can make a big difference.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "money-will-review",
+    "category": "money",
+    "title": "Review your will",
+    "why": "Wills can need updating after big life changes. Talk to a lawyer or trustee service.",
+    "interval": {
+      "every": 3,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "money-energy-plan-compare",
+    "category": "money",
+    "title": "Compare your energy plan",
+    "why": "Comparing plans may save you money. Retail choice varies by state, so check what applies.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "AU"
+    ],
+    "stateVaries": true,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "digital-password-check",
+    "category": "digital",
+    "title": "Check your passwords",
+    "why": "Changing reused or leaked passwords protects your accounts. A password manager helps.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "19:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "digital-phone-backup",
+    "category": "digital",
+    "title": "Back up your phone",
+    "why": "A recent backup means you won't lose photos and contacts if your phone is lost or broken.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "20:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "digital-computer-backup",
+    "category": "digital",
+    "title": "Back up your computer",
+    "why": "A recent backup protects your files from failure, theft and ransomware.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "20:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "digital-update-devices",
+    "category": "digital",
+    "title": "Update your devices",
+    "why": "Updates fix security holes. Turning on automatic updates is even better.",
+    "interval": {
+      "every": 1,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "20:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "digital-app-permissions",
+    "category": "digital",
+    "title": "Review app permissions",
+    "why": "Apps can collect more than they need. Remove access to location, camera and contacts you don't want to share.",
+    "interval": {
+      "every": 6,
+      "unit": "MONTH"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "20:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  },
+  {
+    "id": "digital-account-recovery",
+    "category": "digital",
+    "title": "Check account recovery details",
+    "why": "Up-to-date recovery email, phone and two-step codes help you get back into accounts.",
+    "interval": {
+      "every": 1,
+      "unit": "YEAR"
+    },
+    "repeatFrom": "COMPLETION",
+    "suggestedMonth": null,
+    "suggestedTime": "20:00",
+    "alertLevel": "STANDARD",
+    "regions": [
+      "*"
+    ],
+    "stateVaries": false,
+    "health": false,
+    "link": null,
+    "confidence": "low"
+  }
+]
