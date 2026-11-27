@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evansappstudio.doapp.DoApp
 import com.evansappstudio.doapp.R
+import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.QuickTimes
 import com.evansappstudio.doapp.ui.UnlockScreen
 import com.evansappstudio.doapp.ui.deviceLocale
@@ -83,16 +84,25 @@ class ShareActivity : ComponentActivity() {
                     onSave = { title, dueAt, onCap ->
                         // dueAt is null while the parsed (or default) date is kept.
                         container.scope.launch {
-                            val result = container.capture.saveShare(
-                                draft = draft,
-                                title = title,
-                                dueAt = dueAt,
-                                nagMinutes = container.settings.defaultNagMinutes(),
-                                alertLevel = container.settings.defaultAlertLevel(),
-                                callerPackage = caller,
-                            )
+                            val result = try {
+                                container.capture.saveShare(
+                                    draft = draft,
+                                    title = title,
+                                    dueAt = dueAt,
+                                    nagMinutes = container.settings.defaultNagMinutes(),
+                                    alertLevel = container.settings.defaultAlertLevel(),
+                                    callerPackage = caller,
+                                )
+                            } catch (error: Throwable) {
+                                DoAlarmLog.handlingFailed(id = -1, error)
+                                null
+                            }
                             runOnUiThread {
                                 when (result) {
+                                    null -> {
+                                        Toast.makeText(this@ShareActivity, R.string.share_failed, Toast.LENGTH_SHORT).show()
+                                        finish()
+                                    }
                                     is CaptureResult.Saved -> {
                                         Toast.makeText(this@ShareActivity, R.string.share_saved, Toast.LENGTH_SHORT).show()
                                         finish()

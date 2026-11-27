@@ -178,6 +178,7 @@
     <string name="share_choose">Choose…</string>
     <string name="share_save">Save and go back</string>
     <string name="share_saved">Added to Do</string>
+    <string name="share_failed">Could not add that. Please try again in Do.</string>
     <string name="share_empty">There was no text to add</string>
     <string name="tile_label">Do: Add a reminder</string>
     <string name="shortcut_add_short">Add a reminder</string>

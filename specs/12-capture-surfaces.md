@@ -67,3 +67,58 @@ Phone (Mark with Tim):
 3. Widgets in Glance.
 4. AppFunctions built now, off in release until Gemini access opens.
 5. Agent alert requests are held at Normal until approved.
+
+## Build notes (Claude build agent, 27 Nov 2026)
+
+### Dependencies added
+| Artefact | Version | Why |
+| --- | --- | --- |
+| `androidx.glance:glance-appwidget` | 1.2.0 (stable, 26 Aug 2026) | Both home-screen widgets. 1.3.0 is alpha and needs compileSdk 37. |
+| `androidx.glance:glance-material3` | 1.2.0 | `ColorProviders(light, dark)` so the widgets follow the system dark theme. |
+| `androidx.work:work-runtime` | 2.11.2 (stable) | Glance renders through WorkManager and asks for 2.7.1; pinned to a current stable release. |
+
+WorkManager's manifest asks for `FOREGROUND_SERVICE` and declares `SystemForegroundService`. Do runs no foreground work, so both are removed with `tools:node="remove"`; `checkAlarmManifests` now fails if `FOREGROUND_SERVICE` comes back. `WAKE_LOCK` and `ACCESS_NETWORK_STATE` (normal permissions WorkManager needs) stay. No network is used.
+
+### AppFunctions: thin layer, no annotations yet
+- `androidx.appfunctions` is stable at 1.0.0 (18 Nov 2026; `@AppFunctionServiceEntryPoint`, `@AppFunctionDeclaration`, KSP `appfunctions-compiler`, Android 16 or later at run time). Every release from 1.0.0-alpha09 on, including 1.0.0, has `minCompileSdk=37` and AGP 9.1 or later in its AAR metadata. This project compiles against 36 and the build machine has only platform 36. Older alphas that compile against 36 (alpha07, alpha08) use the `@AppFunction` and `AppFunctionConfiguration` API that 1.0.0 removed, so they would be throw-away work.
+- So, per the brief's fallback, Spec 12 ships the adapter only: `capture/AgentFunctions.kt` (`createReminder`, `completeReminder`, `listReminders`) over `ReminderCommands` with `Origin(AGENT, AGENT, caller)`, its errors as `AgentError` (`Disabled`, `LimitReached`, `InvalidArgument`, `NotFound`, each matching an AppFunctions exception), and the pure mapping in `capture/AgentRequests.kt`. Omitted parameters are handled the AppFunctions way (an omitted `dueAt` arrives as 0, `limit` as 0).
+- The build flag exists now: `BuildConfig.APP_FUNCTIONS_ENABLED`, on in debug and off in release, overridable with `-PappFunctionsEnabled=true|false`. With it off every agent call fails with `Disabled` and nothing is read or written. `checkAlarmManifests` fails if the release manifest mentions `android.app.appfunctions`, `BIND_APP_FUNCTION_SERVICE` or `AppFunctionService` while the release flag is off.
+- To switch it on later: raise compileSdk to 37 (a project-wide change for Gareth to schedule, not a Spec 12 side effect), add `appfunctions` and `ksp(appfunctions-compiler)` 1.0.0, write an abstract `@AppFunctionServiceEntryPoint` service in `src/debug` (or a flag-gated source set) whose three `@AppFunctionDeclaration` functions call `container.agent` and map `AgentError` to the AppFunctions exceptions, and declare the generated service only in the debug manifest until release is approved.
+- Debug builds can drive the layer now: `adb shell am broadcast -n com.evansappstudio.doapp/.debug.DebugReceiver -a com.evansappstudio.doapp.debug.AGENT_CREATE --es text "Bins tomorrow 7pm" --es level Alarm` (also `AGENT_COMPLETE --el id N` and `AGENT_LIST --ei limit N`); results are logged as `DoAlarm agent-...`.
+
+### Choices where the draft was open
+1. **Agent hold lives in the command layer.** `ReminderCommands.add` applies `AgentHold` to every `Actor.AGENT` add: above Normal is stored at `STANDARD` with `requestedAlertLevel` and `approval=PENDING`; an agent asking for Normal stores `requestedAlertLevel=STANDARD`, `approval=NONE`. A person's add is untouched. `Scheduler.add` gained `approval` and `requestedAlertLevel`.
+2. **Agent level words.** Normal, Loud and Alarm (and the stored names Standard, Critical, Prominent), any case; blank means Normal; anything else is refused.
+3. **Agent dates.** A `dueAt` more than a minute in the past is refused. With no `dueAt`, the text is parsed like a share, else tomorrow 9 am. `repeat` goes through the Spec 5 parser, so only the phrases it supports work ("every day", "every Tuesday", "every month", "every 2 hours"; not "every week" or "every 3 days").
+4. **Share accepts `text/plain` only**, not `text/*`: `text/*` would put Do on contact (vCard) and calendar shares, which send files, and that is the clutter section 6 warns about. Browsers and chat apps share text and links as `text/plain`. `EXTRA_SUBJECT` is used when `EXTRA_TEXT` is missing.
+5. **Share sheet title.** The field holds the shared first line with the date words taken out ("Grab the dry cleaning"); the date line under it shows the time and `from "Friday after work"`. If the text is only a date, the whole text stays as the title. A quick choice replaces the parsed date and drops a parsed repeat. No date found shows "No date found, so tomorrow at 9 am" before Save. Nag and alert level are the user's defaults.
+6. **Quick choices.** Tonight is today 7 pm (design screen 6's "Tonight 7 pm"), or an hour from now once 7 pm has passed; Tomorrow is 9 am; Weekend is the next Saturday 9 am still ahead; Choose... is a date then a time picker.
+7. **"After work" is 5:30 pm.** The Spec 5 parser did not know it, so AT-7's message would have got Friday at 9 am. `DateParser` now reads "after work" as a time (5:30 pm). That is the only parser change.
+8. **Calling package.** `Activity.launchedFromPackage` on Android 14 and later (only when the sender shares its identity), else the `android-app://` referrer host, else null. It is informational (the referrer can be set by the sender) and is clipped to 200 characters by `Origin`.
+9. **Sources.** Share stores `SHARE`, the widget's add row and tick store `WIDGET` (the tick's event actor is `USER`). The tile, shortcuts and deep link are the person opening Add, so they store `USER`; no enum value was added. The in-app Add screen now saves through the same `CaptureCommands` adapter, with the entry that opened it.
+10. **Paywall.** The widget's add row, tile, shortcuts and links open the normal Add screen, which already goes to the paywall on the cap. Share shows the same Unlock screen over the sender; backing out of it returns to the sender, or to the sheet if the purchase went through.
+11. **Widget refresh.** `ReminderCommands.addListener` runs after each command returns (after its Room transaction). The app registers one listener, `WidgetRefresher.request`, which folds bursts into one refresh. Fires (`AlarmReceiver`), boot and time or zone changes (`RescheduleReceiver`) request one too, because they change what is overdue without a Room write. Inside the widget, a Room `Flow` plus a time tick feed the composition; nothing polls and `updatePeriodMillis` is 0.
+12. **Widget content.** Large (4 x 3 target): "Do", "N overdue" in alarm red or "All clear", the next three active reminders (overdue first) with a 44dp checkbox row and due time (red when overdue), and a "What needs doing?" row that opens Add. Small (2 x 2): the overdue number in red with "overdue", or "All clear"; tapping anywhere opens Add. Before first unlock the widgets say to unlock instead of reading Room. Dark colours: ground #111827, ink #F3F4F6, secondary #C7CCD4, overdue #FF8A70.
+13. **Tile.** Label "Do: Add a reminder", a plus icon, no state. When locked it calls `unlockAndRun` and then opens Add; on Android 14 and later it uses `startActivityAndCollapse(PendingIntent)`.
+14. **Shortcuts and links.** Static shortcuts "Add a reminder" (`do://add`) and "Today" (`do://today`, the reminder list until the Today tab exists), with an `entry=SHORTCUT` extra. `do://add?text=` takes `%20` or `+` for spaces, any UTF-8 (emoji), and an empty, missing or bad value opens an empty Add; text is cleaned like a share. Other hosts or paths are ignored. The `https://` app link stays out of scope. No direct-share targets (sharing shortcuts) were added.
+15. **Pure files** added to `CorePurityTest`: `capture/ShareText.kt`, `capture/DeepLinks.kt`, `capture/CaptureEntry.kt`, `capture/AgentRequests.kt`, `widget/WidgetModel.kt`. `AgentRequests.kt` uses `AlertLevel` from `alarm/AlertLevel.kt`, which is not itself on the list.
+
+### AT map (unit)
+| AT | Tests |
+| --- | --- |
+| 1 | `capture/ShareTextTest`: `at1KeepsOnlyTheFirstLine`, `at1CutsToTwoHundredCharacters`, `at1EmptyTextIsRefused`, `at1ParsesTheDateAndKeepsItsWords`, `at1KeepsARepeatPhrase`, `at1NoDateMeansTomorrowNineAm`, `at1DateOnlyTextKeepsItsTitle` |
+| 2 | `capture/CaptureCommandsTest`: `at2EntriesMapToTheirOrigins`, `at2ShareSavesWithTheShareOrigin`, `at2ShareQuickChoiceAndNoCaller`, `at2WidgetAddAndDoneUseTheWidgetOrigin`, `at2TileShortcutAndLinkSaveAsUser`, `at2AgentUsesTheAgentOrigin` |
+| 3 | `capture/CaptureCommandsTest`: `at3CapSendsShareAndWidgetToThePaywall`, `at3CapGivesTheAgentALimitReachedError` |
+| 4 | `capture/AgentFunctionsTest`: `at4AlarmRequestIsHeldAtNormal`, `at4OnlyAgentRequestsAboveNormalAreHeld` |
+| 5 | `capture/DeepLinksTest`: `at5DecodesSpaces`, `at5DecodesEmoji`, `at5EmptyTextOpensAnEmptyAdd`, `at5TextIsCleanedLikeShare`, `at5OtherLinksAreRefused`, `at5LaunchRequestsPickTheEntry` |
+| 6 | `capture/AgentFunctionsTest`: `at6FlagOffRefusesEveryFunction`, `at6ReleaseHasAppFunctionsOff`; plus `checkAlarmManifests` (release manifest) and the three CI commands |
+
+Also: `agentRequestsAreChecked`, `listAndCompleteFollowTheirLimits`, `commandListenersRunAfterEachCommandForTheWidgets`, `quickChoicesLandWhereTheSheetSays`, `widget/WidgetModelTest`.
+
+### Phone checks (Mark with Tim)
+- AT-7: share from Messages or WhatsApp; the sheet should show Fri at 5:30 pm with `from "Friday after work"`; Save returns to the chat and a toast says "Added to Do".
+- AT-8: tick from the large widget, then check the app list and that the notification for that reminder is gone. Also check the widgets update after adding in the app, after a fire (overdue count), after reboot, and in dark mode.
+- AT-9: tile from the lock screen should ask for unlock first, then open Add. Do not remove the lock.
+- AT-10: long-press the icon, both shortcuts. Optional: `adb shell am start -a android.intent.action.VIEW -d "do://add?text=Buy%20milk%20tomorrow"`.
+- AT-11: NOT RUN (no AppFunctions service in this build; see above).
+- Worth a look: Share at the free cap (paywall, back returns to the sender), and that Do does not appear when sharing a photo or a contact.
