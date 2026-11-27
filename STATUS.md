@@ -5,7 +5,7 @@ Last updated: Fri 27 Nov 2026, about 5 pm (AWST). Updated by Claude as work land
 ## Running now
 A short pause for a usage limit at about 4 pm AWST Friday; resumed straight after. Running:
 - **Spec 11, Stuff You Should Do.** Being built on `do/spec-11-stuff-you-should-do` (on the fixed Spec 9).
-- **Spec 10 QA.** Independent review of Spec 10 running; report will be `specs/10-qa-report.md`.
+- **Spec 10 fixes.** QA passed it with one medium bug (the Settings row showed A$3.99 without the A$9.99 renewal price) and four low ones; the builder is fixing them and merging in the fixed Spec 9.
 
 
 ## Done
@@ -15,9 +15,8 @@ A short pause for a usage limit at about 4 pm AWST Friday; resumed straight afte
 - Earlier build: on GitHub's Mac runners (Xcode 26.6, iOS 26.5 simulator), branch `ios/engine-test` at `2db43bc`. Not yet run on a real iPhone. Runbook: `ios/engine-test/RUNBOOK.md`. Things only a real phone can show: whether AlarmKit alarms appear without a widget extension, whether the Done and Snooze buttons work with the app closed, and whether AlarmKit has a cap. In AlarmKit mode the buttons are Done and Snooze 10 min (AlarmKit allows two).
 
 ## Next, in order
-1. Rebase Spec 10 onto the fixed Spec 9 once its QA is done.
-2. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
-3. Spec 12, capture surfaces: build and QA (draft: `specs-drafts/12-capture-surfaces.md`).
+1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
+2. Spec 12, capture surfaces: build and QA (draft: `specs-drafts/12-capture-surfaces.md`).
 
 Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
 
@@ -25,6 +24,7 @@ Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, s
 - PR #8: phone rerun (AT-20 to AT-28) and hands-on AT-05, AT-10, AT-12, then your OK to merge.
 - iPhone engine test: build to your iPhone from your Mac (runbook will be at `ios/engine-test/RUNBOOK.md` on branch `ios/engine-test`).
 - Apply for Apple's Critical Alerts entitlement and Google's AppFunctions early access.
+- For Play Console later: consider turning off Resubscribe and Pause on the `annual` base plan (Do has no server, so a resubscribe from the Play Store is only acknowledged when Do is next opened, and a paused plan reads as ended).
 - Name a hosting account for the cloud agent API (Spec 13 can't be specced until then).
 
 ## Nothing merged, nothing published
