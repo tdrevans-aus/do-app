@@ -76,6 +76,8 @@ class Scheduler(
         category: String? = null,
         templateId: String? = null,
         templateVersion: Int? = null,
+        approval: Approval = Approval.DEFAULT,
+        requestedAlertLevel: AlertLevel? = null,
     ): Long? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
@@ -105,6 +107,8 @@ class Scheduler(
             templateVersion = templateVersion,
             updatedAt = now,
             version = 1,
+            approval = approval.name,
+            requestedAlertLevel = requestedAlertLevel?.name,
         ).withRepeat(rule, pattern)
         val id = tx {
             val inserted = dao().insert(row)
