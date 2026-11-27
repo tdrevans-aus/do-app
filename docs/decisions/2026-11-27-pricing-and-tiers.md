@@ -18,14 +18,14 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 4. **One paywall: the number of active reminders.** The free tier allows **5 active (not-done) reminders**. Paid is unlimited.
 5. **Reminders created by an AI agent count towards the free limit**, the same as any other reminder. The reasoning: people who connect an assistant and like it will want more than 5, and that is the natural upgrade moment. The cap also keeps free users' server load small.
 6. **Stuff You Should Do (catalogue) is in the free tier.** Items it creates count towards the same limit.
-7. **Price: annual subscription only, A$6.99 a year, auto-renewing**, in line with Due's A$6.99 Annual Upgrade Pass.
+7. **Price: annual subscription only, auto-renewing. A$3.99 for the first year, then A$9.99 a year.** The first year uses Play's introductory pricing (once per user). Over 3 years that is A$23.97, against about A$27 to A$34 for Due (A$12.99 up front plus its A$6.99 a year pass), and Do has a free tier. The ongoing A$9.99 is above Due's A$6.99 pass. The paywall and Play's renewal notice must state the A$9.99 renewal price clearly, so the jump at year 2 is not a surprise. Watch renewal churn at year 2.
 8. **No lifetime option at launch.** One can be added later; removing one after launch would upset people. A 3-year prepaid pass was considered and rejected, because Google Play subscriptions only go up to 1 year, so it could not auto-renew.
 9. **A lapsed subscription never stops reminders.** Every existing reminder keeps nagging. The user cannot add more beyond 5 active until they renew. Backup and export always work.
 10. **Sponsors, affiliate and "Book it" links are a later, second revenue line**, not v1. They come after there is an audience in one region. Paid users can hide them. Health items are never sponsored. A sponsor never changes when or how a reminder fires.
 
 ## Still open
 
-- **Introductory price:** whether to offer a cheaper first year through Play's introductory pricing (for example A$4.99), or a free trial. Not decided.
+- **Free trial:** whether to add a short free trial of the paid tier on top of the A$3.99 first year. Probably not needed, since the free tier already lets people try everything. Not decided.
 - **The repeating cap of 2 (Spec 8, `FreeTier.REPEATING_REMINDER_CAP`).** Proposed: drop it, so the 5 active reminders limit is the only gate. It cuts against the catalogue, which is mostly repeating tasks. Not yet confirmed.
 - **Name:** "Stuff You Should Do" or "Stuff You Can Do". A trademark check is needed either way ("Stuff You Should Know" is a well-known podcast).
 - **Catalogue scope:** Australian-first (rego, state smoke alarm rules) or global.
