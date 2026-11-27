@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +28,8 @@ fun UnlockScreen(
     onBack: () -> Unit,
     onBuy: () -> Unit,
     onRestore: () -> Unit,
+    /** Spec 11: from first run picks, "Keep 5 for free" adds only what fits. Null hides it. */
+    onKeepFree: (() -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -62,6 +66,7 @@ fun UnlockScreen(
                     onClick = onBuy,
                     enabled = state.buyEnabled,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = DoLook.Alarm),
                 ) {
                     Text(stringResource(R.string.unlock_buy))
                 }
@@ -71,6 +76,11 @@ fun UnlockScreen(
                     text = stringResource(R.string.unlock_failed),
                     color = MaterialTheme.colorScheme.error,
                 )
+            }
+            if (onKeepFree != null && !state.unlocked) {
+                OutlinedButton(onClick = onKeepFree, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.unlock_keep_free))
+                }
             }
             TextButton(onClick = onRestore, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.unlock_restore))
