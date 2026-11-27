@@ -131,7 +131,8 @@ class DebugReceiver : BroadcastReceiver() {
         } else {
             ReminderSource.USER
         }
-        if (source == null) {
+        // IMPORT is set only by backup import, never by a create.
+        if (source == null || source == ReminderSource.IMPORT) {
             Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad source")
             return
         }

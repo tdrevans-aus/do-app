@@ -21,6 +21,7 @@ interface ReminderEventDao {
     )
     suspend fun trim(uuid: String, keep: Int)
 
+    /** Callers pass at most a few hundred uuids per call (SQLite before Android 11 allows 999 variables). */
     @Query("DELETE FROM reminder_event WHERE reminderUuid IN (:uuids)")
     suspend fun deleteForReminders(uuids: List<String>)
 

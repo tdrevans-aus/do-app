@@ -291,7 +291,11 @@ class Spec9QaTest {
         assertEquals("CRITICAL", restored.alertLevel)
         assertEquals("USER", restored.source)
         assertEquals("NONE", restored.approval)
-        assertEquals(restored.createdAt, restored.updatedAt)
+        // Changed by the fix agent for QA bug 2: a merge onto a local row (here a soft-deleted
+        // one) is a change to it, so updatedAt is the clock and version is max(local, incoming) + 1.
+        // The original line expected updatedAt == createdAt, which contradicts the bug 2 fix.
+        assertEquals(fx.clockMillis, restored.updatedAt)
+        assertEquals(3, restored.version)
         assertNotNull(fx.alarms.at(id))
         val other = fx.dao.getByUuid("aaaaaaaa-0000-4000-8000-000000000002")!!
         assertEquals("WEEK", other.repeatUnit)

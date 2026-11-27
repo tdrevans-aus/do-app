@@ -61,6 +61,9 @@ class Scheduler(
          * from the mirror later (who tapped is not recorded; detail says deferred=1).
          */
         val SYSTEM = Origin(Actor.SYSTEM)
+
+        /** uuids per event delete in a purge, well under SQLite's 999-variable limit. */
+        const val PURGE_CHUNK = 500
     }
 
     internal suspend fun add(
@@ -109,9 +112,7 @@ class Scheduler(
             inserted
         }
         val stored = dao().getById(id) ?: error("Inserted reminder $id was not readable")
-        val next = NagSchedule.catchUp(stored.dueAt, now)
-        mirror.upsert(stored.toMirror(nextFireAt = next))
-        alarms.schedule(stored.id, next)
+        armFirstFire(stored, now)
         changed()
         id
     }
@@ -460,10 +461,8 @@ class Scheduler(
         if (!restored) return@guarded false
         val stored = dao().getById(id) ?: return@guarded false
         if (!stored.isDone) {
-            val next = NagSchedule.catchUp(stored.dueAt, now)
             alarms.cancel(id)
-            mirror.upsert(stored.toMirror(nextFireAt = next))
-            alarms.schedule(id, next)
+            armFirstFire(stored, now)
         }
         changed()
         true
@@ -550,7 +549,14 @@ class Scheduler(
                     ids += dao().insert(incoming)
                     record(incoming.uuid, EventType.IMPORTED, origin, EventLog.detail("mode" to "merge"))
                 } else {
-                    dao().update(incoming.copy(id = local.id))
+                    // Merge onto a local row is a change to it: version never goes down.
+                    dao().update(
+                        incoming.copy(
+                            id = local.id,
+                            version = maxOf(local.version, incoming.version) + 1,
+                            updatedAt = clock(),
+                        ),
+                    )
                     ids += local.id
                     val restored = if (local.deletedAt != null) 1 else null
                     record(
@@ -692,7 +698,12 @@ class Scheduler(
 
     private suspend fun rescheduleAllLocked() {
         val now = clock()
-        purgeLocked(SoftDelete.PURGE_AFTER_DAYS)
+        try {
+            purgeLocked(SoftDelete.PURGE_AFTER_DAYS)
+        } catch (error: Throwable) {
+            // A purge failure must never stop alarms being re-armed. The rows stay for the next run.
+            DoAlarmLog.handlingFailed(id = -1, error)
+        }
         val pending = mirror.all().filter { it.pendingDone }
         for (entry in pending) {
             finishDoneLocked(entry.id, entry.pendingDoneAt ?: now, SYSTEM, deferred = true)
@@ -739,7 +750,8 @@ class Scheduler(
             }
             alarms.cancel(reminder.id)
             val stillHeld = entry != null && isNag && entry.dndHeld
-            mirror.upsert(reminder.toMirror(nextFireAt = next, dndHeld = stillHeld))
+            val marker = if (isNag || next == null) next else firstFireMarker(reminder.dueAt, next)
+            mirror.upsert(reminder.toMirror(nextFireAt = marker, dndHeld = stillHeld))
             if (next != null) alarms.schedule(reminder.id, next)
         }
     }
@@ -805,15 +817,13 @@ class Scheduler(
             }
         }
         val now = clock()
-        val next = NagSchedule.catchUp(placed.dueAt, now)
         val stored = reminder.copy(
             dueAt = placed.dueAt,
             patternDueAt = placed.patternDueAt,
             isDone = false,
             doneAt = null,
         )
-        mirror.upsert(stored.toMirror(nextFireAt = next))
-        alarms.schedule(id, next)
+        armFirstFire(stored, now)
         DoAlarmLog.repeatAdvance(id, placed.dueAt, placed.patternDueAt, rule.from.name)
     }
 
@@ -1169,7 +1179,8 @@ class Scheduler(
         val doomed = dao().deletedBefore(cutoff)
         if (doomed.isEmpty()) return 0
         val removed = tx {
-            events().deleteForReminders(doomed.map { it.uuid })
+            // Chunked: SQLite before Android 11 allows at most 999 bound variables.
+            doomed.map { it.uuid }.chunked(PURGE_CHUNK).forEach { events().deleteForReminders(it) }
             dao().purgeDeletedBefore(cutoff)
         }
         for (row in doomed) {
@@ -1178,6 +1189,19 @@ class Scheduler(
         }
         return removed
     }
+
+    /**
+     * Arms the first fire of [reminder]. A due already past is armed at [now], but the
+     * mirror keeps next fire = due, the first-fire marker, so the catch-up alerts as a
+     * first fire (never held as a nag) and is logged FIRED. Same rule as the direct-boot path.
+     */
+    private fun armFirstFire(reminder: Reminder, now: Long) {
+        val armAt = NagSchedule.catchUp(reminder.dueAt, now)
+        mirror.upsert(reminder.toMirror(nextFireAt = firstFireMarker(reminder.dueAt, armAt)))
+        alarms.schedule(reminder.id, armAt)
+    }
+
+    private fun firstFireMarker(dueAt: Long, armAt: Long): Long = if (armAt > dueAt) dueAt else armAt
 
     private fun describe(reminder: Reminder): String? = EventLog.detail(
         "due" to reminder.dueAt,

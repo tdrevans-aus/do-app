@@ -212,9 +212,10 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm backup export path=$path reminders=$reminders schema=${BackupNames.SCHEMA_VERSION}")
     }
 
-    fun backupImport(mode: String, reminders: Int, ids: List<Long>) {
+    /** [schema] is the imported file's schemaVersion, not the app's. */
+    fun backupImport(mode: String, reminders: Int, ids: List<Long>, schema: Int) {
         val suffix = if (ids.isEmpty()) "" else " ids=${ids.joinToString(",")}"
-        Log.i(TAG, "DoAlarm backup import mode=$mode reminders=$reminders schema=${BackupNames.SCHEMA_VERSION}$suffix")
+        Log.i(TAG, "DoAlarm backup import mode=$mode reminders=$reminders schema=$schema$suffix")
     }
 
     fun backupImportError(reason: String) {
