@@ -182,8 +182,8 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 4. **PR #8** (quiet hours, cap removed): CI, the shorter phone rerun (AT-20 to AT-28), three hands-on ATs (05, 10, 12), Gareth's sign-off, Tim's OK to merge.
 5. **Spec 9: data foundation (approved by Tim, 27 Nov 2026).** `ReminderCommands` layer that every entry point calls; Room v5 fields (source, sourceId, category, templateId, templateVersion, updatedAt, version, deletedAt, approval, requested alert level); `reminder_event` log; backup keys for the new fields; onboarding profile and suggestion state. No network, no UI change. **Core logic (repeats, natural-language parsing, quiet hours, catalogue, the commands) stays free of Android code so it can be shared with iPhone later**, for example through Kotlin Multiplatform.
 6. **Spec 10: subscription billing.** Annual product with the introductory first year, entitlement with "expired", paywall wording that shows the renewal price.
-7. **Spec 11: Stuff You Should Do v1.** Catalogue data and schema (from `docs/catalogue/sysd-starter.json`), first-run life areas and picks (opt out, up to 5 pre-ticked), Catalogue tab, the offer rules.
-8. **Spec 12: capture surfaces.** Share sheet, widget, Quick Settings tile, shortcuts and deep link; AppFunctions if confirmed.
+7. **Spec 11: Stuff You Should Do v1.** Catalogue data and schema (from `docs/catalogue/sysd-starter.json`, with region tags down to state), state worked out from the time zone, first-run life areas and picks (opt out, up to 5 pre-ticked), Catalogue tab, the offer rules.
+8. **Spec 12: capture surfaces.** Share sheet, widget, Quick Settings tile, shortcuts and deep link, and AppFunctions entry points (built now; switched on for Gemini when Google opens access).
 9. **Spec 13: cloud agent API, at launch (decided by Tim, 27 Nov 2026).** MCP and REST so assistants that don't run on the phone (ChatGPT, Claude and others) can add, complete and hear back about reminders, with approve-before-ring and the rules on the Assistants screen. Free for everyone; agent reminders count towards the 5. **Needs Tim to name a hosting account** before it can be specced in detail, and a way for an assistant to pair with a phone without a Do account (design question). Can be built alongside Specs 10 to 12 and 14.
 10. **Spec 14: the new UI** from the design pass, **including replacing every Due-derived name and string** (alert levels become Normal, Loud and Alarm; new add-field wording; Do's own time shortcuts; new preview interaction; reworded repeat menu and settings).
 11. **Android release preparation:** close the Spec 1 to 7 human ATs, make the repo private (or remove the Due material), a lawyer's check of the name and final UI, Play declarations, store listing, price test. Only with Tim's go-ahead.
@@ -236,12 +236,14 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 - Catalogue name: "Stuff You Should Do" (SHOULD, not CAN). "Stuff" over "Things" is Tim's instinct; recommendation agrees, because "Things" is also the name of a well-known to-do app (Things 3), which is a closer clash than "Stuff You Should Know" (a podcast).
 - Cloud agent API: at launch.
 
+- **Catalogue regions:** the data is built to work globally (each item tagged everywhere, a country such as `AU`, or a state such as `AU-WA`); the launch content is written for Australia. US, UK and NZ packs can follow without a redesign. Do works out the user's state from the phone's time zone (Perth: WA, Brisbane: Qld, Adelaide: SA, Darwin: NT, Hobart: Tas, Melbourne: Vic), with no location permission. "Sydney" covers NSW and ACT, so that one asks with a single tap. The picks screen shows "Using WA rules. Change" rather than asking a question. State-specific items get the right interval and wording; items that don't apply in that state are hidden.
+- **AppFunctions:** build Do's AppFunctions entry points in Spec 12 as a thin layer over the Spec 9 commands; apply for Google's AppFunctions early access now so Do can be tested with Gemini on the S24+; do not make launch depend on it. Share to Do, the widget and the cloud agent API all work without it. If Gemini access for other apps has not opened by launch, the Assistants screen shows Gemini as "Coming soon". (As at late 2026, Gemini calling third-party apps' AppFunctions is still a limited preview.)
+
 **Still open:**
 
-1. Catalogue Australian-first or global, and how Do knows the user's state (under discussion).
-2. AppFunctions: whether to build for it at launch (under discussion; Gemini access for third-party apps is still a limited preview as at late 2026).
-3. Hosting account for the cloud agent API (Tim to name one).
-4. How an assistant pairs with a phone without a Do account.
+1. Hosting account for the cloud agent API (Tim to name one).
+2. How an assistant pairs with a phone without a Do account (for example a code shown in Do that the user approves on the phone).
+3. Applying for Google's AppFunctions early access (Tim, with a Google developer account).
 
 ## Sources (competitor scan, 27 Nov 2026)
 
