@@ -164,3 +164,69 @@ Claude's defaults for Gareth to confirm or change:
 5. `approval` and `requestedAlertLevel` are stored now and used later.
 6. The core-purity check is a unit test over a listed set of files, not a module split.
 7. No UI change.
+
+## Build notes
+Built on `do/spec-8-quiet-hours-and-repeating-cap` at `ce9048a` (PR #8 had not merged). Notes by the Claude build agent, 27 Nov 2026.
+
+### Choices where the spec left room
+1. **Pure types stay in `alarm/ReminderCommands.kt`.** The file imports no Android or AndroidX code (it only imports `Scheduler`, `Reminder`, `RepeatRule` and `DueShiftMode` from the app), so `alarm/CommandTypes.kt` was not needed. Besides `Origin`, `ReminderSource`, `Actor` and `EventType`, it holds `Approval`, `ReminderCategory` (the eight names; anything else becomes null, case is folded to lower case), `SoftDelete` (`PURGE_AFTER_DAYS = 30`) and `EventLog` (`MAX_PER_REMINDER = 200`, detail cut at 500 characters).
+2. **How the wrap works.** `ReminderCommands` is a thin facade. Each internal `Scheduler` mutator takes the `Origin` as a trailing parameter (default `Origin(Actor.USER)`, or `Origin(Actor.IMPORT)` for `replaceAll` and `mergeAll`), so the event is written by `Scheduler` inside its own `guarded` block. Within that block the reminder write and the event insert (plus the retention trim) run in one `inTransaction` call, before any alarm, notification or mirror side effect. The DAO writes return the number of rows changed, and the event is written only when a row changed.
+3. **Commands that change nothing write nothing.** An edit that changes nothing (`EditResult.UNCHANGED`), setting the level it already has, setting the same repeat, the same title, or a shift that lands on the same due: no version bump, no event.
+4. **Stop bumps version.** `stopAlert` changes only the mirror, but AT-4 lists it, so it uses a `touch` query (updatedAt and version only) beside the `ALERT_STOPPED` event.
+5. **Before unlock.** Room is closed in direct boot, so mirror-only paths (Done, snooze, Stop and fires before the first unlock) write no event. When `rescheduleAll` later applies a pending Done or snooze from the mirror, it writes `DONE` (and `ADVANCED`) or `SNOOZED` with `Actor.SYSTEM` and `deferred=1` in the detail; who tapped is not recorded. Once unlocked, notification buttons and the Prominent screen record `NOTIFICATION`.
+6. **`HELD`.** Written when a nag fire is held at fire time, which in the current code is Do Not Disturb with quiet hours set to follow it. A quiet-hours window is applied when the nag is placed, so the nag never fires inside the window and there is no fire to hold; no separate event is written for that placement.
+7. **`FIRED` or `NAGGED`.** Decided from the mirror before the fire: a stored next fire after the due is a nag, anything else (including a catch-up of a missed first fire and the first fire after a snooze) is `FIRED`. Fire events are written after the alarm work, and a failed fire event is logged rather than thrown, so the nag loop cannot be stopped by the log. Fires never bump version.
+8. **Import keeps exported version and updatedAt.** AT-11 needs every new field to survive Export then Replace, so `replaceAll` and `mergeAll` do not bump `version`; a row with no `updatedAt` (old file) takes its `createdAt`. Each imported row gets one `IMPORTED` event. A merge onto a soft-deleted row clears `deletedAt` and takes the incoming values; its single `IMPORTED` event carries `restored=1` (no separate `RESTORED`).
+9. **Zone alignment is a change.** When a timezone change moves a wall-clock repeat's due in Room, the row's version goes up and an `EDITED` event is written with `Actor.SYSTEM` and `zone=<id>` in the detail.
+10. **Purge.** `Scheduler.purgeDeleted(days)` is public (a system path, like `rescheduleAll`) and is also run at the start of every internal reschedule, so it covers `rescheduleAll` (app start), `onExternalClock` (boot, time, timezone and app update) and the reschedule after an import. Restore is refused once a row is past the window, even if the purge has not run yet.
+11. **Health test reminder.** `HealthMonitor` (not in the section 2 list) also moved to `ReminderCommands`, with `Actor.SYSTEM`.
+12. **Backup decode is lenient for the new keys.** A missing, null, unknown or wrongly typed value takes the default (`USER`, null, `NONE`, version 1, updatedAt from createdAt). An unknown `requestedAlertLevel` becomes null. `sourceId` and `templateId` are cut to 200 characters. The backup log lines now print the real schema number (`schema=2`) instead of a fixed `schema=1`.
+13. **Debug `ADD`.** Accepts any `ReminderSource` name for `--es source`; an unknown source or category logs `DoAlarm debug-add bad source` or `bad category` and adds nothing. `PURGE_NOW --ei days 0` purges every soft-deleted row.
+14. **Existing order kept.** `markDone`, `snooze` and `stopAlert` still cancel the alarm and dismiss the notification before the Room write, as before. If the transaction fails, the reminder is unchanged in Room and the next reschedule re-arms it.
+15. **Release.** No new debug code is in main except the `DoAlarmLog` line formats (`meta`, `event`, `events end`, `deleted`, `restored`, `purge`), which are plain log helpers. `checkAlarmManifests` passes in USE and SCHEDULE and still proves the release manifest has no debug receiver.
+16. **Backup compatibility.** Backups are now schema 2. Older builds refuse a schema 2 file, as they refuse any higher `schemaVersion`. That is expected.
+
+### Changed existing tests (AT-16)
+- `alarm/QuietSchedulerTest.kt`: its private in-memory fixture (`Fixture`, `FakeAlarms`, `FakeAlerts`, `MemoryReminderDao`) moved, unchanged in behaviour, to the shared `alarm/SchedulerFixture.kt`, extended with an in-memory `ReminderEventDao`, a simulated transaction and the new DAO methods. `fixture()` now returns `schedulerFixture()`. No test body changed. The tests are in package `alarm`, so the now-internal `Scheduler` calls still compile.
+- No other existing test changed.
+
+### ReminderDao reads and deletedAt
+| Read | deletedAt | Callers |
+| --- | --- | --- |
+| `observeAll()` | Excludes deleted | `ReminderViewModel.reminders` (the list) |
+| `active()` | Excludes deleted | `Scheduler` reschedule and zone alignment, `HealthMonitor` mirror check |
+| `activeCount()` | Excludes deleted | Free-tier cap in `Scheduler.add`; debug `FAKE_PURCHASE` and `DUMP_UNLOCK` |
+| `all()` | Excludes deleted | Backup export (`BackupController.encodeCurrent`, also filtered again by `exportable()`), `BackupController.reminderCount`, the id list `replaceAll` returns |
+| `allIncludingDeleted()` | Includes deleted (new; the old raw `all`) | `Scheduler.replaceAll` only, to cancel every alarm before clearing the table |
+| `getById(id)` | Includes deleted | `Scheduler` reads through `liveById`, which treats a deleted row as gone, except `restore` (needs the deleted row) and the read-backs after insert and restore. `ReminderViewModel.reminderOrNull` returns null for a deleted row. `HealthMonitor.testStillActive` treats deleted as gone. Debug `APPLY_QAT` and `SET_ALERT_LEVEL` treat deleted as inactive. Debug `ADD`, `SET_REPEAT`, `DUMP_REPEAT`, `DUMP_ALERT`, `DUMP_META`, `DUMP_EVENTS` and `DELETE` read it for logging only |
+| `getByUuid(uuid)` | Includes deleted | `Scheduler.mergeAll`, so a match on a deleted row is restored with the incoming values |
+| `deletedBefore(cutoff)` | Only deleted | Purge |
+
+Every write query that changes a live row (`markDone`, `updateDueAt`, `updateDueAndPattern`, `advanceOccurrence`, `updateDetails`, `touch`) also has `deletedAt IS NULL` in its `WHERE`, so a deleted row cannot be changed by accident. The old hard delete (`deleteById`) is gone.
+
+### Acceptance tests to unit tests
+| AT | Test |
+| --- | --- |
+| 1 | `MetaMigrationTest.at1Version4RowsKeepTheirColumnsAndGainTheDefaults` |
+| 2 | `MetaMigrationTest.at2Schema5IsExportedWithBothTablesAndMatchesTheMigration` (also checks the migrated table's columns, types, nullability and defaults equal the exported `5.json`, which is what Room validates on the phone) |
+| 3 | `ReminderCommandsTest.at3AddStoresTheSourceAndWritesOneCreatedEvent`, `at3LongSourceIdIsCutAndAnUnknownCategoryIsNull` |
+| 4 | `ReminderCommandsTest.at4EveryCommandBumpsVersionOnceAndWritesOneEvent`, `at4RepeatingDoneWritesDoneThenAdvancedWithOneBump`, `at4AnUnchangedEditDoesNotBumpOrWriteAnEvent` |
+| 5 | `ReminderCommandsTest.at5FiresWriteEventsButDoNotBumpVersion` |
+| 6 | `ReminderCommandsTest.at6SoftDeleteHidesTheRowEverywhere` |
+| 7 | `ReminderCommandsTest.at7RestoreWithinTheWindowReArmsAndCatchesUp` |
+| 8 | `ReminderCommandsTest.at8PurgeRemovesRowsDeletedMoreThan30DaysAgoWithTheirEvents` |
+| 9 | `ReminderCommandsTest.at9RetentionKeepsTheNewest200EventsPerReminder` |
+| 10 | `ReminderCommandsTest.at10AFailedEventInsertRollsBackTheReminderChange` |
+| 11 | `BackupMetaTest.at11ExportThenReplaceKeepsEveryNewFieldButDeletedAt` |
+| 12 | `BackupMetaTest.at12AnOldBackupWithoutTheNewKeysImportsWithTheDefaults` |
+| 13 | `ReminderCommandsTest.at13MergeRestoresASoftDeletedMatchWithTheIncomingValues` |
+| 14 | `CommandCallerScanTest.at14NoFileOutsideTheCoreCallsASchedulerMutator`, `at14TheScanCatchesADirectCall`. The scan is stricter than the spec: only `Scheduler.kt` and `ReminderCommands.kt` may call the mutators, so the receivers in `alarm/` are checked too |
+| 15 | `CorePurityTest.at15CoreFilesImportNoAndroidCode`, `at15TheCheckCatchesAnAndroidImport`. Proved by hand: with `import android.util.Log` added to `RepeatMath.kt`, both tests fail (`alarm/RepeatMath.kt: import android.util.Log`); the change was reverted, not committed |
+| 16 | Every Spec 1 to 8 unit test passes |
+| 17 | `./gradlew assembleDebug testDebugUnitTest lintDebug` and `./gradlew assembleDebug -PexactAlarmMode=SCHEDULE` pass; `checkAlarmManifests` runs as a dependency of `assembleDebug`, `testDebugUnitTest` and `lintDebug` |
+
+`ReminderCommandsTest.aDoneTappedBeforeUnlockIsRecordedWhenRoomOpens` covers note 5.
+
+### Phone notes (AT-18 to AT-21)
+- The new hooks take the id as `--el id <id>`, as the other hooks do. `DUMP_EVENTS` takes `--ei limit` (1 to 200, default 20).
+- Export a backup before installing on Tim's phone (section 6).
