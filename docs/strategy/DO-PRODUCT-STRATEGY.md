@@ -184,7 +184,7 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 6. **Spec 10: subscription billing.** Annual product with the introductory first year, entitlement with "expired", paywall wording that shows the renewal price.
 7. **Spec 11: Stuff You Should Do v1.** Catalogue data and schema (from `docs/catalogue/sysd-starter.json`, with region tags down to state), state worked out from the time zone, first-run life areas and picks (opt out, up to 5 pre-ticked), Catalogue tab, the offer rules.
 8. **Spec 12: capture surfaces.** Share sheet, widget, Quick Settings tile, shortcuts and deep link, and AppFunctions entry points (built now; switched on for Gemini when Google opens access).
-9. **Spec 13: cloud agent API, at launch (decided by Tim, 27 Nov 2026).** MCP and REST so assistants that don't run on the phone (ChatGPT, Claude and others) can add, complete and hear back about reminders, with approve-before-ring and the rules on the Assistants screen. Free for everyone; agent reminders count towards the 5. **Needs Tim to name a hosting account** before it can be specced in detail, and a way for an assistant to pair with a phone without a Do account (design question). Can be built alongside Specs 10 to 12 and 14.
+9. **Spec 13: Do Cloud v1, at launch (decided by Tim, 27 Nov 2026; see 9B).** Device registration and push, assistant pairing without an account, the MCP and REST agent API with approve-before-ring, events back to the assistant, and server-side purchase verification. Free for everyone; agent reminders count towards the 5. Built against the Firebase emulator first; Tim creates the Firebase project before deploy. Can be built alongside Specs 10 to 12 and 14.
 10. **Spec 14: the new UI** from the design pass, **including replacing every Due-derived name and string** (alert levels become Normal, Loud and Alarm; new add-field wording; Do's own time shortcuts; new preview interaction; reworded repeat menu and settings).
 11. **Android release preparation:** close the Spec 1 to 7 human ATs, make the repo private (or remove the Due material), a lawyer's check of the name and final UI, Play declarations, store listing, price test. Only with Tim's go-ahead.
 
@@ -224,6 +224,20 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 - **Needs:** an Apple Developer account and a test iPhone. **Approved by Tim, 27 Nov 2026.**
 - **When:** soon after PR #8, in parallel with Spec 9.
 
+## 9B. Architecture: local-first with a thin cloud (decided by Tim, 27 Nov 2026)
+
+The original "no server" design was right for a pure reminder app. With the cloud agent API at launch, an iPhone app, and subscriptions across two stores, Do now needs a small cloud. It does **not** become cloud-first.
+
+- **The phone stays the authority** for every reminder and alarm. Do works fully with no network and no account. If the cloud is down, nothing stops nagging.
+- **A thin cloud ("Do Cloud")** with four jobs: receive assistant requests and push them to the phone; relay the phone's events back to the assistant; verify purchases with Google Play (and later the App Store), which also fixes the resubscribe gap found in Spec 10's QA; and, later, optional sync between devices.
+- **No account by default.** A device gets an anonymous identity only when it first uses a cloud feature. An account (Sign in with Google or Apple) is only for using two devices or carrying a subscription across Android and iPhone, later.
+- **Store the minimum:** assistant requests until processed, events for assistant-created reminders for 30 days, nothing else. Unpairing an assistant deletes its data. Future sync can be end-to-end encrypted.
+- **Hosting: Firebase recommended** (push for Android and iPhone, anonymous and Google/Apple sign-in, Cloud Functions and Firestore in one place). Cloudflare is the cheaper, less locked-in alternative. The phone talks to the cloud through one small interface so the host can be swapped. Firebase's Cloud Functions need the pay-as-you-go plan; free users' load is bounded by the 5-reminder cap.
+- **Build without an account first:** Spec 13 is built and tested against the Firebase Emulator Suite. Tim creates the real Firebase project (his account, his go-ahead) only when it is time to deploy.
+- **Not chosen:** cloud-first (server as the source of truth). It is why other apps' reminders arrive late, and it is the gap Do wins on.
+
+The phone side needs no redesign: Spec 9's stable ids, versions, soft delete, event log, source and approval fields are what sync and agents need.
+
 ## 10. Decisions and open questions
 
 **Decided by Tim, 27 Nov 2026:**
@@ -235,14 +249,15 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 - iPhone engine test: approved.
 - Catalogue name: "Stuff You Should Do" (SHOULD, not CAN). "Stuff" over "Things" is Tim's instinct; recommendation agrees, because "Things" is also the name of a well-known to-do app (Things 3), which is a closer clash than "Stuff You Should Know" (a podcast).
 - Cloud agent API: at launch.
+- Architecture: local-first with a thin cloud, Firebase recommended (9B).
 
 - **Catalogue regions:** the data is built to work globally (each item tagged everywhere, a country such as `AU`, or a state such as `AU-WA`); the launch content is written for Australia. US, UK and NZ packs can follow without a redesign. Do works out the user's state from the phone's time zone (Perth: WA, Brisbane: Qld, Adelaide: SA, Darwin: NT, Hobart: Tas, Melbourne: Vic), with no location permission. "Sydney" covers NSW and ACT, so that one asks with a single tap. The picks screen shows "Using WA rules. Change" rather than asking a question. State-specific items get the right interval and wording; items that don't apply in that state are hidden.
 - **AppFunctions:** build Do's AppFunctions entry points in Spec 12 as a thin layer over the Spec 9 commands; apply for Google's AppFunctions early access now so Do can be tested with Gemini on the S24+; do not make launch depend on it. Share to Do, the widget and the cloud agent API all work without it. If Gemini access for other apps has not opened by launch, the Assistants screen shows Gemini as "Coming soon". (As at late 2026, Gemini calling third-party apps' AppFunctions is still a limited preview.)
 
 **Still open:**
 
-1. Hosting account for the cloud agent API (Tim to name one).
-2. How an assistant pairs with a phone without a Do account (for example a code shown in Do that the user approves on the phone).
+1. Creating the Firebase project for Do Cloud (Tim, before deploy; not needed to build).
+2. Whether to move Do to compileSdk 37, which Google's AppFunctions 1.0.0 needs (Gareth).
 3. Applying for Google's AppFunctions early access (Tim, with a Google developer account).
 
 ## Sources (competitor scan, 27 Nov 2026)
