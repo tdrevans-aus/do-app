@@ -1,10 +1,13 @@
 # Do: weekend build status
 
-Last updated: Fri 27 Nov 2026, evening (AWST). Updated by Claude as work lands.
+Last updated: Fri 27 Nov 2026, late evening (AWST). Updated by Claude as work lands.
 
 ## Running now
 - **Spec 9, data foundation.** Being built by a Claude build agent on branch `do/spec-9-data-foundation`. Spec: `specs/09-data-foundation.md` on that branch.
-- **iPhone engine test app.** Being built on branch `ios/engine-test`, compiled on GitHub's Mac runners. Plan: `docs/ios/IPHONE-ENGINE-TEST-PLAN.md` (this branch).
+
+
+## Done
+- **iPhone engine test app: built, compiles, 14 unit tests pass** on GitHub's Mac runners (Xcode 26.6, iOS 26.5 simulator), branch `ios/engine-test` at `2db43bc`. Not yet run on a real iPhone. Runbook: `ios/engine-test/RUNBOOK.md`. Things only a real phone can show: whether AlarmKit alarms appear without a widget extension, whether the Done and Snooze buttons work with the app closed, and whether AlarmKit has a cap. In AlarmKit mode the buttons are Done and Snooze 10 min (AlarmKit allows two).
 
 ## Next, in order
 1. Spec 9 tested by a separate Claude test agent (host tests, code review against the spec).
