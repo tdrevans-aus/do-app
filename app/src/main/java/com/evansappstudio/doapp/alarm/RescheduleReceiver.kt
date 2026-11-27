@@ -18,6 +18,8 @@ class RescheduleReceiver : BroadcastReceiver() {
             try {
                 app.container.scheduler.onExternalClock(zoneChanged)
                 if (boot) app.container.health.refresh()
+                // Spec 12: boot and clock changes move what counts as overdue.
+                app.container.widgets.request()
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             } finally {

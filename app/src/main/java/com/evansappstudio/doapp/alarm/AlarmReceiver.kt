@@ -19,6 +19,8 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 app.container.health.noteDelivery(id, scheduled, actual)
                 app.container.scheduler.onFire(id, actual, scheduled)
+                // Spec 12: a fire is when a reminder becomes overdue on the widgets.
+                app.container.widgets.request()
                 app.container.health.finishTest(id, scheduled, actual)
                 app.container.health.refresh()
             } catch (error: Throwable) {

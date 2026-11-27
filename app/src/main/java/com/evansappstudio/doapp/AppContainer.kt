@@ -28,6 +28,9 @@ import com.evansappstudio.doapp.backup.BackupController
 import com.evansappstudio.doapp.backup.BackupStore
 import com.evansappstudio.doapp.billing.EntitlementStore
 import com.evansappstudio.doapp.billing.UnlockBilling
+import com.evansappstudio.doapp.capture.AgentFunctions
+import com.evansappstudio.doapp.capture.CaptureCommands
+import com.evansappstudio.doapp.widget.WidgetRefresher
 import com.evansappstudio.doapp.billing.createUnlockBilling
 import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.MIGRATION_1_2
@@ -46,6 +49,9 @@ import kotlinx.coroutines.launch
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Home-screen widgets, refreshed from the command layer, fires, boot and clock changes. */
+    val widgets = WidgetRefresher(appContext, scope)
     val mirror = ReminderMirror(appContext)
     val alarms = AlarmScheduler(appContext)
     val snoozeConfig = SnoozeConfig(appContext)
@@ -92,7 +98,24 @@ class AppContainer(context: Context) {
     }
 
     /** The one public way to change reminders. Every caller passes an Origin. */
-    val commands: ReminderCommands by lazy { ReminderCommands(scheduler) }
+    val commands: ReminderCommands by lazy {
+        ReminderCommands(scheduler).also { it.addListener(widgets::request) }
+    }
+
+    /** Spec 12: the Add screen, Share, the widgets, the tile and links save through this. */
+    val capture: CaptureCommands by lazy { CaptureCommands(commands) }
+
+    /** Spec 12: the layer under AppFunctions. Off unless BuildConfig.APP_FUNCTIONS_ENABLED. */
+    val agent: AgentFunctions by lazy {
+        AgentFunctions(
+            enabled = BuildConfig.APP_FUNCTIONS_ENABLED,
+            commands = commands,
+            active = { reminderDao().active() },
+            byId = { id -> reminderDao().getById(id) },
+            defaultNagMinutes = { settings.defaultNagMinutes() },
+        )
+    }
+
 
     val backup: BackupController by lazy {
         BackupController(
@@ -151,6 +174,7 @@ class AppContainer(context: Context) {
             DoAlarmLog.handlingFailed(id = -1, error)
         }
         billing.start()
+        widgets.start()
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStop(owner: LifecycleOwner) {

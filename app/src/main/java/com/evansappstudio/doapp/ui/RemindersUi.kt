@@ -65,6 +65,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.evansappstudio.doapp.AppContainer
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.UserUnlock
+import com.evansappstudio.doapp.capture.CaptureEntry
+import com.evansappstudio.doapp.capture.LaunchRequest
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.material3.DropdownMenu
@@ -127,6 +129,8 @@ fun ReminderApp(
     container: AppContainer,
     openRequest: Long?,
     onOpenRequestConsumed: () -> Unit,
+    launchRequest: LaunchRequest? = null,
+    onLaunchRequestConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val viewModel: ReminderViewModel = viewModel(factory = ReminderViewModelFactory(container))
@@ -144,6 +148,17 @@ fun ReminderApp(
     var unlockFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var backupFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var replaceCount by remember { mutableIntStateOf(0) }
+    var addEntry by rememberSaveable { mutableStateOf(CaptureEntry.APP.name) }
+    var addText by rememberSaveable { mutableStateOf("") }
+    var addNonce by rememberSaveable { mutableIntStateOf(0) }
+
+    fun openAdd(entry: CaptureEntry, text: String?) {
+        viewModel.reloadQuickTimes()
+        addEntry = entry.name
+        addText = text.orEmpty()
+        addNonce++
+        screen = SCREEN_ADD
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -262,6 +277,15 @@ fun ReminderApp(
         onOpenRequestConsumed()
     }
 
+    LaunchedEffect(launchRequest) {
+        val request = launchRequest ?: return@LaunchedEffect
+        when (request) {
+            is LaunchRequest.Add -> openAdd(request.entry, request.text)
+            LaunchRequest.Today -> screen = SCREEN_LIST
+        }
+        onLaunchRequestConsumed()
+    }
+
     if (unlock.celebrate) {
         AlertDialog(
             onDismissRequest = { container.billing.clearCelebrate() },
@@ -277,8 +301,8 @@ fun ReminderApp(
     when (screen) {
         SCREEN_ADD -> ReminderFormScreen(
             heading = stringResource(R.string.add_reminder),
-            formKey = "add",
-            initialTitle = "",
+            formKey = "add-$addNonce",
+            initialTitle = addText,
             initialDueAt = null,
             initialNagMinutes = viewModel.defaultNagMinutes,
             saveEnabled = true,
@@ -287,7 +311,8 @@ fun ReminderApp(
             parseDates = viewModel.parseDatesEnabled(),
             onParseDates = viewModel::setParseDatesEnabled,
             onSave = { title, dueAt, nagMinutes, rule, _, alert ->
-                viewModel.add(title, dueAt, nagMinutes, rule, alert) { created ->
+                val entry = CaptureEntry.fromName(addEntry) ?: CaptureEntry.APP
+                viewModel.add(entry, title, dueAt, nagMinutes, rule, alert) { created ->
                     screen = if (created) SCREEN_LIST else SCREEN_UNLOCK.also { unlockFrom = SCREEN_ADD }
                 }
             },
@@ -374,10 +399,7 @@ fun ReminderApp(
                 editId = id
                 screen = SCREEN_EDIT
             },
-            onAdd = {
-                viewModel.reloadQuickTimes()
-                screen = SCREEN_ADD
-            },
+            onAdd = { openAdd(CaptureEntry.APP, null) },
             onSnoozeSettings = { screen = SCREEN_SNOOZE },
             showHealthWarning = health.badge,
             onHealth = { openHealth(SCREEN_LIST) },
