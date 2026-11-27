@@ -36,6 +36,11 @@ data class PortableSettings(
     val quietEndMinute: Int? = null,
     val quietFollowDnd: Boolean? = null,
     val quietCriticalPauses: Boolean? = null,
+    /** Spec 11 optional keys: catalogue region token ("AU-WA", "AU", "none") and its source. */
+    val sysdRegion: String? = null,
+    val sysdRegionSource: String? = null,
+    /** Spec 11 optional key: the onboarding profile (life areas). */
+    val sysdAreas: List<String>? = null,
 )
 
 fun PortableSettings.withQuiet(config: QuietConfig): PortableSettings = copy(

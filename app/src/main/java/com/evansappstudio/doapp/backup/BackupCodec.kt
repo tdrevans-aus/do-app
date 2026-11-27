@@ -14,6 +14,8 @@ import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.catalogue.RegionResolver
+import com.evansappstudio.doapp.catalogue.RegionSource
 import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.WeekStart
 
@@ -133,6 +135,9 @@ private fun settingsJson(settings: PortableSettings): JsonValue {
     settings.quietEndMinute?.let { fields["quietEndMinute"] = JsonValue.Num(it.toLong()) }
     settings.quietFollowDnd?.let { fields["quietFollowDnd"] = JsonValue.Bool(it) }
     settings.quietCriticalPauses?.let { fields["quietCriticalPauses"] = JsonValue.Bool(it) }
+    settings.sysdRegion?.let { fields["sysdRegion"] = JsonValue.Str(it) }
+    settings.sysdRegionSource?.let { fields["sysdRegionSource"] = JsonValue.Str(it) }
+    settings.sysdAreas?.let { areas -> fields["sysdAreas"] = JsonValue.Arr(areas.map { JsonValue.Str(it) }) }
     return JsonValue.Obj(fields)
 }
 
@@ -210,7 +215,16 @@ private fun decodeSettings(value: JsonValue?): PortableSettings? {
         quietEndMinute = quietEnd,
         quietFollowDnd = optionalBool(obj.fields["quietFollowDnd"]),
         quietCriticalPauses = optionalBool(obj.fields["quietCriticalPauses"]),
+        sysdRegion = optionalString(obj.fields["sysdRegion"])?.takeIf { RegionResolver.parse(it) != null },
+        sysdRegionSource = optionalString(obj.fields["sysdRegionSource"])?.takeIf { RegionSource.fromName(it) != null },
+        sysdAreas = sysdAreas(obj.fields["sysdAreas"]),
     )
+}
+
+/** Spec 11 optional key. Unknown areas are dropped; a missing or wrongly typed value is ignored. */
+private fun sysdAreas(value: JsonValue?): List<String>? {
+    val arr = value as? JsonValue.Arr ?: return null
+    return arr.items.mapNotNull { ReminderCategory.normalize((it as? JsonValue.Str)?.value) }.distinct()
 }
 
 /** A missing or unusable quiet minute is ignored. Out of range is ignored. */

@@ -112,6 +112,22 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm config-alert-default level=$level")
     }
 
+    fun catalogueSkipped(reason: String) {
+        Log.w(TAG, "DoAlarm catalogue skipped $reason")
+    }
+
+    fun catalogueAdd(items: List<String>, ids: List<Long>, blocked: Boolean) {
+        Log.i(TAG, "DoAlarm catalogue add items=${items.joinToString(",")} ids=${ids.joinToString(",")} blocked=$blocked")
+    }
+
+    fun catalogue(body: String) {
+        Log.i(TAG, "DoAlarm catalogue $body")
+    }
+
+    fun suggestion(body: String) {
+        Log.i(TAG, "DoAlarm suggestion $body")
+    }
+
     fun handlingFailed(id: Long, error: Throwable) {
         Log.e(TAG, "DoAlarm handling failed id=$id", error)
     }

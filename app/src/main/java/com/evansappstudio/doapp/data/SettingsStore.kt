@@ -12,7 +12,14 @@ import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeDue
 import com.evansappstudio.doapp.alarm.SnoozeKind
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.alarm.ReminderCategory
 import com.evansappstudio.doapp.backup.PortableSettings
+import com.evansappstudio.doapp.catalogue.Region
+import com.evansappstudio.doapp.catalogue.RegionResolver
+import com.evansappstudio.doapp.catalogue.RegionSetting
+import com.evansappstudio.doapp.catalogue.RegionSource
+import com.evansappstudio.doapp.catalogue.SuggestionState
+import java.time.LocalDate
 
 /**
  * App settings. The default nag for a new reminder is 5 minutes.
@@ -41,6 +48,9 @@ class SettingsStore(context: Context) {
         parseDates = parseDatesEnabled(),
         defaultAlertLevel = defaultAlertLevel(),
         repeatPromptMode = repeatPromptMode(),
+        sysdRegion = prefs.getString(KEY_SYSD_REGION, null),
+        sysdRegionSource = prefs.getString(KEY_SYSD_REGION_SOURCE, null),
+        sysdAreas = sysdAreas().toList(),
     )
 
     @SuppressLint("ApplySharedPref")
@@ -71,6 +81,16 @@ class SettingsStore(context: Context) {
         editor.putBoolean(KEY_PARSE_DATES, portable.parseDates)
         editor.putString(KEY_ALERT_DEFAULT, portable.defaultAlertLevel.name)
         editor.putString(KEY_REPEAT_PROMPT, portable.repeatPromptMode.name)
+        // Spec 11 optional keys: a file without them leaves the current values.
+        if (portable.sysdRegionSource != null) {
+            editor.putString(KEY_SYSD_REGION_SOURCE, portable.sysdRegionSource)
+            if (portable.sysdRegion != null) {
+                editor.putString(KEY_SYSD_REGION, portable.sysdRegion)
+            } else {
+                editor.remove(KEY_SYSD_REGION)
+            }
+        }
+        portable.sysdAreas?.let { editor.putString(KEY_SYSD_AREAS, encodeAreas(it)) }
         editor.commit()
     }
 
@@ -177,6 +197,72 @@ class SettingsStore(context: Context) {
         prefs.edit().putString(KEY_QAT_POSTPONE, mode.name).commit()
     }
 
+    /** The catalogue region in force: a USER choice, or worked out from the time zone. */
+    fun sysdRegion(zoneId: String): RegionSetting = RegionSetting.effective(
+        prefs.getString(KEY_SYSD_REGION, null),
+        prefs.getString(KEY_SYSD_REGION_SOURCE, null),
+        zoneId,
+    )
+
+    /** A null [region] goes back to AUTO (from the time zone). */
+    @SuppressLint("ApplySharedPref")
+    fun setSysdRegion(region: Region?) {
+        val editor = prefs.edit()
+        if (region == null) {
+            editor.remove(KEY_SYSD_REGION).putString(KEY_SYSD_REGION_SOURCE, RegionSource.AUTO.name)
+        } else {
+            editor.putString(KEY_SYSD_REGION, RegionResolver.token(region))
+                .putString(KEY_SYSD_REGION_SOURCE, RegionSource.USER.name)
+        }
+        editor.commit()
+    }
+
+    /** The onboarding profile: the life areas picked in first run step 3. */
+    fun sysdAreas(): Set<String> = decodeAreas(prefs.getString(KEY_SYSD_AREAS, null))
+
+    @SuppressLint("ApplySharedPref")
+    fun setSysdAreas(areas: Set<String>) {
+        prefs.edit().putString(KEY_SYSD_AREAS, encodeAreas(areas.toList())).commit()
+    }
+
+    /** First run steps 3 and 4: [ONBOARDING_PENDING], [ONBOARDING_STARTED], [ONBOARDING_DONE] or [ONBOARDING_SKIPPED]. */
+    fun sysdOnboarding(): String = prefs.getString(KEY_SYSD_ONBOARDING, null) ?: ONBOARDING_PENDING
+
+    @SuppressLint("ApplySharedPref")
+    fun setSysdOnboarding(state: String) {
+        prefs.edit().putString(KEY_SYSD_ONBOARDING, state).commit()
+    }
+
+    fun suggestionState(): SuggestionState = SuggestionState.decode(prefs.getString(KEY_SYSD_SUGGESTIONS, null))
+
+    @SuppressLint("ApplySharedPref")
+    fun setSuggestionState(state: SuggestionState) {
+        prefs.edit().putString(KEY_SYSD_SUGGESTIONS, state.encode()).commit()
+    }
+
+    /**
+     * Debug override for the date SuggestionPolicy uses, so QA never changes the phone clock.
+     * Only the debug receiver writes it; nothing else reads it.
+     */
+    fun suggestionDateOverride(): LocalDate? = try {
+        prefs.getString(KEY_SYSD_TODAY, null)?.let { LocalDate.parse(it) }
+    } catch (error: RuntimeException) {
+        null
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun setSuggestionDateOverride(date: LocalDate?) {
+        val editor = prefs.edit()
+        if (date == null) editor.remove(KEY_SYSD_TODAY) else editor.putString(KEY_SYSD_TODAY, date.toString())
+        editor.commit()
+    }
+
+    private fun encodeAreas(areas: List<String>): String =
+        areas.mapNotNull { ReminderCategory.normalize(it) }.distinct().joinToString(",")
+
+    private fun decodeAreas(raw: String?): Set<String> =
+        raw.orEmpty().split(",").mapNotNull { ReminderCategory.normalize(it) }.toCollection(LinkedHashSet())
+
     private fun quickTimeSlot(index: Int): QuickTimeSlot {
         val factory = QuickTimes.FACTORY[index]
         val kind = SnoozeKind.fromName(prefs.getString(qatKindKey(index), null)) ?: return factory
@@ -203,15 +289,25 @@ class SettingsStore(context: Context) {
 
     private fun explainedKey(level: AlertLevel) = "explained_alert_${level.name}"
 
-    private companion object {
-        const val PREFS = "do_settings"
-        const val KEY_DEFAULT_NAG = "default_nag_minutes"
-        const val KEY_ASKED_NOTIFICATIONS = "asked_post_notifications"
-        const val KEY_QAT_POSTPONE = "qat_postpone"
-        const val KEY_REPEAT_PROMPT = "repeat_prompt"
-        const val KEY_WEEK_START = "week_start"
-        const val KEY_PARSE_DATES = "parse_dates"
-        const val KEY_ALERT_DEFAULT = "alert_default"
-        const val DEFAULT_NAG_MINUTES = 5
+    companion object {
+        const val ONBOARDING_PENDING = "PENDING"
+        const val ONBOARDING_STARTED = "STARTED"
+        const val ONBOARDING_DONE = "DONE"
+        const val ONBOARDING_SKIPPED = "SKIPPED"
+        private const val KEY_SYSD_REGION = "sysd_region"
+        private const val KEY_SYSD_REGION_SOURCE = "sysd_region_source"
+        private const val KEY_SYSD_AREAS = "sysd_areas"
+        private const val KEY_SYSD_ONBOARDING = "sysd_onboarding"
+        private const val KEY_SYSD_SUGGESTIONS = "sysd_suggestions"
+        private const val KEY_SYSD_TODAY = "sysd_debug_today"
+        private const val PREFS = "do_settings"
+        private const val KEY_DEFAULT_NAG = "default_nag_minutes"
+        private const val KEY_ASKED_NOTIFICATIONS = "asked_post_notifications"
+        private const val KEY_QAT_POSTPONE = "qat_postpone"
+        private const val KEY_REPEAT_PROMPT = "repeat_prompt"
+        private const val KEY_WEEK_START = "week_start"
+        private const val KEY_PARSE_DATES = "parse_dates"
+        private const val KEY_ALERT_DEFAULT = "alert_default"
+        private const val DEFAULT_NAG_MINUTES = 5
     }
 }
