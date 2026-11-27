@@ -148,6 +148,7 @@
     <string name="paywall_price_then">then %1$s a year. Cancel any time in Google Play.</string>
     <string name="paywall_price_renewal">%1$s a year. Cancel any time in Google Play.</string>
     <string name="paywall_price_loading">Price loading</string>
+    <string name="paywall_store_unavailable">Can\'t reach Google Play right now</string>
     <string name="paywall_small_print">Renews at %1$s a year after the first year unless cancelled.</string>
     <string name="paywall_get">Get Do Unlimited</string>
     <string name="paywall_renew">Renew Do Unlimited</string>

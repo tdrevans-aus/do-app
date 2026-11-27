@@ -25,6 +25,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * "Active" means Play's purchase query currently returns the subscription: Play
  * includes grace periods and leaves out account hold, paused and expired ones.
  * There is no server and no other way to pay.
+ *
+ * Every Play callback body runs on the main thread ([onMain]), so the fields
+ * below have one owner and [publish] never races with another callback.
+ * A failed connection or details query sets [storeUnavailable] and keeps the
+ * last good offer and price.
  */
 class PlaySubscriptionBilling(
     context: Context,
@@ -38,18 +43,21 @@ class PlaySubscriptionBilling(
     private var price: PriceInfo? = null
     private var failed = false
     private var celebrate = false
+    private var storeUnavailable = false
     private val uiState = MutableStateFlow(current())
     override val ui: StateFlow<SubscriptionUiState> = uiState.asStateFlow()
 
     private val purchasesUpdated = com.android.billingclient.api.PurchasesUpdatedListener { result, _ ->
-        when (result.responseCode) {
-            BillingClient.BillingResponseCode.OK,
-            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED,
-            -> queryPurchases()
-            BillingClient.BillingResponseCode.USER_CANCELED -> Unit
-            else -> {
-                failed = true
-                publish()
+        onMain {
+            when (result.responseCode) {
+                BillingClient.BillingResponseCode.OK,
+                BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED,
+                -> queryPurchases()
+                BillingClient.BillingResponseCode.USER_CANCELED -> Unit
+                else -> {
+                    failed = true
+                    publish()
+                }
             }
         }
     }
@@ -86,17 +94,21 @@ class PlaySubscriptionBilling(
                 ),
             )
             .build()
-        val launched = client.launchBillingFlow(activity, params)
-        if (launched.responseCode != BillingClient.BillingResponseCode.OK &&
-            launched.responseCode != BillingClient.BillingResponseCode.USER_CANCELED
-        ) {
-            failed = true
-            publish()
+        when (client.launchBillingFlow(activity, params).responseCode) {
+            BillingClient.BillingResponseCode.OK,
+            BillingClient.BillingResponseCode.USER_CANCELED,
+            -> Unit
+            // Play already holds it (renewed elsewhere while the cache said otherwise): re-query.
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> queryPurchases()
+            else -> {
+                failed = true
+                publish()
+            }
         }
     }
 
     override fun restore() {
-        queryPurchases()
+        onMain { queryPurchases() }
     }
 
     override fun price(): PriceInfo? = price
@@ -104,11 +116,22 @@ class PlaySubscriptionBilling(
     override fun dumpSource(): String = if (store.read().lastQueryOk) "play" else "cache"
 
     override fun clearCelebrate() {
-        celebrate = false
-        publish()
+        onMain {
+            celebrate = false
+            publish()
+        }
+    }
+
+    /** Runs [block] on the main thread: now if already there, else posted. */
+    private fun onMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block() else main.post(block)
     }
 
     private fun connect() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post { connect() }
+            return
+        }
         val existing = billingClient
         if (existing != null && existing.isReady) {
             refresh()
@@ -130,7 +153,14 @@ class PlaySubscriptionBilling(
         }
         client.startConnection(object : com.android.billingclient.api.BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
-                if (result.responseCode == BillingClient.BillingResponseCode.OK) refresh()
+                onMain {
+                    if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                        refresh()
+                    } else {
+                        storeUnavailable = true
+                        publish()
+                    }
+                }
             }
 
             override fun onBillingServiceDisconnected() = Unit
@@ -147,21 +177,23 @@ class PlaySubscriptionBilling(
         val params = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.SUBS)
             .build()
-        client.queryPurchasesAsync(params) { result, purchases ->
-            val ok = result.responseCode == BillingClient.BillingResponseCode.OK
-            val applied = EntitlementPolicy.apply(
-                cache = store.read(),
-                querySucceeded = ok,
-                purchases = if (ok) purchases.orEmpty().map { it.toView() } else emptyList(),
-                now = System.currentTimeMillis(),
-                source = EntitlementPolicy.SOURCE_PLAY,
-            )
-            store.write(applied.record)
-            if (applied.justGranted) celebrate = true
-            if (ok) failed = false
-            publish()
-            for (token in applied.acknowledgeTokens) acknowledge(client, token)
-        }
+        client.queryPurchasesAsync(params) { result, purchases -> onMain { onPurchases(client, result, purchases) } }
+    }
+
+    private fun onPurchases(client: BillingClient, result: BillingResult, purchases: List<Purchase>?) {
+        val ok = result.responseCode == BillingClient.BillingResponseCode.OK
+        val applied = EntitlementPolicy.apply(
+            cache = store.read(),
+            querySucceeded = ok,
+            purchases = if (ok) purchases.orEmpty().map { it.toView() } else emptyList(),
+            now = System.currentTimeMillis(),
+            source = EntitlementPolicy.SOURCE_PLAY,
+        )
+        store.write(applied.record)
+        if (applied.justGranted) celebrate = true
+        if (ok) failed = false
+        publish()
+        for (token in applied.acknowledgeTokens) acknowledge(client, token)
     }
 
     private fun queryDetails() {
@@ -177,20 +209,25 @@ class PlaySubscriptionBilling(
             )
             .build()
         client.queryProductDetailsAsync(params) { result, details ->
-            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
-                price = null
-                offerToken = null
-                productDetails = null
-                publish()
-                return@queryProductDetailsAsync
-            }
-            val product = details.productDetailsList.firstOrNull { it.productId == FreeTier.PRODUCT_ID }
-            val choice = SubscriptionOffers.choose(product?.subscriptionOfferDetails.orEmpty().map { it.toView() })
-            productDetails = product.takeIf { choice != null }
-            price = choice?.price
-            offerToken = choice?.offerToken
-            publish()
+            val ok = result.responseCode == BillingClient.BillingResponseCode.OK
+            val product = if (ok) details.productDetailsList.firstOrNull { it.productId == FreeTier.PRODUCT_ID } else null
+            onMain { onDetails(ok, product) }
         }
+    }
+
+    /** A failed query keeps the last good offer and price and flags Play as unreachable. */
+    private fun onDetails(ok: Boolean, product: ProductDetails?) {
+        if (!ok) {
+            storeUnavailable = true
+            publish()
+            return
+        }
+        storeUnavailable = false
+        val choice = SubscriptionOffers.choose(product?.subscriptionOfferDetails.orEmpty().map { it.toView() })
+        productDetails = product.takeIf { choice != null }
+        price = choice?.price
+        offerToken = choice?.offerToken
+        publish()
     }
 
     private fun acknowledge(client: BillingClient, token: String) {
@@ -232,6 +269,7 @@ class PlaySubscriptionBilling(
         price = price,
         failed = failed,
         celebrate = celebrate,
+        storeUnavailable = storeUnavailable,
     )
 }
 

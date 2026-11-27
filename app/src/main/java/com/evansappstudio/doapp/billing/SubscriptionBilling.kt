@@ -65,6 +65,8 @@ data class SubscriptionUiState(
     val price: PriceInfo?,
     val failed: Boolean,
     val celebrate: Boolean,
+    /** The last connection or details query to Play failed. A price already loaded is kept. */
+    val storeUnavailable: Boolean = false,
 ) {
     val active: Boolean get() = state == SubscriptionState.ACTIVE
 
@@ -72,12 +74,18 @@ data class SubscriptionUiState(
         get() = price != null && state != SubscriptionState.ACTIVE && state != SubscriptionState.PENDING
 
     companion object {
-        fun from(record: EntitlementRecord, price: PriceInfo?, failed: Boolean, celebrate: Boolean) =
-            SubscriptionUiState(
-                state = SubscriptionState.of(record),
-                price = price,
-                failed = failed,
-                celebrate = celebrate,
-            )
+        fun from(
+            record: EntitlementRecord,
+            price: PriceInfo?,
+            failed: Boolean,
+            celebrate: Boolean,
+            storeUnavailable: Boolean = false,
+        ) = SubscriptionUiState(
+            state = SubscriptionState.of(record),
+            price = price,
+            failed = failed,
+            celebrate = celebrate,
+            storeUnavailable = storeUnavailable,
+        )
     }
 }

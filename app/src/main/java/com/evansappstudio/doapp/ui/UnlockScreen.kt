@@ -39,6 +39,7 @@ fun paywallTemplates(): PaywallTemplates = PaywallTemplates(
     active = stringResource(R.string.paywall_active),
     pending = stringResource(R.string.paywall_pending),
     expired = stringResource(R.string.paywall_expired),
+    unavailable = stringResource(R.string.paywall_store_unavailable),
 )
 
 /**

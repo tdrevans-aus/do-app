@@ -16,11 +16,14 @@ data class PaywallTemplates(
     val active: String,
     val pending: String,
     val expired: String,
+    /** Shown in place of [loading] when Play could not be reached. Null falls back to [loading]. */
+    val unavailable: String? = null,
 )
 
 /**
  * What the paywall shows. [priceHeadline] is the big price line (or "Price
- * loading"); [priceDetail] sits under it; [smallPrint] only appears with the
+ * loading", or "Can't reach Google Play right now" when Play failed and no
+ * price has loaded); [priceDetail] sits under it; [smallPrint] only appears with the
  * intro offer. [statusLine] is null for a user who has never subscribed.
  */
 data class PaywallText(
@@ -46,7 +49,7 @@ object PaywallCopy {
         val small: String?
         when {
             price == null -> {
-                headline = templates.loading
+                headline = if (ui.storeUnavailable) templates.unavailable ?: templates.loading else templates.loading
                 detail = null
                 small = null
             }

@@ -195,6 +195,25 @@ class SubscriptionLogicTest {
         assertFalse(strings.values.any { it.contains('—') })
     }
 
+    // AT-6 (QA bug 5)
+    @Test
+    fun anUnreachablePlayStoreSaysSoAndKeepsALoadedPrice() {
+        val t = templatesFromStringsXml().copy(unavailable = stringsXml().getValue("paywall_store_unavailable"))
+        val free = ui(SubscriptionState.FREE, null).copy(storeUnavailable = true)
+        val down = PaywallCopy.build(free, t)
+        assertEquals("Can't reach Google Play right now", down.priceHeadline)
+        assertFalse(down.buyEnabled)
+        assertNull(down.smallPrint)
+
+        // A price loaded before the failure is still shown, with its renewal price.
+        val kept = PaywallCopy.build(free.copy(price = PriceInfo("A$3.99", "A$9.99")), t)
+        assertEquals("A$3.99 for your first year", kept.priceHeadline)
+        assertEquals("then A$9.99 a year. Cancel any time in Google Play.", kept.priceDetail)
+
+        // Without the unavailable flag it is still "Price loading".
+        assertEquals("Price loading", PaywallCopy.build(free.copy(storeUnavailable = false), t).priceHeadline)
+    }
+
     @Test
     fun theManageLinkIsPlaysSubscriptionPageForDo() {
         assertEquals(

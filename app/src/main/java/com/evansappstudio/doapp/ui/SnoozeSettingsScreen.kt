@@ -111,7 +111,9 @@ fun SnoozeSettingsScreen(
                 ) {
                     val copy = PaywallCopy.build(unlock, paywallTemplates())
                     Text(text = stringResource(R.string.sub_name))
+                    // The renewal price always sits beside an intro price (priceDetail), as on the paywall.
                     Text(text = copy.statusLine ?: copy.priceHeadline)
+                    if (copy.statusLine == null) copy.priceDetail?.let { Text(text = it) }
                 }
             }
             itemsIndexed(options) { index, option ->

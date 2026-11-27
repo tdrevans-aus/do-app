@@ -45,7 +45,8 @@ object EntitlementPolicy {
             lastQueryAt = now,
             grantSource = source,
             lastQueryOk = true,
-            everSubscribed = cache.everSubscribed || active,
+            // A cached active record (even one written before this key existed) counts as subscribed.
+            everSubscribed = cache.everSubscribed || cache.active || active,
         )
         return PurchaseApply(
             record = record,
