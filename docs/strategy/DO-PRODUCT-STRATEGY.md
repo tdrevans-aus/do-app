@@ -32,7 +32,7 @@ Proposed, not researched with users:
 - **Secondary:** people who already use an AI assistant (Gemini, ChatGPT, Claude) to plan, and want what it sets to actually reach them. Assistants can now schedule things (ChatGPT Tasks, Gemini Scheduled Actions), but they are capped at about 10 active tasks and don't nag or ring through Do Not Disturb.
 - **The catalogue user:** homeowners, renters and car owners who know they "should" clean the gutters or test the smoke alarm, but have no system for it.
 
-Market: Australia first (English, AWST-tested, AUD pricing), then other English-speaking markets. **Android first, iPhone close behind** (see section 9A; proposed 27 Nov 2026, for Tim to confirm). The earlier "iOS later, not instead" is replaced: Do will launch on Apple too, where it sits next to Due.
+Market: Australia first (English, AWST-tested, AUD pricing), then other English-speaking markets. **Android first, iPhone close behind** (see section 9A; decided 27 Nov 2026). The earlier "iOS later, not instead" is replaced: Do will launch on Apple too, where it sits next to Due.
 
 ## 3. Positioning
 
@@ -155,7 +155,7 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 | Stuff You Should Do (27 Nov) | v1.1, after a competitor scan and spec | **Thin slice in v1** (bundled catalogue and picker, no links); links and sponsors post-launch | It solves the empty-app problem and drives upgrades through the 5 limit. The competitor scan is done (this document); Nico's scan can deepen it |
 | Capture surfaces: share sheet, widget, Quick Settings tile, shortcuts (research Shoulds) | After v1 | **v1** | They are the free, on-device half of the AI last mile |
 | On-device AppFunctions (26 Nov paper: v2) | v2 | **v1 if the API is ready; confirm** | No server; cheapest proof of the AI story |
-| Cloud agent API, MCP and REST (26 Nov paper: v2; proposed light Spec 10 "Do Connect") | v2, or v1 if re-scoped, as a paid add-on | **After the on-device slice; free, not a paid product.** v1 only if Tim approves hosting in time | Decided: AI is free. Still needs hosting approval |
+| Cloud agent API, MCP and REST (26 Nov paper: v2; proposed light Spec 10 "Do Connect") | v2, or v1 if re-scoped, as a paid add-on | **At launch (decided 27 Nov 2026), free, as Spec 13** | Decided: AI is free and the cloud API ships with the Android launch. Needs a hosting account |
 | Reusable countdown timers (research Should, "first" after v1) | Next after Spec 8 | **Moved after the catalogue and capture work** | Doesn't serve the new strategy as directly |
 | Completed log with undo, bulk select, "give up after N nags" (research Shoulds) | After v1 | Unchanged, post-launch | |
 | UI and brand redesign (not on the roadmap) | Polish "not finished" | **v1, before release, starting now as design work** | Section 7 |
@@ -173,19 +173,20 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 
 **Now (no code, can start straight away):**
 
-1. **Name check.** Search IP Australia, USPTO, the App Store and Google Play for the name. Decide whether to keep "Do" or choose a more distinctive name before brand, icon or store work. Then reserve it on both stores.
-2. **Repo.** Make `tdrevans-aus/do-app` private, or remove the Due research and notes from it (see `DUE-DIFFERENTIATION-REVIEW.md`). Needs Tim.
+1. **Name: keep "Do" (decided by Tim, 27 Nov 2026).** Still worth a trademark and store search before brand and icon work, to know what can be registered and what the store listing title needs (for example "Do" plus a descriptive subtitle). Reserve the name on both stores.
+2. **Repo: stays public until launch (decided by Tim, 27 Nov 2026)**, because the risk is low and a private repo costs money (on GitHub's free plan, private repos themselves are free, but Actions minutes are capped at 2,000 a month; public repos have no cap). **Pre go-live action:** make it private, or remove the Due research and notes, before launch.
 3. **Design pass:** drafted on 27 Nov 2026 (`docs/design/DESIGN-PASS-1.md`, 14 screens). Review with Gareth; brand and icon wait for the name.
 
 **Build, in order:**
 
 4. **PR #8** (quiet hours, cap removed): CI, the shorter phone rerun (AT-20 to AT-28), three hands-on ATs (05, 10, 12), Gareth's sign-off, Tim's OK to merge.
-5. **Spec 9: data foundation.** `ReminderCommands` layer that every entry point calls; Room v5 fields (source, sourceId, category, templateId, templateVersion, updatedAt, version, deletedAt, approval, requested alert level); `reminder_event` log; backup keys for the new fields; onboarding profile and suggestion state. No network, no UI change. **Core logic (repeats, natural-language parsing, quiet hours, catalogue, the commands) stays free of Android code so it can be shared with iPhone later**, for example through Kotlin Multiplatform. *Needs Tim's approval.*
+5. **Spec 9: data foundation (approved by Tim, 27 Nov 2026).** `ReminderCommands` layer that every entry point calls; Room v5 fields (source, sourceId, category, templateId, templateVersion, updatedAt, version, deletedAt, approval, requested alert level); `reminder_event` log; backup keys for the new fields; onboarding profile and suggestion state. No network, no UI change. **Core logic (repeats, natural-language parsing, quiet hours, catalogue, the commands) stays free of Android code so it can be shared with iPhone later**, for example through Kotlin Multiplatform.
 6. **Spec 10: subscription billing.** Annual product with the introductory first year, entitlement with "expired", paywall wording that shows the renewal price.
 7. **Spec 11: Stuff You Should Do v1.** Catalogue data and schema (from `docs/catalogue/sysd-starter.json`), first-run life areas and picks (opt out, up to 5 pre-ticked), Catalogue tab, the offer rules.
 8. **Spec 12: capture surfaces.** Share sheet, widget, Quick Settings tile, shortcuts and deep link; AppFunctions if confirmed.
-9. **Spec 13: the new UI** from the design pass, **including replacing every Due-derived name and string** (alert levels become Normal, Loud and Alarm; new add-field wording; Do's own time shortcuts; new preview interaction; reworded repeat menu and settings).
-10. **Android release preparation:** close the Spec 1 to 7 human ATs, a lawyer's check of the name and final UI, Play declarations, store listing, price test. Only with Tim's go-ahead.
+9. **Spec 13: cloud agent API, at launch (decided by Tim, 27 Nov 2026).** MCP and REST so assistants that don't run on the phone (ChatGPT, Claude and others) can add, complete and hear back about reminders, with approve-before-ring and the rules on the Assistants screen. Free for everyone; agent reminders count towards the 5. **Needs Tim to name a hosting account** before it can be specced in detail, and a way for an assistant to pair with a phone without a Do account (design question). Can be built alongside Specs 10 to 12 and 14.
+10. **Spec 14: the new UI** from the design pass, **including replacing every Due-derived name and string** (alert levels become Normal, Loud and Alarm; new add-field wording; Do's own time shortcuts; new preview interaction; reworded repeat menu and settings).
+11. **Android release preparation:** close the Spec 1 to 7 human ATs, make the repo private (or remove the Due material), a lawyer's check of the name and final UI, Play declarations, store listing, price test. Only with Tim's go-ahead.
 
 **In parallel, from soon after PR #8:**
 
@@ -194,9 +195,9 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 **After the Android launch:**
 
 - **iPhone app** using the shared core and the engine test's findings, launching a couple of months after Android, with what was learned (pricing, onboarding, Stuff You Should Do) already in.
-- Cloud agent API (with hosting approval), catalogue links, then sponsors and "Book it"; timers; the other Shoulds.
+- Catalogue links, then sponsors and "Book it"; timers; the other Shoulds.
 
-## 9A. Launch plan: Android first, iPhone close behind (proposed 27 Nov 2026, for Tim to confirm)
+## 9A. Launch plan: Android first, iPhone close behind (decided by Tim, 27 Nov 2026)
 
 **Recommendation.** Launch on Android first. Build for both from now on, prove the iPhone nag engine early in parallel, and launch on iPhone a couple of months after Android.
 
@@ -220,20 +221,27 @@ How each item in the handoff's roadmap (section 5), and in Tim's 27 Nov notes, f
 - **Goal:** prove, on a real iPhone, that Do's nag-until-done behaviour can work: a reminder fires on time, nags at a set interval until Done, survives the app being closed and the phone restarting, and (where allowed) gets through silent mode and Focus.
 - **Questions to answer:** what AlarmKit allows for repeated nags; how to stay within the 64-notification limit (for example rolling re-scheduling); whether Critical Alerts is needed and whether Apple is likely to grant it (apply early: it has the longest lead time); how the Loud and Alarm levels map to iOS; what can be shared from the Spec 9 core.
 - **Shape:** a throwaway test app, not product code; time-boxed (suggest two weeks); result written up as a short report with a recommendation on the iPhone build approach.
-- **Needs:** an Apple Developer account and a test iPhone; Tim's go-ahead (it costs the developer fee).
+- **Needs:** an Apple Developer account and a test iPhone. **Approved by Tim, 27 Nov 2026.**
 - **When:** soon after PR #8, in parallel with Spec 9.
 
-## 10. Open questions for Tim
+## 10. Decisions and open questions
 
-1. Confirm the launch plan in 9A: Android first, iPhone close behind?
-2. Keep the name "Do", or choose a more distinctive one after the trademark and store search?
-3. Make the repo private, or remove the Due research and notes from it?
-4. Approve Spec 9 (data foundation) as the next build after PR #8?
-5. Approve the iPhone engine test (Apple Developer account, test iPhone, about two weeks)?
-6. "Stuff You Should Do", "Stuff You Can Do" or "Things You Should Do"?
-7. Catalogue Australian-first or global, and does onboarding ask for the user's state?
-8. Is the cloud agent API a launch item (needs hosting approval soon) or post-launch?
-9. Should the AppFunctions slice be investigated now, to confirm it is usable on the S24+ (Android 17)?
+**Decided by Tim, 27 Nov 2026:**
+
+- Launch plan: Android first, iPhone close behind (9A).
+- Name: keep "Do".
+- Repo: stays public until launch; making it private (or removing the Due material) is a pre go-live action.
+- Spec 9 (data foundation): approved as the next build after PR #8.
+- iPhone engine test: approved.
+- Catalogue name: "Stuff You Should Do" (SHOULD, not CAN). "Stuff" over "Things" is Tim's instinct; recommendation agrees, because "Things" is also the name of a well-known to-do app (Things 3), which is a closer clash than "Stuff You Should Know" (a podcast).
+- Cloud agent API: at launch.
+
+**Still open:**
+
+1. Catalogue Australian-first or global, and how Do knows the user's state (under discussion).
+2. AppFunctions: whether to build for it at launch (under discussion; Gemini access for third-party apps is still a limited preview as at late 2026).
+3. Hosting account for the cloud agent API (Tim to name one).
+4. How an assistant pairs with a phone without a Do account.
 
 ## Sources (competitor scan, 27 Nov 2026)
 
