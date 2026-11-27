@@ -20,6 +20,13 @@ class CorePurityTest {
         assertEquals(emptyList<String>(), offences)
     }
 
+    // AT-15 (the command types carry no Room entity, DAO or Scheduler, so they are portable)
+    @Test
+    fun at15CommandTypesImportNothingFromTheAndroidSide() {
+        val imports = sourceFile("alarm/CommandTypes.kt").readLines().map { it.trim() }.filter { it.startsWith("import ") }
+        assertEquals(emptyList<String>(), imports)
+    }
+
     // AT-15 (the check fails when an Android import is added, for example to RepeatMath.kt)
     @Test
     fun at15TheCheckCatchesAnAndroidImport() {
@@ -51,7 +58,7 @@ class CorePurityTest {
             "alarm/RepeatText.kt",
             "alarm/QuickTimes.kt",
             "data/RepeatRule.kt",
-            "alarm/ReminderCommands.kt",
+            "alarm/CommandTypes.kt",
         )
     }
 }

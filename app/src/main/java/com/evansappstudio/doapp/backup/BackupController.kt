@@ -190,7 +190,7 @@ class BackupController(
             }
             health().refresh()
             publish(preview = null, error = null)
-            DoAlarmLog.backupImport(mode.name.lowercase(), selected.size, ids)
+            DoAlarmLog.backupImport(mode.name.lowercase(), selected.size, ids, document.schemaVersion)
             ImportOutcome.Applied(selected.size, ids)
         } catch (error: Throwable) {
             DoAlarmLog.handlingFailed(id = -1, error)

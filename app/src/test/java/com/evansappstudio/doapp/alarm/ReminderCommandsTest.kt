@@ -325,7 +325,9 @@ class ReminderCommandsTest {
         assertNull(row.deletedAt)
         assertEquals("Bins from backup", row.title)
         assertEquals(10, row.nagMinutes)
-        assertEquals(7, row.version)
+        // Merge onto a local row never lowers version: max(local 2, incoming 7) + 1 (QA bug 2).
+        assertEquals(8, row.version)
+        assertEquals(fx.clockMillis, row.updatedAt)
         assertTrue(fx.dao.active().any { it.id == id })
         assertNotNull(fx.alarms.at(id))
         val last = fx.events.forUuid(local.uuid).last()
