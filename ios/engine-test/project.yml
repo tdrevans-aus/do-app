@@ -1,0 +1,55 @@
+# XcodeGen spec for the throwaway "Do Engine Test" iPhone app.
+# Generate the Xcode project with: xcodegen generate
+name: DoEngineTest
+options:
+  bundleIdPrefix: com.evansappstudio
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  DoEngineTest:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest
+        PRODUCT_NAME: DoEngineTest
+        INFOPLIST_FILE: Sources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/DoEngineTest.entitlements
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_PREVIEWS: YES
+        # Tim sets his own team in Xcode (Signing and Capabilities).
+        DEVELOPMENT_TEAM: ""
+  DoEngineTestTests:
+    type: bundle.unit-test
+    platform: iOS
+    # Not hosted by the app: the tests only need the pure nag maths.
+    sources:
+      - path: Tests
+      - path: Sources/Engine/NagPlan.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+schemes:
+  DoEngineTest:
+    build:
+      targets:
+        DoEngineTest: all
+        DoEngineTestTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - DoEngineTestTests

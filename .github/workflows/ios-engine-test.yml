@@ -1,0 +1,66 @@
+name: iOS engine test
+
+on:
+  push:
+    branches: [ios/engine-test]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-engine-test.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios/engine-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE"; fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project DoEngineTest.xcodeproj -scheme DoEngineTest \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee build.log
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          DEVICE=$(xcrun simctl list devices available | grep -E '^\s+iPhone' | head -n 1 | sed -E 's/^\s+(.*) \(([0-9A-F-]+)\).*/\2/')
+          echo "Simulator: $DEVICE"
+          xcodebuild -project DoEngineTest.xcodeproj -scheme DoEngineTest \
+            -destination "id=$DEVICE" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee test.log
+
+      - name: Report errors
+        if: always()
+        run: |
+          touch build.log test.log
+          ERRORS=$(cat build.log test.log | grep -E 'error:|Test Case .* failed|\*\* (BUILD|TEST) FAILED' | sort -u | head -n 50 || true)
+          if [ -n "$ERRORS" ]; then
+            echo "## Errors" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$ERRORS" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r line; do echo "::error::${line}"; done <<< "$ERRORS"
+          else
+            echo "No errors." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          grep -E 'Executed [0-9]+ test' test.log | tail -n 1 >> "$GITHUB_STEP_SUMMARY" || true
