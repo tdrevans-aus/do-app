@@ -94,7 +94,7 @@ All of it is free (decided). Agent-created reminders count towards the 5 active 
 
 - 40 to 60 items across Home, Car, Health, Money and admin, Family and pets, Digital. Australian wording and intervals first (car rego, smoke alarm testing; state rules differ, so items say "check your state's rules" rather than state a law). **Scope Australian-first or global is still open.**
 - Each item: id, title, category, short "why", default interval, **repeat type** (fixed calendar, such as "every 1 July", or from completion, such as "6 months after you last did it", so overdue maintenance never stacks), suggested time of day, suggested alert level, region tags, a health flag, and an optional link field left empty in v1.
-- Onboarding: "What do you own or look after?" (home, renter, car, pets, kids), then a short list of suggestions with sensible defaults, one tap to add. Shown again from a Catalogue tab.
+- **Offered, never forced (decided 27 Nov 2026).** First run is Do first: permissions, first reminder, Today. The catalogue is offered by a "head start" card on Today after the first reminder, then periodically (seasonal, after a catalogue item is done, related items while typing), never in a notification. The head start asks "What do you look after?" (home, renter, car, pets, kids and so on) only when tapped. A catalogue-focused Play custom store listing can deep-link straight into it. Rules in `docs/design/DESIGN-PASS-1.md`.
 - Items added count towards the 5 active limit (decided). That is a deliberate upgrade moment: someone who picks 8 useful items sees the value before they pay.
 - Catalogue content ships in the APK in v1 (no network). Updates come with app releases.
 

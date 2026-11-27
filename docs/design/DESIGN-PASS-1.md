@@ -4,23 +4,43 @@
 **Status:** First draft for Tim and Gareth. Wireframes are on the private design canvas "Do design pass" (link in chat; share it from the canvas before others can open it).
 **Builds on:** `docs/strategy/DO-PRODUCT-STRATEGY.md`, `docs/decisions/2026-11-27-pricing-and-tiers.md`, `docs/catalogue/sysd-starter.json`.
 
+## Do and Stuff You Should Do: how they fit (decided 27 Nov 2026)
+
+Do is the product. Stuff You Should Do is a feature inside it, **offered, never forced**.
+
+- **First run is Do first:** permissions, then "your first reminder" (skippable), then Today. No questions about your life, no paywall.
+- **The head start is optional:** a card on Today ("Want a head start?") opens the life-areas and picks screens. Only people who tap it are asked about home, car, pets and so on.
+- **Offered again periodically after install** (rules below), always inside the app, never as a notification.
+- **A second way in:** a Google Play custom store listing aimed at life maintenance can deep-link straight into the head start, so people who came for the catalogue get it first. (Custom store listings are a Play Console feature; the deep-link wiring is to be confirmed when it is specced.)
+
+### When Stuff You Should Do is offered
+
+1. Never during first run. The head-start card appears on Today after the first reminder is saved, or after first run is skipped.
+2. "Not now" hides cards for 14 days; a second "Not now", 60 days. "Stop suggesting" turns all cards off; the Catalogue tab stays.
+3. Seasonal: at most once a month, from catalogue items with a suggested month or season (southern hemisphere).
+4. After a catalogue item is marked Done for the first time: one related item, once.
+5. While typing in Add: if the text matches a catalogue item ("car service"), a small "Related: tyres, rego" line.
+6. Never in a notification. The nag channel is only for reminders.
+7. At most one card on Today at a time, always below Overdue.
+
 ## Screens drawn
 
 | # | Screen | What it settles |
 | --- | --- | --- |
-| 0 | Onboarding: let Do get through (runs first) | One screen for the four things Android must allow: notifications, alarms and reminders (exact alarms), full-screen alarms (optional, only for Prominent), and battery (opens the system list, never a direct exemption request, per Play policy). Red dot means needed and missing. A "Test in 1 min" alarm. You can continue with gaps; the health check picks them up later. |
-| 1 | Onboarding: what you look after | Eight life areas (home, rental, car, kids, pets, health, money and admin, digital) drive the catalogue suggestions. Skip goes straight to Today. |
-| 2 | Onboarding: Stuff You Should Do picks | Suggested items grouped by area, ticked by default, each showing its interval and how it repeats. A "Check your state" tag on state-dependent items. A live counter against the 5 free slots. |
-| 3 | Paywall at the 5 limit | Appears only when picks go over 5. Shows A$3.99 first year and the A$9.99 renewal on the same screen. "Keep 5 for free" is a full-size option. Says plainly that reminders keep nagging if you stop paying. |
-| 4 | Today (home) | Overdue, Later today, Coming up. Every reminder shows where it came from (You, Catalogue, Assistant) and whether it is nagging and how often. One tap marks Done. |
-| 5 | Add | Natural-language field with the "Do understood" preview (date and repeat), Quick Times grid, nag interval, and the three alert levels with a one-line explanation of each. |
-| 6 | Catalogue tab | Browse by area, search, add or remove items. Shows the "why" for each item. |
-| 8 | The nag | Two views (switch in the artboard's Tweaks): the lock-screen notification and the Prominent full-screen alarm. Notification: title, due time, "nagging every 5 min until you mark it done", nag count, and Done, 10 min, Snooze to... as real actions, plus a grouped "2 more overdue, Snooze all". Full-screen: a big Done; Snooze 10 min; Stop sound, which stops the ringing but keeps the nag going. Only Done ends a reminder. |
-| 7 | Assistants | Gemini on the phone (AppFunctions) and Share to Do, now. Other assistants through the cloud link, later. An approval card when an assistant asks for Critical or Prominent. Rules every assistant must follow. |
+| 1 | First run: let Do get through | One screen for the four things Android must allow: notifications, alarms and reminders (exact alarms), full-screen alarms (optional, only for Prominent), and battery (opens the system list, never a direct exemption request, per Play policy). Red dot means needed and missing. A "Test in 1 min" alarm. You can continue with gaps; the health check picks them up later. |
+| 2 | First run: your first reminder | One field, natural language, with a live preview and four example chips. Says it will nag until done. Skip goes to Today. |
+| 3 | Today | Overdue, Later today, Coming up. Every reminder shows where it came from (You, Catalogue, Assistant), and whether it is nagging and how often. One tap marks Done. The Stuff You Should Do card sits below Overdue; three variants in the artboard's Tweaks: head start, seasonal, after a catalogue item is done. |
+| 4 | Add | Natural-language field with the "Do understood" preview (date and repeat), Quick Times grid, nag interval, and the three alert levels with a one-line explanation of each. |
+| 5 | Catalogue tab | Browse by area, search, add or remove items. Shows the "why" for each item. |
+| 6 | Assistants | Gemini on the phone (AppFunctions) and Share to Do, now. Other assistants through the cloud link, later. An approval card when an assistant asks for Critical or Prominent. Rules every assistant must follow. |
+| 7 | The nag | Two views (switch in the artboard's Tweaks): the lock-screen notification and the Prominent full-screen alarm. Notification: title, due time, "nagging every 5 min until you mark it done", nag count, and Done, 10 min, Snooze to... as real actions, plus a grouped "2 more overdue, Snooze all". Full-screen: a big Done; Snooze 10 min; Stop sound, which stops the ringing but keeps the nag going. Only Done ends a reminder. |
+| A | Head start: what you look after | Eight life areas (home, rental, car, kids, pets, health, money and admin, digital). Optional; reached from the Today card, the Catalogue tab, or the catalogue store listing. |
+| B | Head start: picks | Suggested items grouped by area, ticked by default, each with its interval and how it repeats. "Check your state" tag where rules vary. A live counter against the 5 free slots. |
+| C | Paywall | Only when picks go over 5. A$3.99 first year and the A$9.99 renewal on the same screen; "Keep 5 for free" as an equal option; reminders keep nagging if you stop paying. |
 
 ## Structure
 
-Four tabs: **Today**, **All**, **Catalogue**, **Settings** (assistants, quiet hours, health check, backup, subscription). Add is a floating button on Today and All. Onboarding runs once: permissions and health check (not drawn yet), then screens 1 to 3.
+Four tabs: **Today**, **All**, **Catalogue**, **Settings** (assistants, quiet hours, health check, backup, subscription). Add is a floating button on Today and All.
 
 ## Look
 
@@ -44,6 +64,7 @@ The screens need these on each reminder:
 Plus, outside the reminder table:
 
 - A per-user onboarding profile (which of the eight areas were picked), so the catalogue can keep suggesting.
+- Suggestion state: when each card was last shown, how many times it was dismissed, and "Stop suggesting".
 - An assistant rules setting (ask before ring-through, what to report back).
 
 ## Open design questions
