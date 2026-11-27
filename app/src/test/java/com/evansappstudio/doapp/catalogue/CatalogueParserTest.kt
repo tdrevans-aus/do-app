@@ -77,7 +77,7 @@ class CatalogueParserTest {
             assertTrue(item.id, item.priority in 0..100)
             assertTrue(item.id, item.keywords.isNotEmpty())
             assertTrue(item.id, item.id.startsWith(item.category + "-"))
-            assertFalse(item.id, item.title.contains('—') || item.why.contains('—'))
+            assertFalse(item.id, item.title.contains('\u2014') || item.why.contains('\u2014'))
         }
     }
 

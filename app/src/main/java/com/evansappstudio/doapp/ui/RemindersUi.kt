@@ -173,6 +173,9 @@ fun ReminderApp(
         screen = SCREEN_LIST
     }
 
+    // A Done on a catalogue reminder (from the list or a notification) can bring a related card.
+    LaunchedEffect(reminders) { sysd.refreshCard() }
+
     // First run steps 3 and 4: once, the first time there is an active reminder
     // (after the first reminder is saved, or on first launch with reminders).
     LaunchedEffect(screen, reminders) {
