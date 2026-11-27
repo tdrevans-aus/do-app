@@ -7,8 +7,9 @@ import android.util.Log
 import com.evansappstudio.doapp.DoApp
 import com.evansappstudio.doapp.UserUnlock
 import com.evansappstudio.doapp.backup.BackupMode
-import com.evansappstudio.doapp.billing.FakeUnlockBilling
+import com.evansappstudio.doapp.billing.FakeSubscriptionBilling
 import com.evansappstudio.doapp.billing.FreeTier
+import com.evansappstudio.doapp.billing.SubscriptionState
 import android.text.format.DateFormat
 import com.evansappstudio.doapp.alarm.Actor
 import com.evansappstudio.doapp.alarm.AlertLevel
@@ -744,24 +745,33 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * FAKE_PURCHASE --es state free|active|pending|expired [--ez intro true|false].
+     * With only intro, the state is kept. With neither, the state is active (Spec 7's default).
+     */
     private fun fakePurchase(context: Context, intent: Intent) {
-        val state = intent.getStringExtra(EXTRA_STATE)?.trim()?.lowercase().orEmpty().ifBlank { "unlocked" }
+        val hasIntro = intent.hasExtra(EXTRA_INTRO)
+        val intro = intent.getBooleanExtra(EXTRA_INTRO, true)
+        val requested = intent.getStringExtra(EXTRA_STATE)?.trim()?.lowercase().orEmpty()
+        val state = requested.ifBlank { if (hasIntro) "" else FakeSubscriptionBilling.STATE_ACTIVE }
         val pending = goAsync()
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
                 val billing = app.container.billing
-                if (billing !is FakeUnlockBilling) {
+                if (billing !is FakeSubscriptionBilling) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm unlock fake unavailable")
                     return@launch
                 }
-                val record = billing.applyState(state)
-                if (record == null) {
+                if (state.isNotEmpty() && FakeSubscriptionBilling.parseState(state) == null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm unlock bad state")
                     return@launch
                 }
+                if (hasIntro) billing.setIntro(intro)
+                if (state.isNotEmpty()) billing.applyState(state)
+                val shown = state.ifEmpty { billing.ui.value.state.name.lowercase() }
                 val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
-                DoAlarmLog.unlockFake(state, active, FreeTier.capLabel())
+                DoAlarmLog.unlockFake(shown, active, FreeTier.capLabel(), billing.intro)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             } finally {
@@ -778,14 +788,20 @@ class DebugReceiver : BroadcastReceiver() {
                 val record = app.container.entitlement.read()
                 val billing = app.container.billing
                 val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
-                val state = if (record.unlocked) "unlocked" else "locked"
+                val state = if (record.active) "unlocked" else "locked"
+                val price = billing.price()
                 DoAlarmLog.unlockDump(
                     state = state,
                     source = billing.dumpSource(),
                     pending = record.pending,
-                    price = billing.formattedPrice() ?: "none",
+                    price = price?.renewal ?: "none",
                     active = active,
                     cap = FreeTier.capLabel(),
+                    subscription = SubscriptionState.of(record).name,
+                    everSubscribed = record.everSubscribed,
+                    intro = price?.intro ?: "none",
+                    renewal = price?.renewal ?: "none",
+                    product = FreeTier.PRODUCT_ID,
                 )
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
@@ -1179,6 +1195,7 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_PATH = "path"
         const val EXTRA_UUIDS = "uuids"
         const val EXTRA_STATE = "state"
+        const val EXTRA_INTRO = "intro"
         const val EXTRA_CLEAR_SUCCESS = "clearSuccess"
         const val EXTRA_TITLE = "title"
         const val EXTRA_IN_SECONDS = "inSeconds"

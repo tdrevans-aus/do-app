@@ -1,6 +1,7 @@
 package com.evansappstudio.doapp.ui
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -77,6 +78,7 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import com.evansappstudio.doapp.backup.BackupNames
+import com.evansappstudio.doapp.billing.FreeTier
 import com.evansappstudio.doapp.alarm.AlarmPermissions
 import com.evansappstudio.doapp.alarm.AlertLevel
 import com.evansappstudio.doapp.alarm.AlertPermissions
@@ -265,7 +267,7 @@ fun ReminderApp(
     if (unlock.celebrate) {
         AlertDialog(
             onDismissRequest = { container.billing.clearCelebrate() },
-            text = { Text(stringResource(R.string.unlock_success)) },
+            text = { Text(stringResource(R.string.paywall_active)) },
             confirmButton = {
                 TextButton(onClick = { container.billing.clearCelebrate() }) {
                     Text(stringResource(R.string.ok))
@@ -329,6 +331,7 @@ fun ReminderApp(
                 onBack = { screen = unlockFrom },
                 onBuy = { if (activity != null) container.billing.buy(activity) },
                 onRestore = { container.billing.restore() },
+                onManage = { openSubscriptionPage(context) },
             )
         }
         SCREEN_BACKUP -> BackupScreen(
@@ -1253,5 +1256,15 @@ private fun openNotificationSettings(context: Context) {
         context.startActivity(intent)
     } catch (error: Exception) {
         DoAlarmLog.handlingFailed(id = -1, error)
+    }
+}
+
+/** Opens Play's management page for Do Unlimited. Does nothing if no app can open it. */
+private fun openSubscriptionPage(context: Context) {
+    val url = FreeTier.manageSubscriptionUrl(context.packageName)
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
+        // No browser or Play Store: leave the paywall as it is.
     }
 }

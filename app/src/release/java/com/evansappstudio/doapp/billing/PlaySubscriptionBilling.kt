@@ -19,24 +19,27 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Release billing. The formatted price comes from Play ProductDetails.
- * Grant, tell the user, then acknowledge. Pending does not grant.
- * There is no other way to pay.
+ * Release billing for the Do Unlimited subscription ([FreeTier.PRODUCT_ID], [BillingClient.ProductType.SUBS]).
+ * The offer and its price text come from Play ProductDetails via [SubscriptionOffers.choose];
+ * no price is in the code. Grant, tell the user, then acknowledge. Pending does not grant.
+ * "Active" means Play's purchase query currently returns the subscription: Play
+ * includes grace periods and leaves out account hold, paused and expired ones.
+ * There is no server and no other way to pay.
  */
-class PlayUnlockBilling(
+class PlaySubscriptionBilling(
     context: Context,
     private val store: EntitlementStore,
-) : UnlockBilling {
+) : SubscriptionBilling {
     private val appContext = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
     private var billingClient: BillingClient? = null
     private var productDetails: ProductDetails? = null
     private var offerToken: String? = null
-    private var price: String? = null
+    private var price: PriceInfo? = null
     private var failed = false
     private var celebrate = false
     private val uiState = MutableStateFlow(current())
-    override val ui: StateFlow<UnlockUiState> = uiState.asStateFlow()
+    override val ui: StateFlow<SubscriptionUiState> = uiState.asStateFlow()
 
     private val purchasesUpdated = com.android.billingclient.api.PurchasesUpdatedListener { result, _ ->
         when (result.responseCode) {
@@ -68,7 +71,7 @@ class PlayUnlockBilling(
         val client = billingClient
         val product = productDetails
         val token = offerToken
-        if (client == null || !client.isReady || product == null || token.isNullOrBlank() || price.isNullOrBlank()) {
+        if (client == null || !client.isReady || product == null || token.isNullOrBlank() || price == null) {
             failed = true
             publish()
             return
@@ -96,7 +99,7 @@ class PlayUnlockBilling(
         queryPurchases()
     }
 
-    override fun formattedPrice(): String? = price
+    override fun price(): PriceInfo? = price
 
     override fun dumpSource(): String = if (store.read().lastQueryOk) "play" else "cache"
 
@@ -113,6 +116,8 @@ class PlayUnlockBilling(
         }
         val client = existing ?: BillingClient.newBuilder(appContext)
             .setListener(purchasesUpdated)
+            // The builder requires pending purchases enabled for one-time products. Prepaid
+            // plans are not enabled: Do Unlimited is an auto-renewing plan.
             .enablePendingPurchases(
                 PendingPurchasesParams.newBuilder().enableOneTimeProducts().build(),
             )
@@ -140,7 +145,7 @@ class PlayUnlockBilling(
     private fun queryPurchases() {
         val client = billingClient ?: return
         val params = QueryPurchasesParams.newBuilder()
-            .setProductType(BillingClient.ProductType.INAPP)
+            .setProductType(BillingClient.ProductType.SUBS)
             .build()
         client.queryPurchasesAsync(params) { result, purchases ->
             val ok = result.responseCode == BillingClient.BillingResponseCode.OK
@@ -166,7 +171,7 @@ class PlayUnlockBilling(
                 listOf(
                     QueryProductDetailsParams.Product.newBuilder()
                         .setProductId(FreeTier.PRODUCT_ID)
-                        .setProductType(BillingClient.ProductType.INAPP)
+                        .setProductType(BillingClient.ProductType.SUBS)
                         .build(),
                 ),
             )
@@ -180,10 +185,10 @@ class PlayUnlockBilling(
                 return@queryProductDetailsAsync
             }
             val product = details.productDetailsList.firstOrNull { it.productId == FreeTier.PRODUCT_ID }
-            val offer = product?.oneTimePurchaseOfferDetailsList?.firstOrNull()
-            productDetails = product
-            price = offer?.formattedPrice?.takeIf { it.isNotBlank() }
-            offerToken = offer?.offerToken?.takeIf { it.isNotBlank() }
+            val choice = SubscriptionOffers.choose(product?.subscriptionOfferDetails.orEmpty().map { it.toView() })
+            productDetails = product.takeIf { choice != null }
+            price = choice?.price
+            offerToken = choice?.offerToken
             publish()
         }
     }
@@ -196,6 +201,13 @@ class PlayUnlockBilling(
             }
         }
     }
+
+    private fun ProductDetails.SubscriptionOfferDetails.toView(): OfferView = OfferView(
+        basePlanId = basePlanId,
+        offerId = offerId,
+        offerToken = offerToken,
+        phasePrices = pricingPhases.pricingPhaseList.map { it.formattedPrice },
+    )
 
     private fun Purchase.toView(): PurchaseView {
         val mapped = when (purchaseState) {
@@ -215,7 +227,7 @@ class PlayUnlockBilling(
         uiState.value = current()
     }
 
-    private fun current(): UnlockUiState = UnlockUiState.from(
+    private fun current(): SubscriptionUiState = SubscriptionUiState.from(
         record = store.read(),
         price = price,
         failed = failed,
@@ -223,6 +235,6 @@ class PlayUnlockBilling(
     )
 }
 
-fun createUnlockBilling(context: Context, store: EntitlementStore): UnlockBilling {
-    return PlayUnlockBilling(context, store)
+fun createSubscriptionBilling(context: Context, store: EntitlementStore): SubscriptionBilling {
+    return PlaySubscriptionBilling(context, store)
 }

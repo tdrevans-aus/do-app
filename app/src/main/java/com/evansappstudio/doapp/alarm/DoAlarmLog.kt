@@ -144,10 +144,15 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm unlock blocked active=$active cap=$cap")
     }
 
-    fun unlockFake(state: String, active: Int, cap: String) {
-        Log.i(TAG, "DoAlarm unlock state=$state source=fake active=$active cap=$cap")
+    fun unlockFake(state: String, active: Int, cap: String, intro: Boolean) {
+        Log.i(TAG, "DoAlarm unlock state=$state source=fake active=$active cap=$cap intro=$intro")
     }
 
+    /**
+     * The Spec 7 fields come first, unchanged in name, so older runner regexes still match:
+     * the first state= is unlocked or locked, product= is the subscription id and price= the renewal price.
+     * The Spec 10 fields follow, with the second state= being FREE, ACTIVE, PENDING or EXPIRED.
+     */
     fun unlockDump(
         state: String,
         source: String,
@@ -155,10 +160,16 @@ object DoAlarmLog {
         price: String,
         active: Int,
         cap: String,
+        subscription: String,
+        everSubscribed: Boolean,
+        intro: String,
+        renewal: String,
+        product: String,
     ) {
         Log.i(
             TAG,
-            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap",
+            "DoAlarm unlock state=$state source=$source pending=$pending product=$product price=$price active=$active cap=$cap " +
+                "state=$subscription everSubscribed=$everSubscribed intro=$intro renewal=$renewal product=$product",
         )
     }
 

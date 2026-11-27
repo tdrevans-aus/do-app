@@ -9,7 +9,7 @@ class UnlockLogicTest {
     @Test
     fun theFreeCapIsOneConstantAndFiveIsTheDefault() {
         assertEquals(5, FreeTier.ACTIVE_REMINDER_CAP)
-        assertEquals("do_unlock", FreeTier.PRODUCT_ID)
+        assertEquals("do_unlimited", FreeTier.PRODUCT_ID)
         assertFalse(FreeTier.blocksAdd(activeCount = 4, unlocked = false))
         assertTrue(FreeTier.blocksAdd(activeCount = 5, unlocked = false))
         assertFalse(FreeTier.blocksAdd(activeCount = 4, unlocked = false))
@@ -37,7 +37,7 @@ class UnlockLogicTest {
         val secret = "purchase-token-secret"
         val purchased = view(PurchaseViewState.PURCHASED, acknowledged = false, token = secret)
         val granted = apply(EntitlementRecord.EMPTY, succeeded = true, listOf(purchased))
-        assertTrue(granted.record.unlocked)
+        assertTrue(granted.record.active)
         assertFalse(granted.record.pending)
         assertEquals(listOf(secret), granted.acknowledgeTokens)
         assertTrue(granted.justGranted)
@@ -48,13 +48,13 @@ class UnlockLogicTest {
 
         val pending = view(PurchaseViewState.PENDING, acknowledged = false, token = "pending-token")
         val waiting = apply(EntitlementRecord.EMPTY, succeeded = true, listOf(pending))
-        assertFalse(waiting.record.unlocked)
+        assertFalse(waiting.record.active)
         assertTrue(waiting.record.pending)
         assertTrue(waiting.acknowledgeTokens.isEmpty())
         assertFalse(waiting.justGranted)
 
         val both = apply(EntitlementRecord.EMPTY, succeeded = true, listOf(pending, purchased))
-        assertTrue(both.record.unlocked)
+        assertTrue(both.record.active)
         assertFalse(both.record.pending)
         assertEquals(listOf(secret), both.acknowledgeTokens)
     }
@@ -62,14 +62,14 @@ class UnlockLogicTest {
     @Test
     fun aSuccessfulQueryWithoutTheProductRevokesAndAFailedQueryKeepsTheCache() {
         val unlocked = EntitlementRecord(
-            unlocked = true,
+            active = true,
             pending = false,
             lastQueryAt = 5L,
             grantSource = EntitlementPolicy.SOURCE_PLAY,
             lastQueryOk = true,
         )
         val revoked = apply(unlocked, succeeded = true, purchases = emptyList(), now = 9L)
-        assertFalse(revoked.record.unlocked)
+        assertFalse(revoked.record.active)
         assertFalse(revoked.record.pending)
         assertEquals(9L, revoked.record.lastQueryAt)
         assertTrue(revoked.acknowledgeTokens.isEmpty())
@@ -77,7 +77,7 @@ class UnlockLogicTest {
 
         val other = view(PurchaseViewState.PURCHASED, acknowledged = false, token = "other-token", product = "other")
         val stillRevoked = apply(unlocked, succeeded = true, listOf(other))
-        assertFalse(stillRevoked.record.unlocked)
+        assertFalse(stillRevoked.record.active)
         assertTrue(stillRevoked.acknowledgeTokens.isEmpty())
 
         val offline = apply(unlocked, succeeded = false, purchases = emptyList(), now = 50L)

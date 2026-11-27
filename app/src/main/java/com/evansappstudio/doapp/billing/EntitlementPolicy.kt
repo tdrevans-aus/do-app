@@ -1,11 +1,13 @@
 package com.evansappstudio.doapp.billing
 
 /**
- * What a Play purchase query does to the local entitlement.
+ * What a Play subscription purchase query does to the local entitlement.
  *
  * Grant only for [PurchaseViewState.PURCHASED]. Acknowledge only those
  * purchases that are still unacknowledged. A failed query keeps the cache.
  * A successful query that no longer contains the product revokes it.
+ * [EntitlementRecord.everSubscribed] is set by the first grant and never
+ * cleared, so a revoke after a grant reads as [SubscriptionState.EXPIRED].
  * The purchase token is returned for acknowledgement and is not stored.
  */
 object EntitlementPolicy {
@@ -32,22 +34,23 @@ object EntitlementPolicy {
         val mine = purchases.filter { productId in it.productIds }
         val purchased = mine.filter { it.state == PurchaseViewState.PURCHASED }
         val pending = mine.any { it.state == PurchaseViewState.PENDING }
-        val unlocked = purchased.isNotEmpty()
+        val active = purchased.isNotEmpty()
         val tokens = purchased
             .filter { !it.acknowledged && it.token.isNotBlank() }
             .map { it.token }
             .distinct()
         val record = EntitlementRecord(
-            unlocked = unlocked,
-            pending = !unlocked && pending,
+            active = active,
+            pending = !active && pending,
             lastQueryAt = now,
             grantSource = source,
             lastQueryOk = true,
+            everSubscribed = cache.everSubscribed || active,
         )
         return PurchaseApply(
             record = record,
             acknowledgeTokens = tokens,
-            justGranted = unlocked && !cache.unlocked,
+            justGranted = active && !cache.active,
             reachedStore = true,
         )
     }
@@ -66,20 +69,27 @@ data class PurchaseView(
     val token: String,
 )
 
+/**
+ * The cached entitlement. [active] means the last successful query returned a
+ * PURCHASED Do Unlimited purchase (Play includes grace periods). [everSubscribed]
+ * is set the first time a grant happens and is never cleared.
+ */
 data class EntitlementRecord(
-    val unlocked: Boolean,
+    val active: Boolean,
     val pending: Boolean,
     val lastQueryAt: Long,
     val grantSource: String,
     val lastQueryOk: Boolean,
+    val everSubscribed: Boolean = false,
 ) {
     companion object {
         val EMPTY = EntitlementRecord(
-            unlocked = false,
+            active = false,
             pending = false,
             lastQueryAt = 0L,
             grantSource = EntitlementPolicy.SOURCE_NONE,
             lastQueryOk = false,
+            everSubscribed = false,
         )
     }
 }

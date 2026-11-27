@@ -27,8 +27,9 @@ import com.evansappstudio.doapp.alarm.asArm
 import com.evansappstudio.doapp.backup.BackupController
 import com.evansappstudio.doapp.backup.BackupStore
 import com.evansappstudio.doapp.billing.EntitlementStore
-import com.evansappstudio.doapp.billing.UnlockBilling
-import com.evansappstudio.doapp.billing.createUnlockBilling
+import com.evansappstudio.doapp.billing.SubscriptionBilling
+import com.evansappstudio.doapp.billing.SubscriptionState
+import com.evansappstudio.doapp.billing.createSubscriptionBilling
 import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.MIGRATION_1_2
 import com.evansappstudio.doapp.data.MIGRATION_2_3
@@ -55,7 +56,7 @@ class AppContainer(context: Context) {
     val zones = ZoneMemory(appContext)
     val entitlement = EntitlementStore(appContext)
     val backupStore = BackupStore(appContext)
-    val billing: UnlockBilling = createUnlockBilling(appContext, entitlement)
+    val billing: SubscriptionBilling = createSubscriptionBilling(appContext, entitlement)
     val health = HealthMonitor(
         appContext,
         mirror = mirror,
@@ -83,7 +84,7 @@ class AppContainer(context: Context) {
             unlocked = { UserUnlock.isUnlocked(appContext) },
             zones = zones,
             weekStart = { settings.weekStart() },
-            paidUnlocked = { entitlement.read().unlocked },
+            paidUnlocked = { SubscriptionState.of(entitlement.read()).liftsCap },
             inTransaction = { body -> database.withTransaction { body() } },
             onCommitted = { backup.noteChange() },
             quietConfig = { quiet.read() },

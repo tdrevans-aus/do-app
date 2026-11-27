@@ -190,8 +190,8 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         check(!release.contains("FAKE_PURCHASE")) {
             "Release manifest contains FAKE_PURCHASE"
         }
-        check(!release.contains("FakeUnlockBilling")) {
-            "Release manifest contains FakeUnlockBilling"
+        check(!release.contains("FakeSubscriptionBilling")) {
+            "Release manifest contains FakeSubscriptionBilling"
         }
         check(!release.contains("SET_QUIET_HOURS")) {
             "Release manifest contains SET_QUIET_HOURS"
@@ -273,7 +273,7 @@ private fun assertReleaseHasNoQuietDebug(root: java.io.File) {
 }
 
 private fun assertReleaseHasNoFakeBilling(root: java.io.File) {
-    val needles = listOf("FakeUnlockBilling", "FAKE_PURCHASE")
+    val needles = listOf("FakeSubscriptionBilling", "FAKE_PURCHASE")
     val releaseFiles = root.walkTopDown().filter { file ->
         file.isFile &&
             file.path.replace('\\', '/').contains("/release/") &&
@@ -289,9 +289,9 @@ private fun assertReleaseHasNoFakeBilling(root: java.io.File) {
         file.isFile &&
             file.path.replace('\\', '/').contains("/debug/") &&
             !file.path.replace('\\', '/').contains("/release/") &&
-            (file.name.contains("FakeUnlockBilling") || (file.extension == "class" && fileContainsNeedle(file, "FakeUnlockBilling")))
+            (file.name.contains("FakeSubscriptionBilling") || (file.extension == "class" && fileContainsNeedle(file, "FakeSubscriptionBilling")))
     }
-    check(debugHasFake) { "Debug output is missing FakeUnlockBilling" }
+    check(debugHasFake) { "Debug output is missing FakeSubscriptionBilling" }
 }
 
 private fun fileContainsNeedle(file: java.io.File, needle: String): Boolean {
