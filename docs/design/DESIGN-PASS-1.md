@@ -8,12 +8,14 @@
 
 | # | Screen | What it settles |
 | --- | --- | --- |
+| 0 | Onboarding: let Do get through (runs first) | One screen for the four things Android must allow: notifications, alarms and reminders (exact alarms), full-screen alarms (optional, only for Prominent), and battery (opens the system list, never a direct exemption request, per Play policy). Red dot means needed and missing. A "Test in 1 min" alarm. You can continue with gaps; the health check picks them up later. |
 | 1 | Onboarding: what you look after | Eight life areas (home, rental, car, kids, pets, health, money and admin, digital) drive the catalogue suggestions. Skip goes straight to Today. |
 | 2 | Onboarding: Stuff You Should Do picks | Suggested items grouped by area, ticked by default, each showing its interval and how it repeats. A "Check your state" tag on state-dependent items. A live counter against the 5 free slots. |
 | 3 | Paywall at the 5 limit | Appears only when picks go over 5. Shows A$3.99 first year and the A$9.99 renewal on the same screen. "Keep 5 for free" is a full-size option. Says plainly that reminders keep nagging if you stop paying. |
 | 4 | Today (home) | Overdue, Later today, Coming up. Every reminder shows where it came from (You, Catalogue, Assistant) and whether it is nagging and how often. One tap marks Done. |
 | 5 | Add | Natural-language field with the "Do understood" preview (date and repeat), Quick Times grid, nag interval, and the three alert levels with a one-line explanation of each. |
 | 6 | Catalogue tab | Browse by area, search, add or remove items. Shows the "why" for each item. |
+| 8 | The nag | Two views (switch in the artboard's Tweaks): the lock-screen notification and the Prominent full-screen alarm. Notification: title, due time, "nagging every 5 min until you mark it done", nag count, and Done, 10 min, Snooze to... as real actions, plus a grouped "2 more overdue, Snooze all". Full-screen: a big Done; Snooze 10 min; Stop sound, which stops the ringing but keeps the nag going. Only Done ends a reminder. |
 | 7 | Assistants | Gemini on the phone (AppFunctions) and Share to Do, now. Other assistants through the cloud link, later. An approval card when an assistant asks for Critical or Prominent. Rules every assistant must follow. |
 
 ## Structure
@@ -48,6 +50,6 @@ Plus, outside the reminder table:
 
 1. **Renewal dates.** Seven yearly items (lease, contents insurance, rego, car insurance, pet registration, other insurance, health insurance) have no fixed month; the date belongs to the user. The picks screen needs a way to ask for it, or the reminder starts undated.
 2. **State-level regions.** Some items only make sense in some states (for example comparing energy plans in WA). The catalogue may need state tags, not only "AU", and onboarding may need to ask for the user's state.
-3. **Onboarding permissions step.** Exact alarms, notifications, full-screen and the health check need one combined screen. Not drawn yet.
-4. **The notification itself.** The nag notification (Done, Snooze, Snooze to) is the most-seen screen and is not drawn yet.
+3. **Stop sound on the full-screen alarm.** Drawn as "stops the ringing, keeps nagging". Spec 5 has Stop; confirm it behaves this way today, or decide it should.
+4. **Snooze all** in the grouped notification is drawn from Spec 2's grouping; confirm the wording.
 5. **Not drawn yet:** All list, Settings main, editing an existing reminder, widget, Quick Settings tile, share sheet target.
