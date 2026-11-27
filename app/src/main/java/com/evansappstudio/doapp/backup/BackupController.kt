@@ -7,7 +7,9 @@ import android.provider.DocumentsContract
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.HealthMonitor
 import com.evansappstudio.doapp.alarm.QuietHoursStore
-import com.evansappstudio.doapp.alarm.Scheduler
+import com.evansappstudio.doapp.alarm.Actor
+import com.evansappstudio.doapp.alarm.Origin
+import com.evansappstudio.doapp.alarm.ReminderCommands
 import com.evansappstudio.doapp.alarm.SnoozeConfig
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.data.SettingsStore
@@ -28,7 +30,7 @@ class BackupController(
     private val quiet: QuietHoursStore,
     private val snoozeConfig: SnoozeConfig,
     private val dao: () -> ReminderDao,
-    private val scheduler: () -> Scheduler,
+    private val commands: () -> ReminderCommands,
     private val health: () -> HealthMonitor,
     private val scope: CoroutineScope,
     private val versionName: String,
@@ -183,8 +185,8 @@ class BackupController(
                 quiet.apply(document.settings.quietPatch())
             }
             val ids = when (mode) {
-                BackupMode.REPLACE -> scheduler().replaceAll(document.reminders.map { it.toReminder(0) })
-                BackupMode.MERGE -> scheduler().mergeAll(selected.map { it.toReminder(0) })
+                BackupMode.REPLACE -> commands().replaceAll(IMPORT, document.reminders.map { it.toReminder(0) })
+                BackupMode.MERGE -> commands().mergeAll(IMPORT, selected.map { it.toReminder(0) })
             }
             health().refresh()
             publish(preview = null, error = null)
@@ -293,7 +295,7 @@ class BackupController(
             appVersionName = versionName,
             exportedAt = clock(),
             settings = settings.portable().withQuiet(quiet.read()),
-            reminders = dao().all().map { it.toPortable() },
+            reminders = dao().all().exportable(),
         )
         return BackupCodec.encode(document).toByteArray(Charsets.UTF_8)
     }
@@ -348,6 +350,7 @@ class BackupController(
 
     companion object {
         const val MAX_BYTES = 32 * 1024 * 1024
+        private val IMPORT = Origin(Actor.IMPORT)
     }
 }
 

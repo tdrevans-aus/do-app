@@ -1,0 +1,231 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "a8f6a80ecd49acec2530fa0dcc824b18",
+    "entities": [
+      {
+        "tableName": "reminder",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL DEFAULT '', `title` TEXT NOT NULL, `dueAt` INTEGER NOT NULL, `nagMinutes` INTEGER, `isDone` INTEGER NOT NULL, `doneAt` INTEGER, `createdAt` INTEGER NOT NULL, `repeatInterval` INTEGER, `repeatUnit` TEXT, `repeatFrom` TEXT, `repeatWeekDays` TEXT, `repeatMonthOn` TEXT, `patternDueAt` INTEGER, `alertLevel` TEXT NOT NULL DEFAULT 'STANDARD', `source` TEXT NOT NULL DEFAULT 'USER', `sourceId` TEXT, `category` TEXT, `templateId` TEXT, `templateVersion` INTEGER, `updatedAt` INTEGER NOT NULL DEFAULT 0, `version` INTEGER NOT NULL DEFAULT 1, `deletedAt` INTEGER, `approval` TEXT NOT NULL DEFAULT 'NONE', `requestedAlertLevel` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uuid",
+            "columnName": "uuid",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dueAt",
+            "columnName": "dueAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nagMinutes",
+            "columnName": "nagMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isDone",
+            "columnName": "isDone",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "doneAt",
+            "columnName": "doneAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "repeatInterval",
+            "columnName": "repeatInterval",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "repeatUnit",
+            "columnName": "repeatUnit",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repeatFrom",
+            "columnName": "repeatFrom",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repeatWeekDays",
+            "columnName": "repeatWeekDays",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "repeatMonthOn",
+            "columnName": "repeatMonthOn",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "patternDueAt",
+            "columnName": "patternDueAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "alertLevel",
+            "columnName": "alertLevel",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'STANDARD'"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'USER'"
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "templateId",
+            "columnName": "templateId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "templateVersion",
+            "columnName": "templateVersion",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deletedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "approval",
+            "columnName": "approval",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NONE'"
+          },
+          {
+            "fieldPath": "requestedAlertLevel",
+            "columnName": "requestedAlertLevel",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "reminder_event",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `reminderUuid` TEXT NOT NULL, `at` INTEGER NOT NULL, `type` TEXT NOT NULL, `actor` TEXT NOT NULL, `sourceId` TEXT, `detail` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reminderUuid",
+            "columnName": "reminderUuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "at",
+            "columnName": "at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actor",
+            "columnName": "actor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "detail",
+            "columnName": "detail",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_reminder_event_reminderUuid_at",
+            "unique": false,
+            "columnNames": [
+              "reminderUuid",
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_reminder_event_reminderUuid_at` ON `${TABLE_NAME}` (`reminderUuid`, `at`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a8f6a80ecd49acec2530fa0dcc824b18')"
+    ]
+  }
+}

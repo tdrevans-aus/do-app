@@ -31,6 +31,7 @@ class HealthMonitor(
     private val mirror: ReminderMirror,
     private val notifications: ReminderNotifier,
     private val scheduler: () -> Scheduler,
+    private val commands: () -> ReminderCommands,
     private val dao: () -> ReminderDao,
     private val unlocked: () -> Boolean = { UserUnlock.isUnlocked(context) },
     private val exactMode: String = BuildConfig.EXACT_ALARM_MODE,
@@ -81,7 +82,7 @@ class HealthMonitor(
         store.setTestResult(result, early)
         if (result == HealthEvaluator.TEST_OK) store.clearLate()
         try {
-            scheduler().markDone(id)
+            commands().markDone(Origin(Actor.SYSTEM), id)
             DoAlarmLog.healthTestDone(id)
         } catch (error: Throwable) {
             DoAlarmLog.handlingFailed(id, error)
@@ -113,7 +114,8 @@ class HealthMonitor(
                 return@withLock whenAt
             }
             val whenAt = System.currentTimeMillis() + TEST_DELAY_MS
-            val id = scheduler().add(
+            val id = commands().add(
+                origin = Origin(Actor.SYSTEM),
                 title = TEST_TITLE,
                 dueAt = whenAt,
                 nagMinutes = null,
@@ -178,7 +180,7 @@ class HealthMonitor(
             DoAlarmLog.handlingFailed(id, error)
             return true
         }
-        if (row == null || row.isDone) {
+        if (row == null || row.isDone || row.deletedAt != null) {
             store.clearTestArmed()
             return false
         }

@@ -16,6 +16,7 @@ import com.evansappstudio.doapp.alarm.DndState
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.HealthMonitor
 import com.evansappstudio.doapp.alarm.QuietHoursStore
+import com.evansappstudio.doapp.alarm.ReminderCommands
 import com.evansappstudio.doapp.alarm.ReminderMirror
 import com.evansappstudio.doapp.alarm.Scheduler
 import com.evansappstudio.doapp.alarm.SnoozeConfig
@@ -32,7 +33,9 @@ import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.MIGRATION_1_2
 import com.evansappstudio.doapp.data.MIGRATION_2_3
 import com.evansappstudio.doapp.data.MIGRATION_3_4
+import com.evansappstudio.doapp.data.MIGRATION_4_5
 import com.evansappstudio.doapp.data.ReminderDao
+import com.evansappstudio.doapp.data.ReminderEventDao
 import com.evansappstudio.doapp.data.SettingsStore
 import com.evansappstudio.doapp.notify.ReminderNotifier
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +61,7 @@ class AppContainer(context: Context) {
         mirror = mirror,
         notifications = notifications,
         scheduler = { scheduler },
+        commands = { commands },
         dao = { reminderDao() },
         backupHealth = { backupStore.health() },
     )
@@ -65,13 +69,14 @@ class AppContainer(context: Context) {
     private val database: AppDatabase by lazy {
         check(UserUnlock.isUnlocked(appContext)) { "Room is unavailable before unlock" }
         Room.databaseBuilder(appContext, AppDatabase::class.java, "do.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 
     val scheduler: Scheduler by lazy {
         Scheduler(
             daoProvider = { database.reminderDao() },
+            eventsProvider = { database.reminderEventDao() },
             mirror = mirror,
             alarms = alarms.asArm(),
             notifications = notifications.asAlerts(),
@@ -86,6 +91,9 @@ class AppContainer(context: Context) {
         )
     }
 
+    /** The one public way to change reminders. Every caller passes an Origin. */
+    val commands: ReminderCommands by lazy { ReminderCommands(scheduler) }
+
     val backup: BackupController by lazy {
         BackupController(
             context = appContext,
@@ -94,7 +102,7 @@ class AppContainer(context: Context) {
             quiet = quiet,
             snoozeConfig = snoozeConfig,
             dao = { reminderDao() },
-            scheduler = { scheduler },
+            commands = { commands },
             health = { health },
             scope = scope,
             versionName = BuildConfig.VERSION_NAME,
@@ -102,6 +110,8 @@ class AppContainer(context: Context) {
     }
 
     fun reminderDao(): ReminderDao = database.reminderDao()
+
+    fun reminderEventDao(): ReminderEventDao = database.reminderEventDao()
 
     /** Credential settings are the source of truth. The device-protected copy feeds notifications. */
     fun saveSnoozeOption(index: Int, option: SnoozeOption) {

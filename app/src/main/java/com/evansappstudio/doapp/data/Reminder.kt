@@ -24,6 +24,30 @@ data class Reminder(
     val patternDueAt: Long? = null,
     @ColumnInfo(defaultValue = "STANDARD")
     val alertLevel: String = "STANDARD",
+    /** Where it was created: a ReminderSource name. Set once at create; import keeps the exported value. */
+    @ColumnInfo(defaultValue = "USER")
+    val source: String = "USER",
+    /** Catalogue item id or agent id, at most 200 characters. */
+    val sourceId: String? = null,
+    /** One of ReminderCategory.ALL, or null. Set only by add. */
+    val category: String? = null,
+    /** Catalogue item id it came from. Set only by add. */
+    val templateId: String? = null,
+    /** Catalogue item version it came from. Set only by add. */
+    val templateVersion: Int? = null,
+    /** Epoch millis of the last change. Migration backfills it from [createdAt]. */
+    @ColumnInfo(defaultValue = "0")
+    val updatedAt: Long = 0L,
+    /** Starts at 1 and goes up by one on every change. */
+    @ColumnInfo(defaultValue = "1")
+    val version: Int = 1,
+    /** Set by soft delete. A deleted row is gone everywhere except [ReminderDao.getById]. */
+    val deletedAt: Long? = null,
+    /** An Approval name. Stored only in this spec. */
+    @ColumnInfo(defaultValue = "NONE")
+    val approval: String = "NONE",
+    /** The level an agent asked for, kept beside [alertLevel], which is what is in force. Stored only. */
+    val requestedAlertLevel: String? = null,
 ) {
     fun repeatRule(): RepeatRule? = RepeatRule.fromColumns(
         interval = repeatInterval,

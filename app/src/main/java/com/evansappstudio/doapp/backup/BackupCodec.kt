@@ -1,6 +1,10 @@
 package com.evansappstudio.doapp.backup
 
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.Approval
+import com.evansappstudio.doapp.alarm.Origin
+import com.evansappstudio.doapp.alarm.ReminderCategory
+import com.evansappstudio.doapp.alarm.ReminderSource
 import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
@@ -143,7 +147,9 @@ private fun slotJson(slot: QuickTimeSlot): JsonValue = jsonObject(
     "unit" to JsonValue.Str(slot.unit.name),
 )
 
-private fun reminderJson(reminder: PortableReminder): JsonValue = jsonObject(
+private fun reminderJson(reminder: PortableReminder): JsonValue = JsonValue.Obj(reminderFields(reminder))
+
+private fun reminderFields(reminder: PortableReminder): LinkedHashMap<String, JsonValue> = linkedMapOf(
     "uuid" to JsonValue.Str(reminder.uuid),
     "title" to JsonValue.Str(reminder.title),
     "dueAt" to JsonValue.Num(reminder.dueAt),
@@ -158,7 +164,17 @@ private fun reminderJson(reminder: PortableReminder): JsonValue = jsonObject(
     "repeatMonthOn" to (reminder.repeatMonthOn?.let { JsonValue.Str(it) } ?: JsonValue.Null),
     "patternDueAt" to (reminder.patternDueAt?.let { JsonValue.Num(it) } ?: JsonValue.Null),
     "alertLevel" to JsonValue.Str(reminder.alertLevel),
-)
+    "source" to JsonValue.Str(reminder.source),
+    "sourceId" to (reminder.sourceId?.let { JsonValue.Str(it) } ?: JsonValue.Null),
+    "category" to (reminder.category?.let { JsonValue.Str(it) } ?: JsonValue.Null),
+    "templateId" to (reminder.templateId?.let { JsonValue.Str(it) } ?: JsonValue.Null),
+    "templateVersion" to (reminder.templateVersion?.let { JsonValue.Num(it.toLong()) } ?: JsonValue.Null),
+    "version" to JsonValue.Num(reminder.version.toLong()),
+    "approval" to JsonValue.Str(reminder.approval),
+    "requestedAlertLevel" to (reminder.requestedAlertLevel?.let { JsonValue.Str(it) } ?: JsonValue.Null),
+).also { fields ->
+    reminder.updatedAt?.let { fields["updatedAt"] = JsonValue.Num(it) }
+}
 
 private fun decodeSettings(value: JsonValue?): PortableSettings? {
     val obj = value as? JsonValue.Obj ?: return null
@@ -252,8 +268,25 @@ private fun decodeReminder(value: JsonValue): PortableReminder? {
         repeatMonthOn = optionalString(obj.fields["repeatMonthOn"]),
         patternDueAt = optionalLong(obj.fields["patternDueAt"]),
         alertLevel = alert,
+        source = (ReminderSource.fromName(lenientString(obj.fields["source"])) ?: ReminderSource.DEFAULT).name,
+        sourceId = Origin.clipSourceId(lenientString(obj.fields["sourceId"])),
+        category = ReminderCategory.normalize(lenientString(obj.fields["category"])),
+        templateId = Origin.clipSourceId(lenientString(obj.fields["templateId"])),
+        templateVersion = lenientLong(obj.fields["templateVersion"])?.toInt(),
+        updatedAt = lenientLong(obj.fields["updatedAt"])?.takeIf { it > 0L },
+        version = lenientLong(obj.fields["version"])?.toInt()?.takeIf { it >= 1 } ?: 1,
+        approval = (Approval.fromName(lenientString(obj.fields["approval"])) ?: Approval.DEFAULT).name,
+        requestedAlertLevel = AlertLevel.fromName(lenientString(obj.fields["requestedAlertLevel"]))?.name,
     )
 }
+
+/**
+ * Schema 2 reminder keys follow the optional-key rule Spec 8 used for quiet hours:
+ * a missing, null, unknown or wrongly typed value takes the default, never a failure.
+ */
+private fun lenientString(value: JsonValue?): String? = (value as? JsonValue.Str)?.value
+
+private fun lenientLong(value: JsonValue?): Long? = (value as? JsonValue.Num)?.value
 
 private fun optionalInt(value: JsonValue?): Int? = when (value) {
     null, JsonValue.Null -> null

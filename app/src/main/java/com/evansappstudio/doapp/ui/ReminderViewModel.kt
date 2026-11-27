@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
+import com.evansappstudio.doapp.alarm.Actor
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.Origin
 import com.evansappstudio.doapp.alarm.QuietConfig
 import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.PostponeMode
@@ -107,7 +109,7 @@ class ReminderViewModel(
         onResult: (created: Boolean) -> Unit = {},
     ) {
         viewModelScope.launch {
-            val created = container.scheduler.add(title, dueAt, nagMinutes, rule, alert) != null
+            val created = container.commands.add(USER, title, dueAt, nagMinutes, rule, alert) != null
             onResult(created)
         }
     }
@@ -122,12 +124,12 @@ class ReminderViewModel(
         alert: AlertLevel,
     ) {
         viewModelScope.launch {
-            container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alert)
+            container.commands.update(USER, id, title, dueAt, nagMinutes, rule, dueShift, alert)
         }
     }
 
     fun setAlertLevel(id: Long, level: AlertLevel) {
-        viewModelScope.launch { container.scheduler.setAlertLevel(id, level) }
+        viewModelScope.launch { container.commands.setAlertLevel(USER, id, level) }
     }
 
     fun parseDatesEnabled(): Boolean = container.settings.parseDatesEnabled()
@@ -164,7 +166,9 @@ class ReminderViewModel(
         container.backup.noteChange()
     }
 
-    suspend fun reminderOrNull(id: Long): Reminder? = container.reminderDao().getById(id)
+    /** A soft-deleted row is treated as gone. */
+    suspend fun reminderOrNull(id: Long): Reminder? =
+        container.reminderDao().getById(id)?.takeIf { it.deletedAt == null }
 
     fun setSnoozeOption(index: Int, option: SnoozeOption) {
         viewModelScope.launch {
@@ -176,11 +180,11 @@ class ReminderViewModel(
     }
 
     fun markDone(id: Long) {
-        viewModelScope.launch { container.scheduler.markDone(id) }
+        viewModelScope.launch { container.commands.markDone(USER, id) }
     }
 
     fun delete(id: Long) {
-        viewModelScope.launch { container.scheduler.delete(id) }
+        viewModelScope.launch { container.commands.delete(USER, id) }
     }
 
     fun hasRequestedNotificationPermission(): Boolean =
@@ -190,6 +194,8 @@ class ReminderViewModel(
         container.settings.markNotificationPermissionRequested()
     }
 }
+
+private val USER = Origin(Actor.USER)
 
 class ReminderViewModelFactory(
     private val container: AppContainer,

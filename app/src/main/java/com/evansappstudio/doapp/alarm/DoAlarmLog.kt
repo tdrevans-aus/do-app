@@ -1,6 +1,9 @@
 package com.evansappstudio.doapp.alarm
 
 import android.util.Log
+import com.evansappstudio.doapp.backup.BackupNames
+import com.evansappstudio.doapp.data.Reminder
+import com.evansappstudio.doapp.data.ReminderEvent
 
 object DoAlarmLog {
     const val TAG = "DoAlarm"
@@ -206,12 +209,12 @@ object DoAlarmLog {
     }
 
     fun backupExport(path: String, reminders: Int) {
-        Log.i(TAG, "DoAlarm backup export path=$path reminders=$reminders schema=1")
+        Log.i(TAG, "DoAlarm backup export path=$path reminders=$reminders schema=${BackupNames.SCHEMA_VERSION}")
     }
 
     fun backupImport(mode: String, reminders: Int, ids: List<Long>) {
         val suffix = if (ids.isEmpty()) "" else " ids=${ids.joinToString(",")}"
-        Log.i(TAG, "DoAlarm backup import mode=$mode reminders=$reminders schema=1$suffix")
+        Log.i(TAG, "DoAlarm backup import mode=$mode reminders=$reminders schema=${BackupNames.SCHEMA_VERSION}$suffix")
     }
 
     fun backupImportError(reason: String) {
@@ -229,7 +232,7 @@ object DoAlarmLog {
     }
 
     fun backupAuto(path: String, reminders: Int) {
-        Log.i(TAG, "DoAlarm backup auto path=$path reminders=$reminders schema=1")
+        Log.i(TAG, "DoAlarm backup auto path=$path reminders=$reminders schema=${BackupNames.SCHEMA_VERSION}")
     }
 
     fun backupAutoSkipped(reason: String) {
@@ -238,5 +241,40 @@ object DoAlarmLog {
 
     fun backupAutoError(reason: String) {
         Log.i(TAG, "DoAlarm backup auto error reason=$reason")
+    }
+
+    fun meta(row: Reminder) {
+        Log.i(
+            TAG,
+            "DoAlarm meta id=${row.id} uuid=${row.uuid} source=${row.source} sourceId=${row.sourceId ?: "none"} " +
+                "category=${row.category ?: "none"} templateId=${row.templateId ?: "none"} " +
+                "templateVersion=${row.templateVersion?.toString() ?: "none"} version=${row.version} " +
+                "updatedAt=${row.updatedAt} deletedAt=${row.deletedAt?.toString() ?: "none"} " +
+                "approval=${row.approval} requestedAlertLevel=${row.requestedAlertLevel ?: "none"}",
+        )
+    }
+
+    fun event(id: Long, event: ReminderEvent) {
+        Log.i(
+            TAG,
+            "DoAlarm event id=$id at=${event.at} type=${event.type} actor=${event.actor} " +
+                "sourceId=${event.sourceId ?: "none"} detail=${event.detail ?: "none"}",
+        )
+    }
+
+    fun eventsEnd(count: Int) {
+        Log.i(TAG, "DoAlarm events end count=$count")
+    }
+
+    fun deleted(id: Long, deletedAt: Long) {
+        Log.i(TAG, "DoAlarm deleted id=$id deletedAt=$deletedAt")
+    }
+
+    fun restored(id: Long) {
+        Log.i(TAG, "DoAlarm restored id=$id")
+    }
+
+    fun purge(removed: Int) {
+        Log.i(TAG, "DoAlarm purge removed=$removed")
     }
 }

@@ -30,9 +30,9 @@ class SnoozeReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 if (all) {
-                    app.container.scheduler.snoozeShowing(optionIndex, option)
+                    app.container.commands.snoozeShowing(Origin(Actor.NOTIFICATION), optionIndex, option)
                 } else {
-                    app.container.scheduler.snooze(id!!, optionIndex, option)
+                    app.container.commands.snooze(Origin(Actor.NOTIFICATION), id!!, optionIndex, option)
                 }
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id ?: -1, error)

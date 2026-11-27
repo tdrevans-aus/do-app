@@ -14,7 +14,7 @@ class StopReceiver : BroadcastReceiver() {
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
-                app.container.scheduler.stopAlert(id)
+                app.container.commands.stopAlert(Origin(Actor.NOTIFICATION), id)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {

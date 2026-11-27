@@ -64,12 +64,12 @@ class ProminentAlertActivity : ComponentActivity() {
                     snoozes = options.map { SnoozeLabels.format(it) },
                     doneLabel = getString(R.string.action_done),
                     stopLabel = getString(R.string.action_stop),
-                    onDone = { attend { app.container.scheduler.markDone(reminderId) } },
+                    onDone = { attend { app.container.commands.markDone(NOTIFICATION, reminderId) } },
                     onSnooze = { index ->
                         val option = options.getOrNull(index) ?: return@ProminentScreen
-                        attend { app.container.scheduler.snooze(reminderId, index, option) }
+                        attend { app.container.commands.snooze(NOTIFICATION, reminderId, index, option) }
                     },
-                    onStop = { attend { app.container.scheduler.stopAlert(reminderId) } },
+                    onStop = { attend { app.container.commands.stopAlert(NOTIFICATION, reminderId) } },
                 )
             }
         }
@@ -104,7 +104,7 @@ class ProminentAlertActivity : ComponentActivity() {
             keyCode == KeyEvent.KEYCODE_VOLUME_MUTE ||
             keyCode == KeyEvent.KEYCODE_HEADSETHOOK
         ) {
-            attend { (application as DoApp).container.scheduler.stopAlert(reminderId) }
+            attend { (application as DoApp).container.commands.stopAlert(NOTIFICATION, reminderId) }
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -170,6 +170,7 @@ class ProminentAlertActivity : ComponentActivity() {
         const val EXTRA_ID = "id"
         const val EXTRA_TITLE = "title"
         const val EXTRA_DUE = "due"
+        private val NOTIFICATION = Origin(Actor.NOTIFICATION)
     }
 }
 

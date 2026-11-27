@@ -38,6 +38,11 @@
                 <action android:name="com.evansappstudio.doapp.debug.SET_TITLE" />
                 <action android:name="com.evansappstudio.doapp.debug.SET_QUIET_HOURS" />
                 <action android:name="com.evansappstudio.doapp.debug.DUMP_QUIET" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_META" />
+                <action android:name="com.evansappstudio.doapp.debug.DUMP_EVENTS" />
+                <action android:name="com.evansappstudio.doapp.debug.DELETE" />
+                <action android:name="com.evansappstudio.doapp.debug.RESTORE" />
+                <action android:name="com.evansappstudio.doapp.debug.PURGE_NOW" />
             </intent-filter>
         </receiver>
     </application>

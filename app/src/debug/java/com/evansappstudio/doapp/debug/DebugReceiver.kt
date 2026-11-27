@@ -10,7 +10,13 @@ import com.evansappstudio.doapp.backup.BackupMode
 import com.evansappstudio.doapp.billing.FakeUnlockBilling
 import com.evansappstudio.doapp.billing.FreeTier
 import android.text.format.DateFormat
+import com.evansappstudio.doapp.alarm.Actor
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.EventLog
+import com.evansappstudio.doapp.alarm.Origin
+import com.evansappstudio.doapp.alarm.ReminderCategory
+import com.evansappstudio.doapp.alarm.ReminderSource
+import com.evansappstudio.doapp.alarm.SoftDelete
 import com.evansappstudio.doapp.alarm.DndState
 import com.evansappstudio.doapp.alarm.QuietConfig
 import com.evansappstudio.doapp.alarm.QuietHours
@@ -78,6 +84,11 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_SET_TITLE -> setTitle(context, intent)
             ACTION_SET_QUIET_HOURS -> setQuietHours(context, intent)
             ACTION_DUMP_QUIET -> dumpQuiet(context, intent)
+            ACTION_DUMP_META -> dumpMeta(context, intent)
+            ACTION_DUMP_EVENTS -> dumpEvents(context, intent)
+            ACTION_DELETE -> delete(context, intent)
+            ACTION_RESTORE -> restore(context, intent)
+            ACTION_PURGE_NOW -> purgeNow(context, intent)
         }
     }
 
@@ -115,6 +126,28 @@ class DebugReceiver : BroadcastReceiver() {
             Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad alert")
             return
         }
+        val source = if (intent.hasExtra(EXTRA_SOURCE)) {
+            ReminderSource.fromName(intent.getStringExtra(EXTRA_SOURCE))
+        } else {
+            ReminderSource.USER
+        }
+        if (source == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad source")
+            return
+        }
+        val categoryRaw = intent.getStringExtra(EXTRA_CATEGORY)
+        val category = ReminderCategory.normalize(categoryRaw)
+        if (!categoryRaw.isNullOrBlank() && category == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm debug-add bad category")
+            return
+        }
+        val origin = Origin(Actor.DEBUG, source, intent.getStringExtra(EXTRA_SOURCE_ID))
+        val templateId = intent.getStringExtra(EXTRA_TEMPLATE_ID)
+        val templateVersion = if (intent.hasExtra(EXTRA_TEMPLATE_VERSION)) {
+            intent.getIntExtra(EXTRA_TEMPLATE_VERSION, 0)
+        } else {
+            null
+        }
         val pending = goAsync()
         val app = context.applicationContext as DoApp
         if (!UserUnlock.isUnlocked(app)) {
@@ -130,7 +163,17 @@ class DebugReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 val alert = explicitAlert ?: app.container.settings.defaultAlertLevel()
-                val id = app.container.scheduler.add(storedTitle, dueAt, nagMinutes, rule, alert)
+                val id = app.container.commands.add(
+                    origin = origin,
+                    title = storedTitle,
+                    dueAt = dueAt,
+                    nagMinutes = nagMinutes,
+                    rule = rule,
+                    alertLevel = alert,
+                    category = category,
+                    templateId = templateId,
+                    templateVersion = templateVersion,
+                )
                 if (id == null) return@launch
                 DoAlarmLog.debugAdd(id, dueAt, nagMinutes)
                 parsed?.let { match ->
@@ -169,7 +212,7 @@ class DebugReceiver : BroadcastReceiver() {
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
-                app.container.scheduler.markDone(id)
+                app.container.commands.markDone(DEBUG, id)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {
@@ -194,7 +237,7 @@ class DebugReceiver : BroadcastReceiver() {
         val option = app.container.snoozeConfig.get()[optionIndex]
         app.container.scope.launch {
             try {
-                app.container.scheduler.snooze(id, optionIndex, option)
+                app.container.commands.snooze(DEBUG, id, optionIndex, option)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {
@@ -319,7 +362,7 @@ class DebugReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 val reminder = app.container.reminderDao().getById(id)
-                if (reminder == null || reminder.isDone) {
+                if (reminder == null || reminder.isDone || reminder.deletedAt != null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm apply-qat inactive id=$id")
                     return@launch
                 }
@@ -342,7 +385,8 @@ class DebugReceiver : BroadcastReceiver() {
                 } else {
                     null
                 }
-                app.container.scheduler.update(
+                app.container.commands.update(
+                    DEBUG,
                     id,
                     reminder.title,
                     newDue,
@@ -380,7 +424,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
         app.container.scope.launch {
             try {
-                app.container.scheduler.setRepeat(id, rule)
+                app.container.commands.setRepeat(DEBUG, id, rule)
                 val stored = app.container.reminderDao().getById(id)
                 if (stored == null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat missing id=$id")
@@ -495,7 +539,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
         app.container.scope.launch {
             try {
-                val stored = app.container.scheduler.shiftDue(id, newDue, mode)
+                val stored = app.container.commands.shiftDue(DEBUG, id, newDue, mode)
                 if (stored == null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm shift-due missing id=$id")
                 } else {
@@ -568,10 +612,10 @@ class DebugReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 val existing = app.container.reminderDao().getById(id)
-                if (existing == null || existing.isDone) {
+                if (existing == null || existing.isDone || existing.deletedAt != null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm alert missing id=$id")
                 } else {
-                    app.container.scheduler.setAlertLevel(id, level)
+                    app.container.commands.setAlertLevel(DEBUG, id, level)
                 }
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
@@ -967,12 +1011,114 @@ class DebugReceiver : BroadcastReceiver() {
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
-                val stored = app.container.scheduler.setTitle(id, title)
+                val stored = app.container.commands.setTitle(DEBUG, id, title)
                 if (stored == null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm set-title missing id=$id")
                 } else {
                     Log.i(DoAlarmLog.TAG, "DoAlarm set-title id=${stored.id} uuid=${stored.uuid} title=${stored.title}")
                 }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun dumpMeta(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        if (id == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm meta missing id")
+            return
+        }
+        unlockedLaunch(context, "meta", id) { app ->
+            val row = app.container.reminderDao().getById(id)
+            if (row == null) {
+                Log.e(DoAlarmLog.TAG, "DoAlarm meta missing id=$id")
+            } else {
+                DoAlarmLog.meta(row)
+            }
+        }
+    }
+
+    private fun dumpEvents(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        val limit = if (intent.hasExtra(EXTRA_LIMIT)) intent.getIntExtra(EXTRA_LIMIT, DEFAULT_EVENT_LIMIT) else DEFAULT_EVENT_LIMIT
+        if (id == null || limit !in 1..EventLog.MAX_PER_REMINDER) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm events bad args")
+            return
+        }
+        unlockedLaunch(context, "events", id) { app ->
+            val row = app.container.reminderDao().getById(id)
+            if (row == null) {
+                Log.e(DoAlarmLog.TAG, "DoAlarm events missing id=$id")
+                return@unlockedLaunch
+            }
+            val events = app.container.reminderEventDao().forReminder(row.uuid, limit)
+            events.forEach { DoAlarmLog.event(id, it) }
+            DoAlarmLog.eventsEnd(events.size)
+        }
+    }
+
+    private fun delete(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        if (id == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm delete missing id")
+            return
+        }
+        unlockedLaunch(context, "delete", id) { app ->
+            app.container.commands.delete(DEBUG, id)
+            val deletedAt = app.container.reminderDao().getById(id)?.deletedAt
+            if (deletedAt == null) {
+                Log.e(DoAlarmLog.TAG, "DoAlarm delete missing id=$id")
+            } else {
+                DoAlarmLog.deleted(id, deletedAt)
+            }
+        }
+    }
+
+    private fun restore(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent)
+        if (id == null) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm restore missing id")
+            return
+        }
+        unlockedLaunch(context, "restore", id) { app ->
+            if (app.container.commands.restore(DEBUG, id)) {
+                DoAlarmLog.restored(id)
+            } else {
+                Log.e(DoAlarmLog.TAG, "DoAlarm restore refused id=$id")
+            }
+        }
+    }
+
+    private fun purgeNow(context: Context, intent: Intent) {
+        val days = if (intent.hasExtra(EXTRA_DAYS)) {
+            intent.getIntExtra(EXTRA_DAYS, SoftDelete.PURGE_AFTER_DAYS)
+        } else {
+            SoftDelete.PURGE_AFTER_DAYS
+        }
+        if (days < 0) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm purge bad days")
+            return
+        }
+        unlockedLaunch(context, "purge", -1) { app ->
+            DoAlarmLog.purge(app.container.scheduler.purgeDeleted(days))
+        }
+    }
+
+    /** Runs [block] off the main thread once the user is unlocked, as the other Room hooks do. */
+    private fun unlockedLaunch(context: Context, label: String, id: Long, block: suspend (DoApp) -> Unit) {
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        if (!UserUnlock.isUnlocked(app)) {
+            Log.e(DoAlarmLog.TAG, "DoAlarm $label user locked")
+            pending.finish()
+            return
+        }
+        app.container.scope.launch {
+            try {
+                block(app)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {
@@ -1012,6 +1158,18 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_SET_TITLE = "com.evansappstudio.doapp.debug.SET_TITLE"
         const val ACTION_SET_QUIET_HOURS = "com.evansappstudio.doapp.debug.SET_QUIET_HOURS"
         const val ACTION_DUMP_QUIET = "com.evansappstudio.doapp.debug.DUMP_QUIET"
+        const val ACTION_DUMP_META = "com.evansappstudio.doapp.debug.DUMP_META"
+        const val ACTION_DUMP_EVENTS = "com.evansappstudio.doapp.debug.DUMP_EVENTS"
+        const val ACTION_DELETE = "com.evansappstudio.doapp.debug.DELETE"
+        const val ACTION_RESTORE = "com.evansappstudio.doapp.debug.RESTORE"
+        const val ACTION_PURGE_NOW = "com.evansappstudio.doapp.debug.PURGE_NOW"
+        const val EXTRA_SOURCE = "source"
+        const val EXTRA_SOURCE_ID = "sourceId"
+        const val EXTRA_CATEGORY = "category"
+        const val EXTRA_TEMPLATE_ID = "templateId"
+        const val EXTRA_TEMPLATE_VERSION = "templateVersion"
+        const val EXTRA_LIMIT = "limit"
+        const val EXTRA_DAYS = "days"
         const val EXTRA_ENABLED = "enabled"
         const val EXTRA_START = "start"
         const val EXTRA_END = "end"
@@ -1048,6 +1206,8 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_LAG_MS = "lagMs"
         private const val MAX_APPLY_COUNT = 1_000
         private const val MAX_DUMP_COUNT = 24
+        private const val DEFAULT_EVENT_LIMIT = 20
+        private val DEBUG = Origin(Actor.DEBUG)
     }
 }
 

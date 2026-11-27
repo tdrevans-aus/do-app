@@ -4,6 +4,8 @@ import com.evansappstudio.doapp.billing.FreeTier
 import com.evansappstudio.doapp.data.DueShiftMode
 import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.ReminderDao
+import com.evansappstudio.doapp.data.ReminderEvent
+import com.evansappstudio.doapp.data.ReminderEventDao
 import com.evansappstudio.doapp.data.RepeatFrom
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.WeekStart
@@ -26,9 +28,17 @@ enum class EditResult {
  *
  * A repeating row stays active on Mark Done. The next due is one pattern step,
  * or one interval after completion, and the nag loop starts again from that due.
+ *
+ * The mutators are internal: callers go through [ReminderCommands]. Each one writes
+ * the reminder change (updatedAt, version + 1) and its [ReminderEvent] inside the
+ * same guarded block and the same [inTransaction] call, before any alarm or mirror
+ * side effect. Fires write an event but never bump version: a fire changes nothing
+ * in Room. Before unlock Room is closed, so mirror-only paths write no event; a
+ * pending Done or snooze is written with [Actor.SYSTEM] when [rescheduleAll] applies it.
  */
 class Scheduler(
     private val daoProvider: () -> ReminderDao,
+    private val eventsProvider: () -> ReminderEventDao,
     private val mirror: ReminderMirror,
     private val alarms: AlarmArm,
     private val notifications: ReminderAlerts,
@@ -45,12 +55,24 @@ class Scheduler(
 ) {
     private val gate = Mutex()
 
-    suspend fun add(
+    private companion object {
+        /**
+         * Fires, zone alignment, and a Done or snooze tapped before unlock and applied
+         * from the mirror later (who tapped is not recorded; detail says deferred=1).
+         */
+        val SYSTEM = Origin(Actor.SYSTEM)
+    }
+
+    internal suspend fun add(
         title: String,
         dueAt: Long,
         nagMinutes: Int?,
         rule: RepeatRule? = null,
         alertLevel: AlertLevel = AlertLevel.STANDARD,
+        origin: Origin = Origin(Actor.USER),
+        category: String? = null,
+        templateId: String? = null,
+        templateVersion: Int? = null,
     ): Long? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
@@ -64,18 +86,28 @@ class Scheduler(
         val nag = NagSchedule.normalize(nagMinutes)
         val now = clock()
         val pattern = if (rule?.from == RepeatFrom.DUE_DATE) dueAt else null
-        val id = dao().insert(
-            Reminder(
-                uuid = UUID.randomUUID().toString(),
-                title = cleanTitle,
-                dueAt = dueAt,
-                nagMinutes = nag,
-                isDone = false,
-                doneAt = null,
-                createdAt = now,
-                alertLevel = alertLevel.name,
-            ).withRepeat(rule, pattern),
-        )
+        val row = Reminder(
+            uuid = UUID.randomUUID().toString(),
+            title = cleanTitle,
+            dueAt = dueAt,
+            nagMinutes = nag,
+            isDone = false,
+            doneAt = null,
+            createdAt = now,
+            alertLevel = alertLevel.name,
+            source = origin.source.name,
+            sourceId = origin.cleanSourceId(),
+            category = ReminderCategory.normalize(category),
+            templateId = Origin.clipSourceId(templateId),
+            templateVersion = templateVersion,
+            updatedAt = now,
+            version = 1,
+        ).withRepeat(rule, pattern)
+        val id = tx {
+            val inserted = dao().insert(row)
+            record(row.uuid, EventType.CREATED, origin, describe(row))
+            inserted
+        }
         val stored = dao().getById(id) ?: error("Inserted reminder $id was not readable")
         val next = NagSchedule.catchUp(stored.dueAt, now)
         mirror.upsert(stored.toMirror(nextFireAt = next))
@@ -84,7 +116,7 @@ class Scheduler(
         id
     }
 
-    suspend fun stopAlert(id: Long) = guarded {
+    internal suspend fun stopAlert(id: Long, origin: Origin = Origin(Actor.USER)) = guarded {
         alarms.cancel(id)
         notifications.dismiss(id)
         AlertSession.attended(id)
@@ -98,33 +130,47 @@ class Scheduler(
             return@guarded
         }
         alignRoomLocked(zone())
-        val reminder = dao().getById(id)
+        val reminder = liveById(id)
         if (reminder == null || reminder.isDone) {
             mirror.remove(id)
             DoAlarmLog.alertStop(id, null)
             return@guarded
         }
         val next = deferIfNag(id, reminder.dueAt, nextAfterAttend(reminder.nagMinutes, now), reminder.alertLevel)
+        tx {
+            if (dao().touch(id, now) > 0) {
+                record(reminder.uuid, EventType.ALERT_STOPPED, origin, EventLog.detail("next" to next))
+            }
+        }
         mirror.upsert(reminder.toMirror(nextFireAt = next))
         if (next != null) alarms.schedule(id, next)
         DoAlarmLog.alertStop(id, next)
     }
 
-    suspend fun setAlertLevel(id: Long, level: AlertLevel) = guarded {
+    internal suspend fun setAlertLevel(id: Long, level: AlertLevel, origin: Origin = Origin(Actor.USER)) = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        val existing = dao().getById(id) ?: return@guarded
+        val existing = liveById(id) ?: return@guarded
         if (existing.isDone) return@guarded
         val stored = existing.copy(alertLevel = level.name)
         if (stored.alertLevel != existing.alertLevel) {
-            dao().updateDetails(stored)
+            tx {
+                if (dao().updateDetails(stored, clock()) > 0) {
+                    record(
+                        existing.uuid,
+                        EventType.LEVEL_CHANGED,
+                        origin,
+                        EventLog.detail("from" to existing.alertLevel, "to" to stored.alertLevel),
+                    )
+                }
+            }
             applyLevelOnly(stored)
             changed()
         }
         DoAlarmLog.alert(id, level.name)
     }
 
-    suspend fun markDone(id: Long) = guarded {
+    internal suspend fun markDone(id: Long, origin: Origin = Origin(Actor.USER)) = guarded {
         alarms.cancel(id)
         notifications.dismiss(id)
         AlertSession.attended(id)
@@ -149,7 +195,7 @@ class Scheduler(
             return@guarded
         }
         alignRoomLocked(zone())
-        finishDoneLocked(id, clock())
+        finishDoneLocked(id, clock(), origin)
         changed()
     }
 
@@ -160,16 +206,25 @@ class Scheduler(
      * by [rescheduleAll]. A pending done wins over a pending snooze.
      * The repeat rule and pattern anchor are left alone.
      */
-    suspend fun snooze(id: Long, optionIndex: Int, option: SnoozeOption) = guarded {
-        applySnooze(id, optionIndex, option)
+    internal suspend fun snooze(
+        id: Long,
+        optionIndex: Int,
+        option: SnoozeOption,
+        origin: Origin = Origin(Actor.USER),
+    ) = guarded {
+        applySnooze(id, optionIndex, option, origin)
         changed()
     }
 
-    /** Applies [option] to every reminder notification currently showing. */
-    suspend fun snoozeShowing(optionIndex: Int, option: SnoozeOption) = guarded {
+    /** Applies [option] to every reminder notification currently showing. One event per reminder. */
+    internal suspend fun snoozeShowing(
+        optionIndex: Int,
+        option: SnoozeOption,
+        origin: Origin = Origin(Actor.USER),
+    ) = guarded {
         val ids = notifications.showingIds()
         for (id in ids) {
-            applySnooze(id, optionIndex, option)
+            applySnooze(id, optionIndex, option, origin)
         }
         changed()
     }
@@ -179,7 +234,7 @@ class Scheduler(
      * series changes, [dueShift] chooses this occurrence or all future ones.
      * A null [dueShift] on that path postpones this occurrence only.
      */
-    suspend fun update(
+    internal suspend fun update(
         id: Long,
         title: String,
         dueAt: Long,
@@ -187,13 +242,14 @@ class Scheduler(
         rule: RepeatRule?,
         dueShift: DueShiftMode? = null,
         alertLevel: AlertLevel = AlertLevel.STANDARD,
+        origin: Origin = Origin(Actor.USER),
     ): EditResult = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
         val cleanTitle = title.trim()
         require(cleanTitle.isNotEmpty()) { "title is required" }
         val nag = NagSchedule.normalize(nagMinutes)
-        val existing = dao().getById(id) ?: return@guarded EditResult.UNCHANGED
+        val existing = liveById(id) ?: return@guarded EditResult.UNCHANGED
         if (existing.isDone) return@guarded EditResult.UNCHANGED
         val deviceZone = zone()
         val dueChanged = dueAt != existing.dueAt
@@ -230,13 +286,17 @@ class Scheduler(
             nagMinutes = nag,
             alertLevel = alertLevel.name,
         ).withRepeat(finalRule, finalPattern)
-        dao().updateDetails(stored)
         val nagChanged = nag != existing.nagMinutes
         val titleChanged = cleanTitle != existing.title
         val scheduleChanged = finalDue != existing.dueAt
         val levelChanged = stored.alertLevel != existing.alertLevel
         if (!scheduleChanged && !nagChanged && !titleChanged && !levelChanged && sameSeries(existing, stored)) {
             return@guarded EditResult.UNCHANGED
+        }
+        tx {
+            if (dao().updateDetails(stored, clock()) > 0) {
+                record(existing.uuid, EventType.EDITED, origin, describe(stored))
+            }
         }
         if (scheduleChanged) {
             armDue(stored, clock(), dismiss = true)
@@ -280,10 +340,10 @@ class Scheduler(
      * rule copies the current due into [Reminder.patternDueAt] when that
      * anchor is still null. Repeat Off clears the anchor.
      */
-    suspend fun setRepeat(id: Long, rule: RepeatRule?) = guarded {
+    internal suspend fun setRepeat(id: Long, rule: RepeatRule?, origin: Origin = Origin(Actor.USER)) = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        val existing = dao().getById(id) ?: return@guarded
+        val existing = liveById(id) ?: return@guarded
         if (existing.isDone) return@guarded
         val pattern = when {
             rule == null -> null
@@ -292,7 +352,18 @@ class Scheduler(
             else -> existing.dueAt
         }
         val stored = existing.withRepeat(rule, pattern)
-        dao().updateDetails(stored)
+        if (!sameSeries(existing, stored)) {
+            tx {
+                if (dao().updateDetails(stored, clock()) > 0) {
+                    record(
+                        existing.uuid,
+                        EventType.REPEAT_CHANGED,
+                        origin,
+                        EventLog.detail("repeat" to (rule?.token() ?: "OFF"), "pattern" to stored.patternDueAt),
+                    )
+                }
+            }
+        }
         val entry = mirror.get(id)
         if (entry != null) {
             mirror.upsert(entry.copy(wallClock = rule?.keepsWallClock() == true))
@@ -301,10 +372,15 @@ class Scheduler(
     }
 
     /** Debug SHIFT_DUE and the warning-icon apply. Returns the stored placement. */
-    suspend fun shiftDue(id: Long, newDue: Long, mode: DueShiftMode): Reminder? = guarded {
+    internal suspend fun shiftDue(
+        id: Long,
+        newDue: Long,
+        mode: DueShiftMode,
+        origin: Origin = Origin(Actor.USER),
+    ): Reminder? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        val existing = dao().getById(id) ?: return@guarded null
+        val existing = liveById(id) ?: return@guarded null
         if (existing.isDone) return@guarded null
         val rule = existing.repeatRule()
         val stored = if (rule?.from == RepeatFrom.DUE_DATE) {
@@ -320,56 +396,133 @@ class Scheduler(
         } else {
             existing.copy(dueAt = newDue).withRepeat(rule, if (rule == null) null else existing.patternDueAt)
         }
-        dao().updateDetails(stored)
-        if (stored.dueAt != existing.dueAt || stored.patternDueAt != existing.patternDueAt) {
+        val moved = stored.dueAt != existing.dueAt || stored.patternDueAt != existing.patternDueAt
+        if (moved || !sameSeries(existing, stored)) {
+            tx {
+                if (dao().updateDetails(stored, clock()) > 0) {
+                    record(
+                        existing.uuid,
+                        EventType.EDITED,
+                        origin,
+                        EventLog.detail("shift" to mode.name, "due" to stored.dueAt, "pattern" to stored.patternDueAt),
+                    )
+                }
+            }
+        }
+        if (moved) {
             armDue(stored, clock(), dismiss = true)
         }
         changed()
-        stored
+        liveById(id) ?: stored
     }
 
     suspend fun rebuildShowingNotifications() = guarded {
         notifications.rebuildShowing()
     }
 
-    suspend fun delete(id: Long) = guarded {
-        if (unlocked()) dao().deleteById(id)
+    /**
+     * Soft delete: sets deletedAt and keeps the row for [SoftDelete.PURGE_AFTER_DAYS]
+     * days. The alarm, the notification and the mirror entry go, as hard delete did.
+     */
+    internal suspend fun delete(id: Long, origin: Origin = Origin(Actor.USER)) = guarded {
+        if (unlocked()) {
+            val existing = liveById(id)
+            if (existing != null) {
+                tx {
+                    if (dao().softDelete(id, clock()) > 0) {
+                        record(existing.uuid, EventType.DELETED, origin)
+                    }
+                }
+            }
+        }
         alarms.cancel(id)
         notifications.dismiss(id)
         mirror.remove(id)
         changed()
     }
 
+    /**
+     * Clears deletedAt and re-arms a not-done row through the add path (a past due
+     * catches up). False when the row is missing, not deleted, or past the purge window.
+     */
+    internal suspend fun restore(id: Long, origin: Origin = Origin(Actor.USER)): Boolean = guarded {
+        check(unlocked()) { "Cannot save a reminder before unlock" }
+        alignRoomLocked(zone())
+        val existing = dao().getById(id) ?: return@guarded false
+        val deletedAt = existing.deletedAt ?: return@guarded false
+        val now = clock()
+        if (!SoftDelete.canRestore(deletedAt, now)) return@guarded false
+        val restored = tx {
+            val count = dao().restore(id, now)
+            if (count > 0) record(existing.uuid, EventType.RESTORED, origin)
+            count > 0
+        }
+        if (!restored) return@guarded false
+        val stored = dao().getById(id) ?: return@guarded false
+        if (!stored.isDone) {
+            val next = NagSchedule.catchUp(stored.dueAt, now)
+            alarms.cancel(id)
+            mirror.upsert(stored.toMirror(nextFireAt = next))
+            alarms.schedule(id, next)
+        }
+        changed()
+        true
+    }
+
+    /**
+     * Removes rows soft-deleted more than [days] days ago, with their events.
+     * Runs on every [rescheduleAll]. Returns how many rows went.
+     */
+    suspend fun purgeDeleted(days: Int = SoftDelete.PURGE_AFTER_DAYS): Int = guarded {
+        check(unlocked()) { "Cannot purge before unlock" }
+        purgeLocked(days)
+    }
+
     /** Debug title edit. Keeps the uuid and the local id. */
-    suspend fun setTitle(id: Long, title: String): Reminder? = guarded {
+    internal suspend fun setTitle(id: Long, title: String, origin: Origin = Origin(Actor.USER)): Reminder? = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         val clean = title.trim()
         if (clean.isEmpty()) return@guarded null
-        val existing = dao().getById(id) ?: return@guarded null
+        val existing = liveById(id) ?: return@guarded null
         if (existing.isDone) return@guarded null
         val stored = existing.copy(title = clean)
-        dao().updateDetails(stored)
+        if (clean != existing.title) {
+            tx {
+                if (dao().updateDetails(stored, clock()) > 0) {
+                    record(existing.uuid, EventType.EDITED, origin, EventLog.detail("field" to "title"))
+                }
+            }
+        }
         val entry = mirror.get(id)
         if (entry != null) mirror.upsert(entry.copy(title = clean))
         notifications.refreshIfShowing(id, clean, stored.dueAt, stored.alert())
         changed()
-        stored
+        liveById(id) ?: stored
     }
 
-    /** Replace every reminder. Callers cancel alarms before the insert. Reschedules afterwards. */
-    suspend fun replaceAll(reminders: List<Reminder>): List<Long> = guarded {
+    /**
+     * Replace every reminder. Clears every row, soft-deleted ones included, and
+     * every event, then writes one IMPORTED event per row. Imported rows keep
+     * their exported version and updatedAt. Reschedules afterwards.
+     */
+    internal suspend fun replaceAll(
+        reminders: List<Reminder>,
+        origin: Origin = Origin(Actor.IMPORT),
+    ): List<Long> = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        for (row in dao().all()) {
+        for (row in dao().allIncludingDeleted()) {
             alarms.cancel(row.id)
             notifications.dismiss(row.id)
             mirror.remove(row.id)
         }
-        inTransaction {
+        tx {
+            events().deleteAll()
             dao().deleteAll()
             for (row in reminders) {
-                val uuid = row.uuid.ifBlank { UUID.randomUUID().toString() }
-                dao().insert(row.copy(id = 0, uuid = uuid))
+                val incoming = imported(row)
+                dao().insert(incoming)
+                record(incoming.uuid, EventType.IMPORTED, origin, EventLog.detail("mode" to "replace"))
             }
         }
         rescheduleAllLocked()
@@ -378,20 +531,34 @@ class Scheduler(
         dao().all().map { it.id }
     }
 
-    /** Upsert by uuid. Local-only rows stay. Imported fields win. */
-    suspend fun mergeAll(reminders: List<Reminder>): List<Long> = guarded {
+    /**
+     * Upsert by uuid. Local-only rows stay. Imported fields win. A match on a
+     * soft-deleted local row restores it with the incoming values.
+     */
+    internal suspend fun mergeAll(
+        reminders: List<Reminder>,
+        origin: Origin = Origin(Actor.IMPORT),
+    ): List<Long> = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
         val ids = ArrayList<Long>()
-        inTransaction {
+        tx {
             for (row in reminders) {
-                val uuid = row.uuid.ifBlank { UUID.randomUUID().toString() }
-                val local = dao().getByUuid(uuid)
+                val incoming = imported(row)
+                val local = dao().getByUuid(incoming.uuid)
                 if (local == null) {
-                    ids += dao().insert(row.copy(id = 0, uuid = uuid))
+                    ids += dao().insert(incoming)
+                    record(incoming.uuid, EventType.IMPORTED, origin, EventLog.detail("mode" to "merge"))
                 } else {
-                    dao().update(row.copy(id = local.id, uuid = uuid))
+                    dao().update(incoming.copy(id = local.id))
                     ids += local.id
+                    val restored = if (local.deletedAt != null) 1 else null
+                    record(
+                        incoming.uuid,
+                        EventType.IMPORTED,
+                        origin,
+                        EventLog.detail("mode" to "merge", "restored" to restored),
+                    )
                 }
             }
         }
@@ -403,13 +570,14 @@ class Scheduler(
 
     suspend fun onFire(id: Long, actual: Long, scheduled: Long = actual) = guarded {
         if (unlocked()) {
-            val reminder = dao().getById(id)
+            val reminder = liveById(id)
             if (reminder == null || reminder.isDone) {
                 alarms.cancel(id)
                 notifications.dismiss(id)
                 mirror.remove(id)
                 return@guarded
             }
+            val wasNag = mirror.get(id)?.pendingNag() == true
             if (holdNagIfNeeded(
                     id = reminder.id,
                     dueAt = reminder.dueAt,
@@ -421,6 +589,7 @@ class Scheduler(
                     actual = actual,
                 )
             ) {
+                recordFire(reminder, EventType.HELD, EventLog.detail("reason" to "dnd", "next" to mirror.get(id)?.nextFireAt))
                 return@guarded
             }
             val decision = notifications.show(reminder.id, reminder.title, reminder.dueAt, reminder.alert())
@@ -445,6 +614,11 @@ class Scheduler(
                     reminder.alertLevel,
                 )
             }
+            recordFire(
+                reminder,
+                if (wasNag) EventType.NAGGED else EventType.FIRED,
+                EventLog.detail("scheduled" to scheduled, "level" to decision.effective.name),
+            )
         } else {
             val entry = mirror.get(id)
             if (entry == null || entry.pendingDone) {
@@ -518,16 +692,21 @@ class Scheduler(
 
     private suspend fun rescheduleAllLocked() {
         val now = clock()
+        purgeLocked(SoftDelete.PURGE_AFTER_DAYS)
         val pending = mirror.all().filter { it.pendingDone }
         for (entry in pending) {
-            finishDoneLocked(entry.id, entry.pendingDoneAt ?: now)
+            finishDoneLocked(entry.id, entry.pendingDoneAt ?: now, SYSTEM, deferred = true)
         }
         val pendingSnooze = mirror.all().filter { !it.pendingDone && it.pendingSnoozeDueAt != null }
         for (entry in pendingSnooze) {
             val due = entry.pendingSnoozeDueAt ?: continue
-            val reminder = dao().getById(entry.id)
+            val reminder = liveById(entry.id)
             if (reminder == null || reminder.isDone) continue
-            dao().updateDueAt(reminder.id, due)
+            tx {
+                if (dao().updateDueAt(reminder.id, due, now) > 0) {
+                    record(reminder.uuid, EventType.SNOOZED, SYSTEM, EventLog.detail("until" to due, "deferred" to 1))
+                }
+            }
             val updated = reminder.copy(dueAt = due)
             mirror.upsert(
                 updated.toMirror(
@@ -589,15 +768,20 @@ class Scheduler(
         }
     }
 
-    private suspend fun finishDoneLocked(id: Long, completedAt: Long) {
-        val reminder = dao().getById(id)
+    private suspend fun finishDoneLocked(id: Long, completedAt: Long, origin: Origin, deferred: Boolean = false) {
+        val reminder = liveById(id)
         if (reminder == null || reminder.isDone) {
             mirror.remove(id)
             return
         }
+        val flag = if (deferred) 1 else null
         val rule = reminder.repeatRule()
         if (rule == null) {
-            dao().markDone(id, completedAt)
+            tx {
+                if (dao().markDone(id, completedAt, clock()) > 0) {
+                    record(reminder.uuid, EventType.DONE, origin, EventLog.detail("at" to completedAt, "deferred" to flag))
+                }
+            }
             mirror.remove(id)
             return
         }
@@ -609,7 +793,17 @@ class Scheduler(
             zone = zone(),
             weekStart = weekStart(),
         )
-        dao().advanceOccurrence(id, placed.dueAt, placed.patternDueAt)
+        tx {
+            if (dao().advanceOccurrence(id, placed.dueAt, placed.patternDueAt, clock()) > 0) {
+                record(reminder.uuid, EventType.DONE, origin, EventLog.detail("at" to completedAt, "deferred" to flag))
+                record(
+                    reminder.uuid,
+                    EventType.ADVANCED,
+                    origin,
+                    EventLog.detail("due" to placed.dueAt, "pattern" to placed.patternDueAt, "from" to rule.from.name),
+                )
+            }
+        }
         val now = clock()
         val next = NagSchedule.catchUp(placed.dueAt, now)
         val stored = reminder.copy(
@@ -623,7 +817,7 @@ class Scheduler(
         DoAlarmLog.repeatAdvance(id, placed.dueAt, placed.patternDueAt, rule.from.name)
     }
 
-    private suspend fun applySnooze(id: Long, optionIndex: Int, option: SnoozeOption) {
+    private suspend fun applySnooze(id: Long, optionIndex: Int, option: SnoozeOption, origin: Origin) {
         val now = clock()
         val newDue = SnoozeDue.compute(option, now, zone())
         val nextFire = SnoozeDue.nextFire(newDue, now)
@@ -657,13 +851,17 @@ class Scheduler(
             return
         }
         alignRoomLocked(zone())
-        val reminder = dao().getById(id)
+        val reminder = liveById(id)
         if (reminder == null || reminder.isDone) {
             mirror.remove(id)
             DoAlarmLog.snoozeSkipped(id, "inactive")
             return
         }
-        dao().updateDueAt(id, newDue)
+        tx {
+            if (dao().updateDueAt(id, newDue, now) > 0) {
+                record(reminder.uuid, EventType.SNOOZED, origin, EventLog.detail("option" to optionIndex, "until" to newDue))
+            }
+        }
         mirror.upsert(reminder.copy(dueAt = newDue).toMirror(nextFireAt = nextFire))
         alarms.schedule(id, nextFire)
     }
@@ -870,7 +1068,16 @@ class Scheduler(
             val newDue = RepeatMath.adjustZone(row.dueAt, rule, stored, device)
             val newPattern = row.patternDueAt?.let { RepeatMath.adjustZone(it, rule, stored, device) }
             if (newDue != row.dueAt || newPattern != row.patternDueAt) {
-                dao().updateDueAndPattern(row.id, newDue, newPattern)
+                tx {
+                    if (dao().updateDueAndPattern(row.id, newDue, newPattern, clock()) > 0) {
+                        record(
+                            row.uuid,
+                            EventType.EDITED,
+                            SYSTEM,
+                            EventLog.detail("zone" to device.id, "due" to newDue, "pattern" to newPattern),
+                        )
+                    }
+                }
             }
         }
         zones.setRoomZone(device)
@@ -916,6 +1123,75 @@ class Scheduler(
     }
 
     private fun dao(): ReminderDao = daoProvider()
+
+    private fun events(): ReminderEventDao = eventsProvider()
+
+    /** A row that has not been soft-deleted. A deleted row is treated as gone. */
+    private suspend fun liveById(id: Long): Reminder? = dao().getById(id)?.takeIf { it.deletedAt == null }
+
+    /** Runs [block] in one Room transaction and returns its result. */
+    private suspend fun <T> tx(block: suspend () -> T): T {
+        var result: Any? = null
+        inTransaction { result = block() }
+        @Suppress("UNCHECKED_CAST")
+        return result as T
+    }
+
+    /** Appends one event and trims the reminder's log. Call inside [tx], beside the reminder write. */
+    private suspend fun record(uuid: String, type: EventType, origin: Origin, detail: String? = null) {
+        events().insert(
+            ReminderEvent(
+                reminderUuid = uuid,
+                at = clock(),
+                type = type.name,
+                actor = origin.actor.name,
+                sourceId = origin.cleanSourceId(),
+                detail = EventLog.clipDetail(detail),
+            ),
+        )
+        events().trim(uuid, EventLog.MAX_PER_REMINDER)
+    }
+
+    /**
+     * A fire changes nothing in Room, so it does not bump version. It is written
+     * after the alarm work so a failed event write cannot stop the nag loop.
+     */
+    private suspend fun recordFire(reminder: Reminder, type: EventType, detail: String?) {
+        try {
+            tx { record(reminder.uuid, type, SYSTEM, detail) }
+        } catch (error: Throwable) {
+            DoAlarmLog.handlingFailed(reminder.id, error)
+        }
+    }
+
+    private suspend fun purgeLocked(days: Int): Int {
+        val cutoff = SoftDelete.cutoff(clock(), days)
+        val doomed = dao().deletedBefore(cutoff)
+        if (doomed.isEmpty()) return 0
+        val removed = tx {
+            events().deleteForReminders(doomed.map { it.uuid })
+            dao().purgeDeletedBefore(cutoff)
+        }
+        for (row in doomed) {
+            alarms.cancel(row.id)
+            mirror.remove(row.id)
+        }
+        return removed
+    }
+
+    private fun describe(reminder: Reminder): String? = EventLog.detail(
+        "due" to reminder.dueAt,
+        "nag" to (reminder.nagMinutes ?: 0),
+        "level" to reminder.alertLevel,
+        "repeat" to (reminder.repeatRule()?.token() ?: "OFF"),
+    )
+
+    /** An incoming import row: new local id, a uuid, never deleted, updatedAt never before createdAt. */
+    private fun imported(row: Reminder): Reminder {
+        val uuid = row.uuid.ifBlank { UUID.randomUUID().toString() }
+        val updatedAt = if (row.updatedAt <= 0L) row.createdAt else row.updatedAt
+        return row.copy(id = 0, uuid = uuid, deletedAt = null, updatedAt = updatedAt)
+    }
 
     private fun changed() {
         try {

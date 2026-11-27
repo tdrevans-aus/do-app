@@ -14,7 +14,7 @@ class DoneReceiver : BroadcastReceiver() {
         val app = context.applicationContext as DoApp
         app.container.scope.launch {
             try {
-                app.container.scheduler.markDone(id)
+                app.container.commands.markDone(Origin(Actor.NOTIFICATION), id)
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id, error)
             } finally {

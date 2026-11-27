@@ -1,6 +1,8 @@
 package com.evansappstudio.doapp.backup
 
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.Approval
+import com.evansappstudio.doapp.alarm.ReminderSource
 import com.evansappstudio.doapp.alarm.QuietConfig
 import com.evansappstudio.doapp.alarm.QuietPatch
 import com.evansappstudio.doapp.alarm.PostponeMode
@@ -16,7 +18,11 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** Schema 1 backup. Local Room ids are not portable and are not in the file. */
+/**
+ * Backup document. Local Room ids are not portable and are not in the file.
+ * Schema 2 added the reminder provenance and change-tracking keys; every one is
+ * optional on decode, so schema 1 files still import with the column defaults.
+ */
 data class PortableSettings(
     val defaultNagMinutes: Int,
     val snooze: List<SnoozeOption>,
@@ -63,6 +69,16 @@ data class PortableReminder(
     val repeatMonthOn: String?,
     val patternDueAt: Long?,
     val alertLevel: String,
+    val source: String = ReminderSource.DEFAULT.name,
+    val sourceId: String? = null,
+    val category: String? = null,
+    val templateId: String? = null,
+    val templateVersion: Int? = null,
+    /** Null when the file has no updatedAt (schema 1); import then uses [createdAt]. */
+    val updatedAt: Long? = null,
+    val version: Int = 1,
+    val approval: String = Approval.DEFAULT.name,
+    val requestedAlertLevel: String? = null,
 )
 
 data class BackupDocument(
@@ -89,7 +105,19 @@ fun Reminder.toPortable(): PortableReminder = PortableReminder(
     repeatMonthOn = repeatMonthOn,
     patternDueAt = patternDueAt,
     alertLevel = alertLevel,
+    source = source,
+    sourceId = sourceId,
+    category = category,
+    templateId = templateId,
+    templateVersion = templateVersion,
+    updatedAt = updatedAt,
+    version = version,
+    approval = approval,
+    requestedAlertLevel = requestedAlertLevel,
 )
+
+/** Soft-deleted rows are never exported, and deletedAt is never written. */
+fun List<Reminder>.exportable(): List<PortableReminder> = filter { it.deletedAt == null }.map { it.toPortable() }
 
 fun PortableReminder.toReminder(id: Long): Reminder = Reminder(
     id = id,
@@ -107,10 +135,20 @@ fun PortableReminder.toReminder(id: Long): Reminder = Reminder(
     repeatMonthOn = repeatMonthOn,
     patternDueAt = patternDueAt,
     alertLevel = alertLevel.ifBlank { AlertLevel.STANDARD.name },
+    source = source,
+    sourceId = sourceId,
+    category = category,
+    templateId = templateId,
+    templateVersion = templateVersion,
+    updatedAt = updatedAt ?: createdAt,
+    version = version,
+    deletedAt = null,
+    approval = approval,
+    requestedAlertLevel = requestedAlertLevel,
 )
 
 object BackupNames {
-    const val SCHEMA_VERSION = 1
+    const val SCHEMA_VERSION = 2
     const val APP_ID = "com.evansappstudio.doapp"
     const val AUTO_GAP_MS = 24L * 60L * 60L * 1000L
     private val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")
