@@ -192,7 +192,7 @@ class Spec10QaTest {
         for (us in listOf("catalog<", "catalog ", "canceled", "license ", "color")) {
             assertFalse(us, strings.contains(us))
         }
-        assertFalse(strings.contains('—'))
+        assertFalse(strings.contains('\u2014'))
     }
 
     // QA: fails until the Settings Do Unlimited row shows the renewal price beside the intro price is fixed
