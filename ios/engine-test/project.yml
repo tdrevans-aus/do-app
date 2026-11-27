@@ -65,22 +65,7 @@ schemes:
     build:
       targets:
         DoEngineTest: all
-        DoEngineTestWidget:
-    type: app-extension
-    platform: iOS
-    sources:
-      - path: Widget
-      - path: Shared
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest.widget
-        PRODUCT_NAME: DoEngineTestWidget
-        INFOPLIST_FILE: Widget/Info.plist
-        CODE_SIGN_STYLE: Automatic
-        TARGETED_DEVICE_FAMILY: "1"
-        SKIP_INSTALL: YES
-        DEVELOPMENT_TEAM: ""
-  DoEngineTestTests: [test]
+        DoEngineTestTests: [test]
     run:
       config: Debug
     test:
