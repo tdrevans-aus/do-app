@@ -29,15 +29,20 @@ Do is the product, and Stuff You Should Do is **part of the default way in, with
 
 | # | Screen | What it settles |
 | --- | --- | --- |
-| 1 | First run: let Do get through | One screen for the four things Android must allow: notifications, alarms and reminders (exact alarms), full-screen alarms (optional, only for Prominent), and battery (opens the system list, never a direct exemption request, per Play policy). Red dot means needed and missing. A "Test in 1 min" alarm. You can continue with gaps; the health check picks them up later. |
+| 1 | First run: let Do get through | One screen for the four things Android must allow: notifications, alarms and reminders (exact alarms), full-screen alarms (optional, only for the Alarm level), and battery (opens the system list, never a direct exemption request, per Play policy). Red dot means needed and missing. A "Test in 1 min" alarm. You can continue with gaps; the health check picks them up later. |
 | 2 | First run: your first reminder | One field, natural language, with a live preview and four example chips. Says it will nag until done. |
 | 3 | First run: what you look after | Eight life areas (home, rental, car, kids, pets, health, money and admin, digital). Skip visible. Says the answers stay on the phone. |
 | 4 | First run: picks | Suggested items grouped by area, up to 5 pre-ticked (counting the first reminder), each with its interval and how it repeats. "Check your state" tag where rules vary. A live counter against the free 5. |
 | 5 | Today | Overdue, Later today, Coming up. Every reminder shows where it came from (You, Catalogue, Assistant), and whether it is nagging and how often. One tap marks Done. The Stuff You Should Do card sits below Overdue; three variants in the artboard's Tweaks: head start, seasonal, after a catalogue item is done. |
-| 6 | Add | Natural-language field with the "Do understood" preview (date and repeat), Quick Times grid, nag interval, and the three alert levels with a one-line explanation of each. |
+| 6 | Add | Natural-language field ("What needs doing?") with the "Do understood" preview (date and repeat); the title is tidied automatically with an Undo. A row of Do's own time shortcuts (In an hour, Tonight 7 pm, Tomorrow 9 am, Saturday morning, Next week, Choose...). Nag interval, and three alert levels, **Normal, Loud and Alarm**, each with a one-line explanation. |
 | 7 | Catalogue tab | Browse by area, search, add or remove items. Shows the "why" for each item. |
-| 8 | Assistants | Gemini on the phone (AppFunctions) and Share to Do, now. Other assistants through the cloud link, later. An approval card when an assistant asks for Critical or Prominent. Rules every assistant must follow. |
-| 9 | The nag | Two views (switch in the artboard's Tweaks): the lock-screen notification and the Prominent full-screen alarm. Notification: title, due time, "nagging every 5 min until you mark it done", nag count, and Done, 10 min, Snooze to... as real actions, plus a grouped "2 more overdue, Snooze all". Full-screen: a big Done; Snooze 10 min; Stop sound, which stops the ringing but keeps the nag going. Only Done ends a reminder. |
+| 8 | Assistants | Gemini on the phone (AppFunctions) and Share to Do, now. Other assistants through the cloud link, later. An approval card when an assistant asks for Loud or Alarm. Rules every assistant must follow. |
+| 9 | The nag | Two views (switch in the artboard's Tweaks): the lock-screen notification and the full-screen Alarm. Notification: title, due time, "nagging every 5 min until you mark it done", nag count, and Done, +10 min, Later... as real actions, plus a grouped "2 more overdue, Snooze all". Full-screen: a big Done; Snooze 10 min; Stop sound, which stops the ringing but keeps the nag going. Only Done ends a reminder. |
+| 10 | All | Search, filters (Active, Repeating, Catalogue, Assistant, Done), a "4 of 5 free" indicator that opens the paywall, and a repeat icon. |
+| 11 | Edit | The reminder's settings, a "From Stuff You Should Do" box with the item's why, history (from the event log), Mark done and Delete. |
+| 12 | Settings | Subscription card first, then Nagging, Helpers (assistants, Stuff You Should Do suggestions, health check) and Your data. |
+| 13 | Widget and Quick Settings tile | Large widget with tick-to-done and an add field, small "2 overdue" widget, and a Do tile in Quick Settings that opens Add. |
+| 14 | Share to Do | Bottom sheet over another app. Turns "Friday after work" into a date, shows where it came from, saves and returns. |
 | - | Paywall | Only when the user ticks more than the free 5. A$3.99 first year and the A$9.99 renewal on the same screen; "Keep 5 for free" as an equal option; reminders keep nagging if you stop paying. |
 
 ## Structure
@@ -75,4 +80,4 @@ Plus, outside the reminder table:
 2. **State-level regions.** Some items only make sense in some states (for example comparing energy plans in WA). The catalogue may need state tags, not only "AU", and onboarding may need to ask for the user's state.
 3. **Stop sound on the full-screen alarm.** Drawn as "stops the ringing, keeps nagging". Spec 5 has Stop; confirm it behaves this way today, or decide it should.
 4. **Snooze all** in the grouped notification is drawn from Spec 2's grouping; confirm the wording.
-5. **Not drawn yet:** All list, Settings main, editing an existing reminder, widget, Quick Settings tile, share sheet target.
+5. **Moving away from Due (27 Nov 2026):** the add field, alert levels, time shortcuts, notification actions and settings wording were changed so nothing copies Due. See `docs/strategy/DUE-DIFFERENTIATION-REVIEW.md`; the same changes are still needed in the app's code.
