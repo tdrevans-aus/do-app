@@ -9,11 +9,15 @@ import java.time.ZoneId
  * instants were last rewritten for. Device-protected so a timezone change
  * before unlock can still move mirror dues.
  */
-class ZoneMemory(context: Context) {
-    private val file: File = File(
-        context.createDeviceProtectedStorageContext().filesDir,
-        FILE_NAME,
-    ).also { it.parentFile?.mkdirs() }
+class ZoneMemory internal constructor(
+    private val file: File,
+) {
+    constructor(context: Context) : this(
+        File(
+            context.createDeviceProtectedStorageContext().filesDir,
+            FILE_NAME,
+        ).also { it.parentFile?.mkdirs() },
+    )
 
     private val lock = Any()
 

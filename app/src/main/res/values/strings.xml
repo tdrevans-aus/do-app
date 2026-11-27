@@ -117,6 +117,15 @@
     <string name="repeat_warning_title">Off the pattern</string>
     <string name="repeat_warning_body">This due time no longer matches the repeat. Apply it to all future occurrences?</string>
     <string name="restore_prompts">Restore warnings and prompts</string>
+    <string name="quiet_hours">Quiet hours</string>
+    <string name="quiet_caption">Pauses repeat alerts during these hours. The first alert still comes. Critical alerts are not paused unless you turn that on below, and Prominent alerts are never paused.</string>
+    <string name="quiet_starts">Starts</string>
+    <string name="quiet_ends">Ends</string>
+    <string name="quiet_same">Start and end cannot be the same.</string>
+    <string name="quiet_follow_dnd">Pause nags while Do Not Disturb is on</string>
+    <string name="quiet_follow_dnd_subtitle">Follows your phone\'s Do Not Disturb, however it was turned on.</string>
+    <string name="quiet_critical">Critical alerts also pause during quiet hours</string>
+    <string name="quiet_critical_subtitle">Applies to quiet hours and Do Not Disturb. Prominent alerts are never paused.</string>
     <string name="health_check">Health check</string>
     <string name="health_lead">These checks look for anything that would stop reminders firing or nagging.</string>
     <string name="health_test_button">Test alarm in 1 minute</string>

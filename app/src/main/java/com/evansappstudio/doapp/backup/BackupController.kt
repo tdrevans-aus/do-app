@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.HealthMonitor
+import com.evansappstudio.doapp.alarm.QuietHoursStore
 import com.evansappstudio.doapp.alarm.Scheduler
 import com.evansappstudio.doapp.alarm.SnoozeConfig
 import com.evansappstudio.doapp.data.ReminderDao
@@ -24,6 +25,7 @@ class BackupController(
     context: Context,
     private val store: BackupStore,
     private val settings: SettingsStore,
+    private val quiet: QuietHoursStore,
     private val snoozeConfig: SnoozeConfig,
     private val dao: () -> ReminderDao,
     private val scheduler: () -> Scheduler,
@@ -173,10 +175,12 @@ class BackupController(
             document.reminders
         }
         val previous = settings.portable()
+        val previousQuiet = quiet.read()
         return try {
             if (mode == BackupMode.REPLACE) {
                 settings.replacePortable(document.settings)
                 snoozeConfig.setAll(settings.snoozeOptions())
+                quiet.apply(document.settings.quietPatch())
             }
             val ids = when (mode) {
                 BackupMode.REPLACE -> scheduler().replaceAll(document.reminders.map { it.toReminder(0) })
@@ -192,6 +196,7 @@ class BackupController(
                 try {
                     settings.replacePortable(previous)
                     snoozeConfig.setAll(settings.snoozeOptions())
+                    quiet.write(previousQuiet)
                 } catch (restore: Throwable) {
                     DoAlarmLog.handlingFailed(id = -1, restore)
                 }
@@ -287,7 +292,7 @@ class BackupController(
             appId = BackupNames.APP_ID,
             appVersionName = versionName,
             exportedAt = clock(),
-            settings = settings.portable(),
+            settings = settings.portable().withQuiet(quiet.read()),
             reminders = dao().all().map { it.toPortable() },
         )
         return BackupCodec.encode(document).toByteArray(Charsets.UTF_8)

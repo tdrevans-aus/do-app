@@ -132,6 +132,62 @@ class BackupLogicTest {
         assertTrue(extraction.contains("<device-transfer>"))
         assertTrue(extraction.contains("do_entitlement"))
         assertFalse(extraction.contains("reminder-mirror"))
+        assertTrue(rules.contains("domain=\"device_sharedpref\" path=\"do_quiet.xml\""))
+        assertTrue(extraction.contains("domain=\"device_sharedpref\" path=\"do_quiet.xml\""))
+        val cloud = extraction.substringAfter("<cloud-backup>").substringBefore("</cloud-backup>")
+        val transfer = extraction.substringAfter("<device-transfer>").substringBefore("</device-transfer>")
+        assertTrue(cloud.contains("domain=\"device_sharedpref\" path=\"do_quiet.xml\""))
+        assertTrue(transfer.contains("domain=\"device_sharedpref\" path=\"do_quiet.xml\""))
+        assertTrue(cloud.contains("domain=\"sharedpref\" path=\"do_settings.xml\""))
+        assertTrue(transfer.contains("domain=\"sharedpref\" path=\"do_settings.xml\""))
+    }
+
+    @Test
+    fun quietKeysAreOptionalOnSchema1() {
+        val plain = BackupCodec.decode(BackupCodec.encode(document(emptyList())))
+        val plainSettings = (plain as BackupDecode.Ok).document.settings
+        assertEquals(null, plainSettings.quietEnabled)
+        assertEquals(null, plainSettings.quietStartMinute)
+        assertEquals(null, plainSettings.quietEndMinute)
+        assertEquals(null, plainSettings.quietFollowDnd)
+        assertEquals(null, plainSettings.quietCriticalPauses)
+
+        val full = sampleSettings().copy(
+            quietEnabled = true,
+            quietStartMinute = 23 * 60,
+            quietEndMinute = 6 * 60,
+            quietFollowDnd = true,
+            quietCriticalPauses = true,
+        )
+        val round = BackupCodec.decode(BackupCodec.encode(document(emptyList()).copy(settings = full)))
+        assertEquals(full, (round as BackupDecode.Ok).document.settings)
+
+        val onlyEnabled = sampleSettings().copy(quietEnabled = true)
+        val partial = (BackupCodec.decode(
+            BackupCodec.encode(document(emptyList()).copy(settings = onlyEnabled)),
+        ) as BackupDecode.Ok).document.settings
+        assertEquals(true, partial.quietEnabled)
+        assertEquals(null, partial.quietStartMinute)
+        assertEquals(null, partial.quietEndMinute)
+        assertEquals(null, partial.quietFollowDnd)
+        assertEquals(null, partial.quietCriticalPauses)
+
+        val bad = full.copy(quietStartMinute = 2000, quietEndMinute = 2000)
+        val ignored = (BackupCodec.decode(
+            BackupCodec.encode(document(emptyList()).copy(settings = bad)),
+        ) as BackupDecode.Ok).document.settings
+        assertEquals(null, ignored.quietStartMinute)
+        assertEquals(null, ignored.quietEndMinute)
+        assertEquals(true, ignored.quietEnabled)
+        assertEquals(true, ignored.quietFollowDnd)
+
+        val equal = full.copy(quietStartMinute = 100, quietEndMinute = 100)
+        val kept = (BackupCodec.decode(
+            BackupCodec.encode(document(emptyList()).copy(settings = equal)),
+        ) as BackupDecode.Ok).document.settings
+        assertEquals(null, kept.quietStartMinute)
+        assertEquals(null, kept.quietEndMinute)
+        assertEquals(true, kept.quietFollowDnd)
     }
 
     private fun document(reminders: List<PortableReminder>) = BackupDocument(

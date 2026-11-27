@@ -159,6 +159,48 @@ object DoAlarmLog {
         )
     }
 
+    fun quietDefer(id: Long, planned: Long, at: Long) {
+        Log.i(TAG, "DoAlarm quiet-defer id=$id planned=$planned at=$at")
+    }
+
+    fun dndHold(id: Long, scheduled: Long, next: Long) {
+        Log.i(TAG, "DoAlarm dnd-hold id=$id scheduled=$scheduled next=$next")
+    }
+
+    fun dndRelease(id: Long, at: Long) {
+        Log.i(TAG, "DoAlarm dnd-release id=$id at=$at")
+    }
+
+    fun dndFilter(filter: Int, active: Boolean) {
+        Log.i(TAG, "DoAlarm dnd filter=$filter active=$active")
+    }
+
+    fun quietSet(
+        enabled: Boolean,
+        start: String,
+        end: String,
+        followDnd: Boolean,
+        criticalPauses: Boolean,
+        simDnd: String,
+    ) {
+        Log.i(
+            TAG,
+            "DoAlarm quiet set enabled=$enabled start=$start end=$end followDnd=$followDnd criticalPauses=$criticalPauses simDnd=$simDnd",
+        )
+    }
+
+    fun quietBadArgs() {
+        Log.i(TAG, "DoAlarm quiet bad args")
+    }
+
+    fun quietDump(body: String) {
+        Log.i(TAG, "DoAlarm quiet $body")
+    }
+
+    fun quietId(body: String) {
+        Log.i(TAG, "DoAlarm quiet $body")
+    }
+
     fun unlockAckFailed(responseCode: Int) {
         Log.i(TAG, "DoAlarm unlock ack failed code=$responseCode")
     }

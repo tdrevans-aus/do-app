@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.QuietConfig
+import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimesSettings
@@ -34,6 +36,47 @@ class ReminderViewModel(
 
     private val quickTimesState = MutableStateFlow(container.settings.quickTimes())
     val quickTimes: StateFlow<QuickTimesSettings> = quickTimesState.asStateFlow()
+
+    private val quietState = MutableStateFlow(container.quiet.read())
+    val quietHours: StateFlow<QuietConfig> = quietState.asStateFlow()
+
+    fun reloadQuiet() {
+        quietState.value = container.quiet.read()
+    }
+
+    fun quietConfig(): QuietConfig = container.quiet.read()
+
+    fun setQuietEnabled(enabled: Boolean) = writeQuiet { it.copy(enabled = enabled) }
+
+    fun setQuietFollowDnd(enabled: Boolean) = writeQuiet { it.copy(followDnd = enabled) }
+
+    fun setQuietCriticalPauses(enabled: Boolean) = writeQuiet { it.copy(criticalPauses = enabled) }
+
+    /** False when the minute matches the other end. The stored window is left as it was. */
+    fun setQuietStart(minute: Int): Boolean {
+        val current = container.quiet.read()
+        if (!QuietHours.minuteInRange(minute) || minute == current.endMinute) return false
+        writeQuiet { it.copy(startMinute = minute) }
+        return true
+    }
+
+    /** False when the minute matches the other end. The stored window is left as it was. */
+    fun setQuietEnd(minute: Int): Boolean {
+        val current = container.quiet.read()
+        if (!QuietHours.minuteInRange(minute) || minute == current.startMinute) return false
+        writeQuiet { it.copy(endMinute = minute) }
+        return true
+    }
+
+    private fun writeQuiet(block: (QuietConfig) -> QuietConfig) {
+        viewModelScope.launch {
+            val next = block(container.quiet.read())
+            if (container.quiet.write(next)) {
+                quietState.value = container.quiet.read()
+                container.scheduler.reconcileQuietHours()
+            }
+        }
+    }
 
     fun reloadQuickTimes() {
         quickTimesState.value = container.settings.quickTimes()

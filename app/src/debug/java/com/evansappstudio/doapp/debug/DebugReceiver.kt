@@ -11,6 +11,9 @@ import com.evansappstudio.doapp.billing.FakeUnlockBilling
 import com.evansappstudio.doapp.billing.FreeTier
 import android.text.format.DateFormat
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.DndState
+import com.evansappstudio.doapp.alarm.QuietConfig
+import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.AlertPermissions
 import com.evansappstudio.doapp.alarm.AlertPolicy
 import com.evansappstudio.doapp.alarm.DateParser
@@ -73,6 +76,8 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_CONFIG_BACKUP_FOLDER -> configBackupFolder(context, intent)
             ACTION_AUTO_BACKUP -> autoBackup(context)
             ACTION_SET_TITLE -> setTitle(context, intent)
+            ACTION_SET_QUIET_HOURS -> setQuietHours(context, intent)
+            ACTION_DUMP_QUIET -> dumpQuiet(context, intent)
         }
     }
 
@@ -842,6 +847,115 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun setQuietHours(context: Context, intent: Intent) {
+        DndDebugOverride.install()
+        val app = context.applicationContext as DoApp
+        val current = app.container.quiet.read()
+        val enabled = if (intent.hasExtra(EXTRA_ENABLED)) boolExtra(intent, EXTRA_ENABLED) else current.enabled
+        val follow = if (intent.hasExtra(EXTRA_FOLLOW_DND)) boolExtra(intent, EXTRA_FOLLOW_DND) else current.followDnd
+        val critical = if (intent.hasExtra(EXTRA_CRITICAL_PAUSES)) {
+            boolExtra(intent, EXTRA_CRITICAL_PAUSES)
+        } else {
+            current.criticalPauses
+        }
+        val start = if (intent.hasExtra(EXTRA_START)) {
+            QuietHours.parseMinute(intent.getStringExtra(EXTRA_START).orEmpty())
+        } else {
+            current.startMinute
+        }
+        val end = if (intent.hasExtra(EXTRA_END)) {
+            QuietHours.parseMinute(intent.getStringExtra(EXTRA_END).orEmpty())
+        } else {
+            current.endMinute
+        }
+        val simRaw = if (intent.hasExtra(EXTRA_SIM_DND)) intent.getStringExtra(EXTRA_SIM_DND) else null
+        val simOk = simRaw == null || simRaw.trim().lowercase() in setOf(
+            DndDebugOverride.ON,
+            DndDebugOverride.OFF,
+            DndDebugOverride.REAL,
+        )
+        if (start == null || end == null || start == end || !simOk) {
+            DoAlarmLog.quietBadArgs()
+            return
+        }
+        val next = QuietConfig(
+            enabled = enabled,
+            startMinute = start,
+            endMinute = end,
+            followDnd = follow,
+            criticalPauses = critical,
+        )
+        if (!app.container.quiet.write(next)) {
+            DoAlarmLog.quietBadArgs()
+            return
+        }
+        if (simRaw != null) DndDebugOverride.set(simRaw)
+        DoAlarmLog.quietSet(
+            enabled = next.enabled,
+            start = QuietHours.formatMinute(next.startMinute),
+            end = QuietHours.formatMinute(next.endMinute),
+            followDnd = next.followDnd,
+            criticalPauses = next.criticalPauses,
+            simDnd = DndDebugOverride.mode,
+        )
+        if (simRaw != null) {
+            val filter = DndState.filter(app)
+            DoAlarmLog.dndFilter(filter, DndState.isActive(filter))
+        }
+        val pending = goAsync()
+        app.container.scope.launch {
+            try {
+                app.container.scheduler.reconcileQuietHours()
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun dumpQuiet(context: Context, intent: Intent) {
+        DndDebugOverride.install()
+        val pending = goAsync()
+        val app = context.applicationContext as DoApp
+        app.container.scope.launch {
+            try {
+                val config = app.container.quiet.read()
+                val filter = DndState.filter(app)
+                val active = DndState.isActive(filter)
+                val zone = java.time.ZoneId.systemDefault()
+                val now = System.currentTimeMillis()
+                val inside = QuietHours.inWindow(now, config, zone)
+                val endAt = QuietHours.windowEnd(now, config, zone)
+                DoAlarmLog.quietDump(
+                    "enabled=${config.enabled} start=${QuietHours.formatMinute(config.startMinute)} " +
+                        "end=${QuietHours.formatMinute(config.endMinute)} followDnd=${config.followDnd} " +
+                        "criticalPauses=${config.criticalPauses} filter=$filter filterSource=${DndDebugOverride.source()} " +
+                        "dndActive=$active zone=$zone now=$now inWindow=$inside windowEnd=${endAt?.toString() ?: "none"}",
+                )
+                if (intent.hasExtra(DoneReceiver.EXTRA_ID) || intent.hasExtra("id")) {
+                    val id = DoneReceiver.longExtra(intent)
+                    if (id != null) {
+                        val entry = app.container.mirror.get(id)
+                        if (entry != null) {
+                            val level = com.evansappstudio.doapp.alarm.AlertLevel.fromName(entry.alertLevel)
+                                ?: com.evansappstudio.doapp.alarm.AlertLevel.STANDARD
+                            DoAlarmLog.quietId(
+                                "id=$id level=${level.name} exempt=${QuietHours.exempt(level, config)} " +
+                                    "dueAt=${entry.dueAt} nextFireAt=${entry.nextFireAt?.toString() ?: "null"} " +
+                                    "pendingNag=${entry.pendingNag()} dndHeld=${entry.dndHeld}",
+                            )
+                        }
+                    }
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     private fun setTitle(context: Context, intent: Intent) {
         val id = DoneReceiver.longExtra(intent)
         val title = intent.getStringExtra(EXTRA_TITLE)?.trim().orEmpty()
@@ -896,6 +1010,14 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_CONFIG_BACKUP_FOLDER = "com.evansappstudio.doapp.debug.CONFIG_BACKUP_FOLDER"
         const val ACTION_AUTO_BACKUP = "com.evansappstudio.doapp.debug.AUTO_BACKUP"
         const val ACTION_SET_TITLE = "com.evansappstudio.doapp.debug.SET_TITLE"
+        const val ACTION_SET_QUIET_HOURS = "com.evansappstudio.doapp.debug.SET_QUIET_HOURS"
+        const val ACTION_DUMP_QUIET = "com.evansappstudio.doapp.debug.DUMP_QUIET"
+        const val EXTRA_ENABLED = "enabled"
+        const val EXTRA_START = "start"
+        const val EXTRA_END = "end"
+        const val EXTRA_FOLLOW_DND = "followDnd"
+        const val EXTRA_CRITICAL_PAUSES = "criticalPauses"
+        const val EXTRA_SIM_DND = "simDnd"
         const val EXTRA_PATH = "path"
         const val EXTRA_UUIDS = "uuids"
         const val EXTRA_STATE = "state"

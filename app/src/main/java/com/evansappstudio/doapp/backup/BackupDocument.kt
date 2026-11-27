@@ -1,6 +1,8 @@
 package com.evansappstudio.doapp.backup
 
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.QuietConfig
+import com.evansappstudio.doapp.alarm.QuietPatch
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimes
@@ -23,6 +25,27 @@ data class PortableSettings(
     val parseDates: Boolean,
     val defaultAlertLevel: AlertLevel,
     val repeatPromptMode: RepeatPromptMode,
+    val quietEnabled: Boolean? = null,
+    val quietStartMinute: Int? = null,
+    val quietEndMinute: Int? = null,
+    val quietFollowDnd: Boolean? = null,
+    val quietCriticalPauses: Boolean? = null,
+)
+
+fun PortableSettings.withQuiet(config: QuietConfig): PortableSettings = copy(
+    quietEnabled = config.enabled,
+    quietStartMinute = config.startMinute,
+    quietEndMinute = config.endMinute,
+    quietFollowDnd = config.followDnd,
+    quietCriticalPauses = config.criticalPauses,
+)
+
+fun PortableSettings.quietPatch() = QuietPatch(
+    enabled = quietEnabled,
+    startMinute = quietStartMinute,
+    endMinute = quietEndMinute,
+    followDnd = quietFollowDnd,
+    criticalPauses = quietCriticalPauses,
 )
 
 data class PortableReminder(

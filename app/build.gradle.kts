@@ -79,6 +79,10 @@ android {
     lint {
         abortOnError = true
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 ksp {
@@ -146,6 +150,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.sqlite.jdbc)
+    testImplementation("org.json:json:20240303")
 }
 
 val checkAlarmManifests = tasks.register("checkAlarmManifests") {
@@ -188,6 +193,28 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         check(!release.contains("FakeUnlockBilling")) {
             "Release manifest contains FakeUnlockBilling"
         }
+        check(!release.contains("SET_QUIET_HOURS")) {
+            "Release manifest contains SET_QUIET_HOURS"
+        }
+        check(!release.contains("DUMP_QUIET")) {
+            "Release manifest contains DUMP_QUIET"
+        }
+        check(!release.contains("DndDebugOverride")) {
+            "Release manifest contains DndDebugOverride"
+        }
+        check(!release.contains("INTERRUPTION_FILTER_CHANGED")) {
+            "Release manifest contains an interruption-filter receiver"
+        }
+        check(!debug.contains("INTERRUPTION_FILTER_CHANGED")) {
+            "Debug manifest contains an interruption-filter receiver"
+        }
+        val policy = Regex("ACCESS_NOTIFICATION_POLICY").findAll(release).count()
+        check(policy == 1) {
+            "Release manifest ACCESS_NOTIFICATION_POLICY count is $policy; this PR must not add another"
+        }
+        check(debug.contains("SET_QUIET_HOURS") && debug.contains("DUMP_QUIET")) {
+            "Debug manifest is missing SET_QUIET_HOURS or DUMP_QUIET"
+        }
         check(debug.contains("com.evansappstudio.doapp.debug.DebugReceiver")) {
             "Debug manifest is missing DebugReceiver"
         }
@@ -195,6 +222,7 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
             "Debug manifest is missing FAKE_PURCHASE"
         }
         assertReleaseHasNoFakeBilling(root)
+        assertReleaseHasNoQuietDebug(root)
 
         for ((variant, text) in listOf("release" to release, "debug" to debug)) {
             check(!text.contains("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")) {
@@ -220,6 +248,28 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
             }
         }
     }
+}
+
+private fun assertReleaseHasNoQuietDebug(root: java.io.File) {
+    val needles = listOf("SET_QUIET_HOURS", "DUMP_QUIET", "DndDebugOverride")
+    val releaseFiles = root.walkTopDown().filter { file ->
+        file.isFile &&
+            file.path.replace('\\', '/').contains("/release/") &&
+            !file.path.replace('\\', '/').contains("/debug/") &&
+            file.extension in setOf("class", "jar", "dex", "apk")
+    }.toList()
+    check(releaseFiles.isNotEmpty()) { "No release class output under $root" }
+    for (needle in needles) {
+        val hit = releaseFiles.firstOrNull { file -> fileContainsNeedle(file, needle) }
+        check(hit == null) { "Release output contains $needle in $hit" }
+    }
+    val debugHasOverride = root.walkTopDown().any { file ->
+        file.isFile &&
+            file.path.replace('\\', '/').contains("/debug/") &&
+            !file.path.replace('\\', '/').contains("/release/") &&
+            (file.name.contains("DndDebugOverride") || (file.extension == "class" && fileContainsNeedle(file, "DndDebugOverride")))
+    }
+    check(debugHasOverride) { "Debug output is missing DndDebugOverride" }
 }
 
 private fun assertReleaseHasNoFakeBilling(root: java.io.File) {

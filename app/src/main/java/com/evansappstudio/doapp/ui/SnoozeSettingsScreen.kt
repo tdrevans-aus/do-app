@@ -1,5 +1,6 @@
 package com.evansappstudio.doapp.ui
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.evansappstudio.doapp.R
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.QuietHours
+import java.util.Calendar
 import com.evansappstudio.doapp.alarm.AlertPermissions
 import com.evansappstudio.doapp.alarm.DoAlarmLog
 import com.evansappstudio.doapp.alarm.SnoozeKind
@@ -59,7 +62,10 @@ fun SnoozeSettingsScreen(
     onUnlock: () -> Unit,
 ) {
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
+    val quiet by viewModel.quietHours.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
+    var quietPick by remember { mutableStateOf<String?>(null) }
+    var quietRejected by remember { mutableStateOf(false) }
     var weekStart by remember { mutableStateOf(viewModel.weekStart()) }
     var parseDates by remember { mutableStateOf(viewModel.parseDatesEnabled()) }
     var alertDefault by remember { mutableStateOf(viewModel.defaultAlertLevel()) }
@@ -72,6 +78,7 @@ fun SnoozeSettingsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 parseDates = viewModel.parseDatesEnabled()
                 alertDefault = viewModel.defaultAlertLevel()
+                viewModel.reloadQuiet()
                 permissionTick++
             }
         }
@@ -201,6 +208,44 @@ fun SnoozeSettingsScreen(
                     TextButton(onClick = {
                         openSettings(context, AlertPermissions.dndSettings())
                     }) { Text(stringResource(R.string.alert_open)) }
+                    Text(stringResource(R.string.quiet_hours))
+                    Text(stringResource(R.string.quiet_caption))
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(stringResource(R.string.quiet_hours), modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = quiet.enabled,
+                            onCheckedChange = { viewModel.setQuietEnabled(it) },
+                        )
+                    }
+                    TextButton(onClick = { quietPick = "start" }) {
+                        Text(stringResource(R.string.quiet_starts) + " " + formatQuietMinute(context, quiet.startMinute))
+                    }
+                    TextButton(onClick = { quietPick = "end" }) {
+                        Text(stringResource(R.string.quiet_ends) + " " + formatQuietMinute(context, quiet.endMinute))
+                    }
+                    if (quietRejected) {
+                        Text(stringResource(R.string.quiet_same))
+                    }
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.quiet_follow_dnd))
+                            Text(stringResource(R.string.quiet_follow_dnd_subtitle))
+                        }
+                        Switch(
+                            checked = quiet.followDnd,
+                            onCheckedChange = { viewModel.setQuietFollowDnd(it) },
+                        )
+                    }
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.quiet_critical))
+                            Text(stringResource(R.string.quiet_critical_subtitle))
+                        }
+                        Switch(
+                            checked = quiet.criticalPauses,
+                            onCheckedChange = { viewModel.setQuietCriticalPauses(it) },
+                        )
+                    }
                     TextButton(onClick = onOpenHealth) {
                         Text(stringResource(R.string.health_check))
                     }
@@ -215,6 +260,26 @@ fun SnoozeSettingsScreen(
                 }
             }
         }
+    }
+    val picking = quietPick
+    if (picking != null) {
+        val initial = if (picking == "start") quiet.startMinute else quiet.endMinute
+        val is24Hour = rememberIs24Hour()
+        QuietMinuteDialog(
+            title = stringResource(if (picking == "start") R.string.quiet_starts else R.string.quiet_ends),
+            minute = initial,
+            is24Hour = is24Hour,
+            onDismiss = { quietPick = null },
+            onSave = { minute ->
+                val accepted = if (picking == "start") {
+                    viewModel.setQuietStart(minute)
+                } else {
+                    viewModel.setQuietEnd(minute)
+                }
+                quietRejected = !accepted
+                quietPick = null
+            },
+        )
     }
     val index = editing
     if (index != null && index in options.indices) {
@@ -313,6 +378,45 @@ private fun SnoozeOptionDialog(
             text = { TimePicker(state = state) },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuietMinuteDialog(
+    title: String,
+    minute: Int,
+    is24Hour: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+) {
+    val state = rememberTimePickerState(
+        initialHour = minute / 60,
+        initialMinute = minute % 60,
+        is24Hour = is24Hour,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = { onSave(state.hour * 60 + state.minute) }) {
+                Text(stringResource(R.string.ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
+private fun formatQuietMinute(context: android.content.Context, minute: Int): String {
+    val safe = minute.coerceIn(0, QuietHours.MINUTES_PER_DAY - 1)
+    val calendar = Calendar.getInstance()
+    calendar.set(Calendar.HOUR_OF_DAY, safe / 60)
+    calendar.set(Calendar.MINUTE, safe % 60)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    return DateFormat.getTimeFormat(context).format(calendar.time)
 }
 
 private fun openSettings(context: android.content.Context, intent: Intent) {

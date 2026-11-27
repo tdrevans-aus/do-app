@@ -4,8 +4,10 @@ package com.evansappstudio.doapp.billing
  * Free-tier cap. This is the only place the number lives.
  *
  * [ACTIVE_REMINDER_CAP] is how many not-done reminders can exist before unlock.
- * Null or 0 turns the cap off. Unlock always removes it. Tim chooses the real
- * split and the number later; 5 is the build default. There is no time trial.
+ * It counts every not-done reminder, repeating or not, whatever created it.
+ * It is the only free-tier limit (decision of 27 Nov 2026: there is no
+ * separate repeating cap). Null or 0 turns the cap off. Unlock always removes
+ * it. There is no time trial.
  */
 object FreeTier {
     val ACTIVE_REMINDER_CAP: Int? = 5

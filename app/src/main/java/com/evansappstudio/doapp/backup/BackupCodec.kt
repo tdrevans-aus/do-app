@@ -1,6 +1,7 @@
 package com.evansappstudio.doapp.backup
 
 import com.evansappstudio.doapp.alarm.AlertLevel
+import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimeUnit
@@ -110,18 +111,26 @@ fun mergeReminders(
     return byUuid.values.toList()
 }
 
-private fun settingsJson(settings: PortableSettings): JsonValue = jsonObject(
-    "defaultNagMinutes" to JsonValue.Num(settings.defaultNagMinutes.toLong()),
-    "snooze" to JsonValue.Arr(settings.snooze.map { snoozeJson(it) }),
-    "quickTimes" to jsonObject(
-        "postpone" to JsonValue.Str(settings.quickTimes.postpone.name),
-        "slots" to JsonValue.Arr(settings.quickTimes.slots.map { slotJson(it) }),
-    ),
-    "weekStart" to JsonValue.Str(settings.weekStart.name),
-    "parseDates" to JsonValue.Bool(settings.parseDates),
-    "defaultAlertLevel" to JsonValue.Str(settings.defaultAlertLevel.name),
-    "repeatPromptMode" to JsonValue.Str(settings.repeatPromptMode.name),
-)
+private fun settingsJson(settings: PortableSettings): JsonValue {
+    val fields = linkedMapOf(
+        "defaultNagMinutes" to JsonValue.Num(settings.defaultNagMinutes.toLong()),
+        "snooze" to JsonValue.Arr(settings.snooze.map { snoozeJson(it) }),
+        "quickTimes" to jsonObject(
+            "postpone" to JsonValue.Str(settings.quickTimes.postpone.name),
+            "slots" to JsonValue.Arr(settings.quickTimes.slots.map { slotJson(it) }),
+        ),
+        "weekStart" to JsonValue.Str(settings.weekStart.name),
+        "parseDates" to JsonValue.Bool(settings.parseDates),
+        "defaultAlertLevel" to JsonValue.Str(settings.defaultAlertLevel.name),
+        "repeatPromptMode" to JsonValue.Str(settings.repeatPromptMode.name),
+    )
+    settings.quietEnabled?.let { fields["quietEnabled"] = JsonValue.Bool(it) }
+    settings.quietStartMinute?.let { fields["quietStartMinute"] = JsonValue.Num(it.toLong()) }
+    settings.quietEndMinute?.let { fields["quietEndMinute"] = JsonValue.Num(it.toLong()) }
+    settings.quietFollowDnd?.let { fields["quietFollowDnd"] = JsonValue.Bool(it) }
+    settings.quietCriticalPauses?.let { fields["quietCriticalPauses"] = JsonValue.Bool(it) }
+    return JsonValue.Obj(fields)
+}
 
 private fun snoozeJson(option: SnoozeOption): JsonValue = jsonObject(
     "kind" to JsonValue.Str(option.kind.name),
@@ -166,6 +175,12 @@ private fun decodeSettings(value: JsonValue?): PortableSettings? {
     val parse = (obj.fields["parseDates"] as? JsonValue.Bool)?.value ?: return null
     val alert = AlertLevel.fromName((obj.fields["defaultAlertLevel"] as? JsonValue.Str)?.value) ?: return null
     val prompt = RepeatPromptMode.fromName((obj.fields["repeatPromptMode"] as? JsonValue.Str)?.value) ?: return null
+    var quietStart = quietMinute(obj.fields["quietStartMinute"])
+    var quietEnd = quietMinute(obj.fields["quietEndMinute"])
+    if (quietStart != null && quietEnd != null && quietStart == quietEnd) {
+        quietStart = null
+        quietEnd = null
+    }
     return PortableSettings(
         defaultNagMinutes = nag,
         snooze = snooze,
@@ -174,7 +189,28 @@ private fun decodeSettings(value: JsonValue?): PortableSettings? {
         parseDates = parse,
         defaultAlertLevel = alert,
         repeatPromptMode = prompt,
+        quietEnabled = optionalBool(obj.fields["quietEnabled"]),
+        quietStartMinute = quietStart,
+        quietEndMinute = quietEnd,
+        quietFollowDnd = optionalBool(obj.fields["quietFollowDnd"]),
+        quietCriticalPauses = optionalBool(obj.fields["quietCriticalPauses"]),
     )
+}
+
+/** A missing or unusable quiet minute is ignored. Out of range is ignored. */
+private fun quietMinute(value: JsonValue?): Int? {
+    val minute = when (value) {
+        null, JsonValue.Null -> return null
+        is JsonValue.Num -> value.value.toInt()
+        else -> return null
+    }
+    return minute.takeIf { QuietHours.minuteInRange(it) }
+}
+
+private fun optionalBool(value: JsonValue?): Boolean? = when (value) {
+    null, JsonValue.Null -> null
+    is JsonValue.Bool -> value.value
+    else -> null
 }
 
 private fun decodeSnooze(value: JsonValue): SnoozeOption? {
