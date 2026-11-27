@@ -59,6 +59,12 @@ class CorePurityTest {
             "alarm/QuickTimes.kt",
             "data/RepeatRule.kt",
             "alarm/CommandTypes.kt",
+            // Spec 12 capture logic.
+            "capture/ShareText.kt",
+            "capture/DeepLinks.kt",
+            "capture/CaptureEntry.kt",
+            "capture/AgentRequests.kt",
+            "widget/WidgetModel.kt",
         )
     }
 }
