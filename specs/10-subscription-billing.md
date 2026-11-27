@@ -92,3 +92,45 @@ Phone (Mark with Tim, debug build with the fake):
 3. `EXPIRED` is free limits plus different copy; nothing stops nagging.
 4. Debug fake starts active.
 5. The old `do_unlock` code path is removed, not kept alongside.
+
+## Build notes (Claude build agent, 27 Nov 2026)
+
+### Play Billing facts checked
+Checked against Google's Play Billing docs (integrate, subscriptions, subscription lifecycle) on 27 Nov 2026:
+- `queryProductDetailsAsync` with `ProductType.SUBS` returns the product and up to 50 offers **the user is eligible for** in `subscriptionOfferDetails`. Each has `basePlanId`, `offerId` (null for the base plan's own offer), `offerToken` and `pricingPhases.pricingPhaseList` in order, each phase with `formattedPrice`. Confirmed.
+- Purchase with `ProductDetailsParams.setProductDetails(...).setOfferToken(...)`. Confirmed.
+- `queryPurchasesAsync` with `ProductType.SUBS`: returns subscriptions in a **grace period** (still `PURCHASED`) and cancelled ones until the paid period ends. It does **not** return them on **account hold** (confirmed, so the spec's assumption is right) or while **paused** (unless `includeSuspendedSubscriptions` is set, which Do does not set). Both read as `EXPIRED` here until Play returns the purchase again.
+- New subscription purchases must be acknowledged within three days or Play refunds and revokes them. Renewals need no acknowledgement (they arrive already acknowledged, so the existing "acknowledge only unacknowledged" rule is right). Never acknowledge `PENDING`.
+- Pending transactions for subscriptions are only for **prepaid** plans (Billing 7+), enabled explicitly. Do sells an auto-renewing plan, so `enablePrepaidPlans()` is not called and `PENDING` should be rare for Do Unlimited. It is still mapped to `PENDING` (no grant) in case Play reports it. The builder still needs `enablePendingPurchases(enableOneTimeProducts())`, kept as before.
+- The management deep link `https://play.google.com/store/account/subscriptions?sku=<productId>&package=<package>` is the documented format. The app builds it from `FreeTier.PRODUCT_ID` and the running package name.
+
+### Choices
+1. **Offer choice** (`SubscriptionOffers.choose`, pure Kotlin): only offers on base plan `annual` with a non-blank token and non-blank phase prices count. `first-year` is chosen if present with at least two phases (intro = first phase, renewal = last); otherwise the base plan offer (`offerId == null`), renewal only. Any other offer (a future winback, say) is ignored, so it can't be sold by accident. Nothing usable means "Price loading" and Buy disabled.
+2. **Names.** `UnlockBilling` is now `SubscriptionBilling`, `UnlockUiState` is `SubscriptionUiState` (holds a `SubscriptionState` and a `PriceInfo(intro, renewal)` in place of `unlocked`, `pending` and `price`), `PlayUnlockBilling` is `PlaySubscriptionBilling`, `FakeUnlockBilling` is `FakeSubscriptionBilling`, `createUnlockBilling` is `createSubscriptionBilling`, `formattedPrice()` is `price()`. `EntitlementRecord.unlocked` is renamed `active`; the SharedPreferences key stays `unlocked`. The screen keeps its file and composable name `UnlockScreen` (the spec calls it that). `Scheduler`'s `paidUnlocked` parameter is unchanged (Spec 9 code); `AppContainer` now passes `SubscriptionState.of(record).liftsCap`.
+3. **State derivation** (`SubscriptionState.of`): active wins, then pending, then `everSubscribed` gives `EXPIRED`, else `FREE`. So a pending renewal after a lapse shows "Payment pending". Only `ACTIVE` lifts the cap.
+4. **Paywall copy** is built by `PaywallCopy.build` from templates in `strings.xml` (`%1$s` is replaced, not `String.format`, so a price containing `%` is safe). "Price loading" replaces Spec 7's "Price unavailable". "Keep 5 for free" takes the number from `FreeTier.ACTIVE_REMINDER_CAP`. The ticks are drawn with a plain tick character. PENDING and EXPIRED add a status line above the price. Restore purchases is kept (re-queries Play). The success dialog now says "You have Do Unlimited." The old `unlock_*` strings are removed.
+5. **Settings row.** The existing Spec 7 row on the snooze settings screen now reads "Do Unlimited" with the state line or the price headline. The full Settings subscription card is still out of scope.
+6. **Debug fake.** Starts `ACTIVE` (with `everSubscribed=true`). `buy` stands in for a completed purchase and grants `ACTIVE` (Spec 7's fake had no price, so Buy was disabled; now the fake has prices, so the button needed to do something). `FAKE_PURCHASE` accepts `free|active|pending|expired`, and Spec 7's `unlocked` and `locked` as aliases for `active` and `free`. `--ez intro` on its own keeps the state; with neither extra the state is `active` (Spec 7's default). `free` clears `everSubscribed` (Play never would; debug only). The intro toggle is in memory and resets to true on process restart. The `FAKE_PURCHASE` log line gains `intro=<bool>` at the end.
+7. **`DUMP_UNLOCK`** is one line: the Spec 7 fields first, unchanged in name and order (first `state=` is `unlocked|locked`, `price=` is the renewal price, `product=` is now `do_unlimited`), then `state=<FREE|ACTIVE|PENDING|EXPIRED> everSubscribed= intro= renewal= product=do_unlimited` exactly as section E. So `state=` and `product=` appear twice; a runner wanting the new state should match `state=(FREE|ACTIVE|PENDING|EXPIRED)`.
+8. **Backup (section F and the "survives backup restore" in C).** `everSubscribed` is never in Do's own backup file (the entitlement prefs never were). Android Auto Backup still includes `do_entitlement.xml`, as since Spec 7 (an existing test asserts it), so `everSubscribed` comes back on a new phone via Auto Backup; that is what "survives backup restore" means here. A restored cache can show `ACTIVE` only until the first successful Play query, the same offline risk Spec 7 accepted. The rules are unchanged.
+9. **`EntitlementStore`** gains an internal constructor over `SharedPreferences` so AT-2 can check a restart with an in-memory store. No new dependencies.
+
+### Tests changed (AT-7)
+`UnlockLogicTest`: `record.unlocked` is now `record.active` (5 asserts), the `EntitlementRecord(unlocked = true, ...)` argument is now `active = true`, and the product id assertion is now `do_unlimited`. Nothing else changed. `checkAlarmManifests` now looks for `FakeSubscriptionBilling` in place of `FakeUnlockBilling` (release must not have it, debug must).
+
+### AT map
+| AT | Test |
+| --- | --- |
+| 1 | `billing/SubscriptionLogicTest.at1ActiveGrantsPendingDoesNotAndAFailedQueryKeepsTheCache` |
+| 2 | `billing/SubscriptionLogicTest.at2EverSubscribedIsStickyAndSurvivesARestart` |
+| 3 | `billing/SubscriptionLogicTest.at3OnlyUnacknowledgedPurchasedSubscriptionsAreAcknowledged` (plus the existing `UnlockLogicTest.acknowledgementIsOnlyForPurchasedUnacknowledgedTokens`) |
+| 4 | `billing/SubscriptionLogicTest.at4TheIntroOfferIsChosenWhenPlayReturnsItElseTheBasePlan` |
+| 5 | `alarm/SubscriptionCapTest.at5ExpiredKeepsEveryReminderWorkingAndOnlyBlocksAddingPastFive`, `at5FreeAndExpiredHaveTheSameCapAndPendingDoesNotLiftIt` |
+| 6 | `billing/SubscriptionLogicTest.at6PaywallTextHasTheThreePriceVariants` |
+| 7 | the whole `testDebugUnitTest` suite, with `UnlockLogicTest` changed only as listed above |
+| 8 | `assembleDebug testDebugUnitTest lintDebug` and `assembleDebug -PexactAlarmMode=SCHEDULE`; both run `checkAlarmManifests`, which compiles the release source set and checks release has no `FakeSubscriptionBilling` or `FAKE_PURCHASE` |
+
+### For Tim in Play Console (with his go-ahead)
+- Create subscription `do_unlimited`, base plan `annual` (auto-renewing, 1 year, A$9.99), offer `first-year` on it (new customers only, one 1-year phase at A$3.99). The ids must match exactly.
+- Grace period and account hold are on by default; the app needs no change for either. Consider turning **pause** off for this plan: a paused subscription reads as ended in the app (only adding past 5 is blocked).
+- Add a licence tester and an internal testing track for AT-11.
