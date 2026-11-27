@@ -15,7 +15,7 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 1. **No display ads, ever.** No ad SDK. Ads need daily use at scale, which a nag app does not get, and they damage trust in an app that rings through Do Not Disturb. "Ads" was a common 1-star theme in rival reviews.
 2. **Freemium.** The app is free to install and use, and the main revenue is a paid tier.
 3. **All AI assistant features are free.** That includes on-device capture (natural-language add, share sheet, shortcuts, widget, tile, AppFunctions) and, when built, the cloud agent API (MCP and REST), events back to the agent, and assistant-set alert levels. There is no separate paid "Do Connect" product. Rate limits apply to everyone, to stop abuse, and do not depend on paying.
-4. **One paywall: the number of active reminders.** The free tier allows **5 active (not-done) reminders**. Paid is unlimited.
+4. **One paywall: the number of active reminders.** The free tier allows **5 active (not-done) reminders**. Paid is unlimited. **The repeating cap of 2 (Spec 8, `FreeTier.REPEATING_REMINDER_CAP`) is dropped.** Repeating reminders count towards the 5 like any other, with no separate limit. The catalogue is mostly repeating tasks, so a separate repeat cap would have worked against it.
 5. **Reminders created by an AI agent count towards the free limit**, the same as any other reminder. The reasoning: people who connect an assistant and like it will want more than 5, and that is the natural upgrade moment. The cap also keeps free users' server load small.
 6. **Stuff You Should Do (catalogue) is in the free tier.** Items it creates count towards the same limit.
 7. **Price: annual subscription only, auto-renewing. A$3.99 for the first year, then A$9.99 a year.** The first year uses Play's introductory pricing (once per user). Over 3 years that is A$23.97, against about A$27 to A$34 for Due (A$12.99 up front plus its A$6.99 a year pass), and Do has a free tier. The ongoing A$9.99 is above Due's A$6.99 pass. The paywall and Play's renewal notice must state the A$9.99 renewal price clearly, so the jump at year 2 is not a surprise. Watch renewal churn at year 2.
@@ -26,7 +26,7 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 ## Still open
 
 - **Free trial:** whether to add a short free trial of the paid tier on top of the A$3.99 first year. Probably not needed, since the free tier already lets people try everything. Not decided.
-- **The repeating cap of 2 (Spec 8, `FreeTier.REPEATING_REMINDER_CAP`).** Proposed: drop it, so the 5 active reminders limit is the only gate. It cuts against the catalogue, which is mostly repeating tasks. Not yet confirmed.
+- **Where the repeating cap is removed:** from open PR #8 before it merges, or in a later spec after it merges. Not decided.
 - **Name:** "Stuff You Should Do" or "Stuff You Can Do". A trademark check is needed either way ("Stuff You Should Know" is a well-known podcast).
 - **Catalogue scope:** Australian-first (rego, state smoke alarm rules) or global.
 - **Spec 9 groundwork and the cloud agent API** are still not approved, and no hosting account may be used until Tim names one.
@@ -35,7 +35,7 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 
 - Spec 7's one-time `do_unlock` product is replaced by an annual subscription in `billing`.
 - Entitlement gains an "expired" state, which keeps existing reminders working and only blocks adding beyond 5.
-- `FreeTier` changes depend on the repeating-cap decision above.
+- `FreeTier.REPEATING_REMINDER_CAP`, the `BLOCKED_REPEAT` result from `Scheduler.update`, and the repeat-cap path to the unlock screen (all from Spec 8) are removed. Spec 8 ATs 14 to 18 that test the repeat cap are retired, not rerun. `ACTIVE_REMINDER_CAP` stays at 5.
 - Test prices before launch, with Play Console price experiments or a single-market launch.
 
 ## Reference prices (from research, not tested on Do users)
