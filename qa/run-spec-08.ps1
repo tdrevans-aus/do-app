@@ -512,7 +512,7 @@ function Get-UnlockDump {
     param()
     $before = Get-LogLen
     Send-Broadcast -Command "am broadcast -a $DumpUnlockAction -n $Recv"
-    if ($DryRun) { return 'DoAlarm unlock state=unlocked source=fake pending=false product=do_unlock price=none active=0 cap=5 repeating=0 repeatCap=2' }
+    if ($DryRun) { return 'DoAlarm unlock state=unlocked source=fake pending=false product=do_unlock price=none active=0 cap=5' }
     $m = Wait-ForMatch -Pattern 'DoAlarm unlock state=\S+ source=\S+[^\r\n]*' -BeforeLen $before -WaitSeconds 15
     if ($m) { return $m.Value }
     return ''
@@ -1315,16 +1315,27 @@ function Run-AT28 {
     if ($ok) { Record-Result -Id $tid -Status 'PASS' -Detail $detail } else { Record-Result -Id $tid -Status 'FAIL' -Detail $detail }
 }
 
+# The repeating cap was removed from Spec 8 on 27 Nov 2026 (one free-tier limit: 5 active).
+# AT-14 to AT-18 are withdrawn. Their Run-AT functions are kept for the record but not called.
+function Record-WithdrawnCapRows {
+    [CmdletBinding()]
+    param()
+    foreach ($n in 14..18) {
+        $id = "Do-AT-$n"
+        if (-not (Should-Run -Id $id)) { continue }
+        Record-Result -Id $id -Status 'NOT RUN' -Detail 'Withdrawn 27 Nov 2026: repeating cap removed from Spec 8.'
+    }
+}
+
 function Record-ManualRows {
     [CmdletBinding()]
     param()
     $rows = @(
-        @{ Id = 'Do-AT-01'; Status = 'MANUAL'; Detail = 'CI. Quiet-hours window maths, DST, first fire, nag pause and resume, Critical and Prominent bypass, DND hold and release, and the repeating cap are unit tests. checkAlarmManifests covers USE and SCHEDULE.' },
+        @{ Id = 'Do-AT-01'; Status = 'MANUAL'; Detail = 'CI. Quiet-hours window maths, DST, first fire, nag pause and resume, Critical and Prominent bypass, DND hold and release, and "repeats are not capped separately" are unit tests. checkAlarmManifests covers USE and SCHEDULE.' },
         @{ Id = 'Do-AT-05'; Status = 'MANUAL'; Detail = 'Human screen. The dump is scripted. Tim sees the full-screen alarm inside the window, taps Stop, and the next nag follows the interval rather than the window end.' },
         @{ Id = 'Do-AT-10'; Status = 'MANUAL'; Detail = 'Human reboot. A held Standard nag fires at the window end, not at boot. A Critical nag inside the window stays on its schedule. A dndHeld nag whose Do Not Disturb ends while the phone is off fires within a minute of onExternalClock.' },
         @{ Id = 'Do-AT-11'; Status = 'MANUAL'; Detail = 'Unit only. The runner does not change the phone clock or zone.' },
         @{ Id = 'Do-AT-12'; Status = 'MANUAL'; Detail = 'Human. Quiet hours, Starts 22:00, Ends 07:00, the two switches, subtitles and caption. No permission prompt for the Do Not Disturb switch. Equal start and end is refused. Values survive leaving Settings and match DUMP_QUIET.' },
-        @{ Id = 'Do-AT-18'; Status = 'MANUAL'; Detail = 'Human. Fake locked, two repeating reminders. Daily on a third opens the unlock screen and Back returns to the unsaved editor. "Bins every Tuesday 7am" on add opens the unlock screen. Editing an existing repeating reminder saves.' },
         @{ Id = 'Do-AT-19'; Status = 'MANUAL'; Detail = 'CI. assembleDebug, testDebugUnitTest, lintDebug, and checkAlarmManifests in USE and SCHEDULE.' }
     )
     foreach ($row in $rows) {
@@ -1406,10 +1417,7 @@ try {
     Run-AT08
     Run-AT09
     Run-AT13
-    Run-AT14
-    Run-AT15
-    Run-AT16
-    Run-AT17
+    Record-WithdrawnCapRows
     Run-AT20
     Run-AT21
     Run-AT22

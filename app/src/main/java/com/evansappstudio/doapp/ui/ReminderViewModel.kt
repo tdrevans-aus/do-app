@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.evansappstudio.doapp.AppContainer
 import com.evansappstudio.doapp.alarm.AlertLevel
-import com.evansappstudio.doapp.alarm.EditResult
 import com.evansappstudio.doapp.alarm.QuietConfig
 import com.evansappstudio.doapp.alarm.QuietHours
 import com.evansappstudio.doapp.alarm.PostponeMode
@@ -121,11 +120,9 @@ class ReminderViewModel(
         rule: RepeatRule?,
         dueShift: DueShiftMode?,
         alert: AlertLevel,
-        onResult: (EditResult) -> Unit = {},
     ) {
         viewModelScope.launch {
-            val result = container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alert)
-            onResult(result)
+            container.scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alert)
         }
     }
 

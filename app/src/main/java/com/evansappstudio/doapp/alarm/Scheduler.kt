@@ -12,11 +12,10 @@ import kotlinx.coroutines.sync.Mutex
 import java.time.ZoneId
 import java.util.UUID
 
-/** What an editor save did. A blocked repeat writes nothing. */
+/** What an editor save did. */
 enum class EditResult {
     SAVED,
     UNCHANGED,
-    BLOCKED_REPEAT,
 }
 
 /**
@@ -61,13 +60,6 @@ class Scheduler(
         if (FreeTier.blocksAdd(active, paidUnlocked())) {
             DoAlarmLog.unlockBlocked(active, FreeTier.capLabel())
             return@guarded null
-        }
-        if (rule != null) {
-            val repeating = dao().repeatingActiveCount()
-            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
-                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
-                return@guarded null
-            }
         }
         val nag = NagSchedule.normalize(nagMinutes)
         val now = clock()
@@ -232,13 +224,6 @@ class Scheduler(
                 else -> existing.patternDueAt
             }
         }
-        if (existing.repeatRule() == null && finalRule != null) {
-            val repeating = dao().repeatingActiveCount()
-            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
-                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
-                return@guarded EditResult.BLOCKED_REPEAT
-            }
-        }
         val stored = existing.copy(
             title = cleanTitle,
             dueAt = finalDue,
@@ -295,18 +280,11 @@ class Scheduler(
      * rule copies the current due into [Reminder.patternDueAt] when that
      * anchor is still null. Repeat Off clears the anchor.
      */
-    suspend fun setRepeat(id: Long, rule: RepeatRule?): Boolean = guarded {
+    suspend fun setRepeat(id: Long, rule: RepeatRule?) = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        val existing = dao().getById(id) ?: return@guarded true
-        if (existing.isDone) return@guarded true
-        if (existing.repeatRule() == null && rule != null) {
-            val repeating = dao().repeatingActiveCount()
-            if (FreeTier.blocksRepeat(repeating, paidUnlocked())) {
-                DoAlarmLog.unlockBlockedRepeat(repeating, FreeTier.repeatCapLabel())
-                return@guarded false
-            }
-        }
+        val existing = dao().getById(id) ?: return@guarded
+        if (existing.isDone) return@guarded
         val pattern = when {
             rule == null -> null
             rule.from == RepeatFrom.COMPLETION -> null
@@ -320,7 +298,6 @@ class Scheduler(
             mirror.upsert(entry.copy(wallClock = rule?.keepsWallClock() == true))
         }
         changed()
-        true
     }
 
     /** Debug SHIFT_DUE and the warning-icon apply. Returns the stored placement. */

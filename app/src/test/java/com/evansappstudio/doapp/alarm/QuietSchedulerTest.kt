@@ -1,6 +1,5 @@
 package com.evansappstudio.doapp.alarm
 
-import com.evansappstudio.doapp.billing.FreeTier
 import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.ReminderDao
 import com.evansappstudio.doapp.data.RepeatFrom
@@ -13,6 +12,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -254,50 +254,38 @@ class QuietSchedulerTest {
     }
 
     @Test
-    fun repeatingCapBlocksOnlyANewRepeatAndImportKeepsRowsAboveTheCap() = runBlocking {
-        assertFalse(FreeTier.blocksRepeat(2, unlocked = true))
-        assertFalse(FreeTier.blocksRepeat(2, unlocked = false, cap = null))
-        assertFalse(FreeTier.blocksRepeat(2, unlocked = false, cap = 0))
-        assertFalse(FreeTier.blocksRepeat(1, unlocked = false))
-        assertTrue(FreeTier.blocksRepeat(2, unlocked = false))
-        assertEquals("2", FreeTier.repeatCapLabel())
-        assertEquals("none", FreeTier.repeatCapLabel(null))
-
+    fun repeatsAreNotCappedSeparatelyAndOnlyTheActiveCapApplies() = runBlocking {
         val fx = fixture()
         fx.paid = false
         val day = RepeatRule.of(1, RepeatUnit.DAY, RepeatFrom.DUE_DATE)!!
         val week = RepeatRule.of(1, RepeatUnit.WEEK, RepeatFrom.COMPLETION)!!
         val first = fx.scheduler.add("One", 1_000L, null, day)!!
-        val second = fx.scheduler.add("Two", 2_000L, null, day)!!
-        assertNull(fx.scheduler.add("Three", 3_000L, null, week))
-        assertEquals(2, fx.dao.repeatingActiveCount())
+        fx.scheduler.add("Two", 2_000L, null, day)!!
+        fx.scheduler.add("Three", 3_000L, null, week)!!
         val plain = fx.scheduler.add("Plain", 4_000L, null)!!
-        assertEquals(3, fx.dao.activeCount())
-        assertEquals(fx.dao.active().count { it.repeatRule() != null }, fx.dao.repeatingActiveCount())
+        assertEquals(4, fx.dao.activeCount())
 
         val edited = fx.dao.getById(plain)!!
         assertEquals(
-            EditResult.BLOCKED_REPEAT,
+            EditResult.SAVED,
             fx.scheduler.update(plain, "Renamed", edited.dueAt, null, day, null, AlertLevel.STANDARD),
         )
-        assertEquals("Plain", fx.dao.getById(plain)!!.title)
-        assertNull(fx.dao.getById(plain)!!.repeatRule())
-        assertEquals(false, fx.scheduler.setRepeat(plain, day))
-        assertNull(fx.dao.getById(plain)!!.repeatRule())
-        assertEquals(true, fx.scheduler.setRepeat(second, week))
-        assertEquals(RepeatUnit.WEEK, fx.dao.getById(second)!!.repeatRule()!!.unit)
+        assertEquals("Renamed", fx.dao.getById(plain)!!.title)
+        assertEquals(RepeatUnit.DAY, fx.dao.getById(plain)!!.repeatRule()!!.unit)
 
+        val fifth = fx.scheduler.add("Five", 5_000L, null)!!
+        fx.scheduler.setRepeat(fifth, week)
+        assertEquals(RepeatUnit.WEEK, fx.dao.getById(fifth)!!.repeatRule()!!.unit)
+        assertEquals(5, fx.dao.active().count { it.repeatRule() != null })
+
+        assertNull(fx.scheduler.add("Six", 6_000L, null, day))
+        assertNull(fx.scheduler.add("Six plain", 6_000L, null))
+        assertEquals(5, fx.dao.activeCount())
+
+        fx.scheduler.setRepeat(first, null)
+        assertNull(fx.dao.getById(first)!!.repeatRule())
         fx.paid = true
-        val third = fx.scheduler.add("Three", 5_000L, null, week)!!
-        fx.paid = false
-        val incoming = listOf(fx.dao.getById(first)!!, fx.dao.getById(second)!!, fx.dao.getById(third)!!)
-        fx.scheduler.replaceAll(incoming.map { it.copy(id = 0) })
-        assertEquals(3, fx.dao.repeatingActiveCount())
-        val extra = fx.scheduler.add("Extra", 6_000L, null)!!
-        assertEquals(false, fx.scheduler.setRepeat(extra, day))
-        fx.paid = true
-        assertEquals(true, fx.scheduler.setRepeat(extra, day))
-        assertEquals(4, fx.dao.repeatingActiveCount())
+        assertNotNull(fx.scheduler.add("Six", 6_000L, null, day))
     }
 
     private suspend fun holdStandard(fx: Fixture): Long {
@@ -400,7 +388,6 @@ private class MemoryReminderDao : ReminderDao {
     override fun observeAll(): Flow<List<Reminder>> = flowOf(rows.toList())
     override suspend fun active(): List<Reminder> = rows.filter { !it.isDone }
     override suspend fun activeCount(): Int = active().size
-    override suspend fun repeatingActiveCount(): Int = rows.count { !it.isDone && it.repeatUnit != null }
     override suspend fun all(): List<Reminder> = rows.toList()
     override suspend fun getById(id: Long): Reminder? = rows.firstOrNull { it.id == id }
     override suspend fun getByUuid(uuid: String): Reminder? = rows.firstOrNull { it.uuid == uuid }

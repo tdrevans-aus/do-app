@@ -380,8 +380,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
         app.container.scope.launch {
             try {
-                val allowed = app.container.scheduler.setRepeat(id, rule)
-                if (!allowed) return@launch
+                app.container.scheduler.setRepeat(id, rule)
                 val stored = app.container.reminderDao().getById(id)
                 if (stored == null) {
                     Log.e(DoAlarmLog.TAG, "DoAlarm set-repeat missing id=$id")
@@ -718,8 +717,7 @@ class DebugReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
-                val repeating = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().repeatingActiveCount() else 0
-                DoAlarmLog.unlockFake(state, active, FreeTier.capLabel(), repeating, FreeTier.repeatCapLabel())
+                DoAlarmLog.unlockFake(state, active, FreeTier.capLabel())
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             } finally {
@@ -736,7 +734,6 @@ class DebugReceiver : BroadcastReceiver() {
                 val record = app.container.entitlement.read()
                 val billing = app.container.billing
                 val active = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().activeCount() else 0
-                val repeating = if (UserUnlock.isUnlocked(app)) app.container.reminderDao().repeatingActiveCount() else 0
                 val state = if (record.unlocked) "unlocked" else "locked"
                 DoAlarmLog.unlockDump(
                     state = state,
@@ -745,8 +742,6 @@ class DebugReceiver : BroadcastReceiver() {
                     price = billing.formattedPrice() ?: "none",
                     active = active,
                     cap = FreeTier.capLabel(),
-                    repeating = repeating,
-                    repeatCap = FreeTier.repeatCapLabel(),
                 )
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)

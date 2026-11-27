@@ -49,7 +49,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +79,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.evansappstudio.doapp.backup.BackupNames
 import com.evansappstudio.doapp.alarm.AlarmPermissions
 import com.evansappstudio.doapp.alarm.AlertLevel
-import com.evansappstudio.doapp.alarm.EditResult
 import com.evansappstudio.doapp.alarm.AlertPermissions
 import com.evansappstudio.doapp.alarm.AlertPolicy
 import com.evansappstudio.doapp.alarm.DateParser
@@ -144,7 +142,6 @@ fun ReminderApp(
     val unlock by container.billing.ui.collectAsStateWithLifecycle()
     val backupUi by container.backup.ui.collectAsStateWithLifecycle()
     var unlockFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
-    val editorState = rememberSaveableStateHolder()
     var backupFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var replaceCount by remember { mutableIntStateOf(0) }
 
@@ -309,24 +306,15 @@ fun ReminderApp(
             onQuickSlotChange = viewModel::setQuickTimeSlot,
             onPostponeChange = viewModel::setPostponeMode,
         )
-        SCREEN_EDIT -> editorState.SaveableStateProvider(key = "edit-${editId ?: 0L}") {
-            EditReminderScreen(
-                viewModel = viewModel,
-                editId = editId,
-                quickSlots = quickTimes.slots,
-                postpone = quickTimes.postpone,
-                onQuickSlotChange = viewModel::setQuickTimeSlot,
-                onPostponeChange = viewModel::setPostponeMode,
-                onBack = {
-                    editorState.removeState("edit-${editId ?: 0L}")
-                    screen = SCREEN_LIST
-                },
-                onBlockedRepeat = {
-                    unlockFrom = SCREEN_EDIT
-                    screen = SCREEN_UNLOCK
-                },
-            )
-        }
+        SCREEN_EDIT -> EditReminderScreen(
+            viewModel = viewModel,
+            editId = editId,
+            quickSlots = quickTimes.slots,
+            postpone = quickTimes.postpone,
+            onQuickSlotChange = viewModel::setQuickTimeSlot,
+            onPostponeChange = viewModel::setPostponeMode,
+            onBack = { screen = SCREEN_LIST },
+        )
         SCREEN_SNOOZE -> SnoozeSettingsScreen(
             viewModel = viewModel,
             unlock = unlock,
@@ -596,7 +584,6 @@ private fun EditReminderScreen(
     onQuickSlotChange: (Int, QuickTimeSlot) -> Unit,
     onPostponeChange: (PostponeMode) -> Unit,
     onBack: () -> Unit,
-    onBlockedRepeat: () -> Unit,
 ) {
     var reminder by remember(editId) { mutableStateOf<Reminder?>(null) }
     var checked by remember(editId) { mutableStateOf(false) }
@@ -624,9 +611,8 @@ private fun EditReminderScreen(
                 saveEnabled = !current.isDone,
                 onBack = onBack,
                 onSave = { title, dueAt, nagMinutes, rule, shift, alert ->
-                    viewModel.update(current.id, title, dueAt, nagMinutes, rule, shift, alert) { result ->
-                        if (result == EditResult.BLOCKED_REPEAT) onBlockedRepeat() else onBack()
-                    }
+                    viewModel.update(current.id, title, dueAt, nagMinutes, rule, shift, alert)
+                    onBack()
                 },
                 promptMode = viewModel::repeatPromptMode,
                 onPromptMode = viewModel::setRepeatPromptMode,

@@ -141,15 +141,8 @@ object DoAlarmLog {
         Log.i(TAG, "DoAlarm unlock blocked active=$active cap=$cap")
     }
 
-    fun unlockBlockedRepeat(repeating: Int, cap: String) {
-        Log.i(TAG, "DoAlarm unlock blocked repeating=$repeating repeatCap=$cap")
-    }
-
-    fun unlockFake(state: String, active: Int, cap: String, repeating: Int, repeatCap: String) {
-        Log.i(
-            TAG,
-            "DoAlarm unlock state=$state source=fake active=$active cap=$cap repeating=$repeating repeatCap=$repeatCap",
-        )
+    fun unlockFake(state: String, active: Int, cap: String) {
+        Log.i(TAG, "DoAlarm unlock state=$state source=fake active=$active cap=$cap")
     }
 
     fun unlockDump(
@@ -159,12 +152,10 @@ object DoAlarmLog {
         price: String,
         active: Int,
         cap: String,
-        repeating: Int,
-        repeatCap: String,
     ) {
         Log.i(
             TAG,
-            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap repeating=$repeating repeatCap=$repeatCap",
+            "DoAlarm unlock state=$state source=$source pending=$pending product=do_unlock price=$price active=$active cap=$cap",
         )
     }
 
