@@ -1,0 +1,46 @@
+# Decision: pricing, free tier and AI access
+
+**Date:** 27 Nov 2026 (AWST, Australia/Perth)
+**Decided by:** Tim Evans
+**Status:** Decided, except the items under "Still open". Prices are to be tested before the first release.
+
+This replaces the earlier plan of an A$12.99 one-time unlock with a free tier of 5 nagging and 2 repeating reminders (Specs 7 and 8). It settles the handoff note "re-decide monetisation with Tim before the first release".
+
+## Context
+
+Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the last mile for an AI assistant, and Stuff You Should Do (a catalogue of periodic life-maintenance tasks), with sponsors and links as a possible later revenue line. The revenue model had to be settled first, because it decides the free tier, onboarding, network use and the UI.
+
+## Decisions
+
+1. **No display ads, ever.** No ad SDK. Ads need daily use at scale, which a nag app does not get, and they damage trust in an app that rings through Do Not Disturb. "Ads" was a common 1-star theme in rival reviews.
+2. **Freemium.** The app is free to install and use, and the main revenue is a paid tier.
+3. **All AI assistant features are free.** That includes on-device capture (natural-language add, share sheet, shortcuts, widget, tile, AppFunctions) and, when built, the cloud agent API (MCP and REST), events back to the agent, and assistant-set alert levels. There is no separate paid "Do Connect" product. Rate limits apply to everyone, to stop abuse, and do not depend on paying.
+4. **One paywall: the number of active reminders.** The free tier allows **5 active (not-done) reminders**. Paid is unlimited.
+5. **Reminders created by an AI agent count towards the free limit**, the same as any other reminder. The reasoning: people who connect an assistant and like it will want more than 5, and that is the natural upgrade moment. The cap also keeps free users' server load small.
+6. **Stuff You Should Do (catalogue) is in the free tier.** Items it creates count towards the same limit.
+7. **Price: annual subscription only, A$6.99 a year, auto-renewing**, in line with Due's A$6.99 Annual Upgrade Pass.
+8. **No lifetime option at launch.** One can be added later; removing one after launch would upset people. A 3-year prepaid pass was considered and rejected, because Google Play subscriptions only go up to 1 year, so it could not auto-renew.
+9. **A lapsed subscription never stops reminders.** Every existing reminder keeps nagging. The user cannot add more beyond 5 active until they renew. Backup and export always work.
+10. **Sponsors, affiliate and "Book it" links are a later, second revenue line**, not v1. They come after there is an audience in one region. Paid users can hide them. Health items are never sponsored. A sponsor never changes when or how a reminder fires.
+
+## Still open
+
+- **Introductory price:** whether to offer a cheaper first year through Play's introductory pricing (for example A$4.99), or a free trial. Not decided.
+- **The repeating cap of 2 (Spec 8, `FreeTier.REPEATING_REMINDER_CAP`).** Proposed: drop it, so the 5 active reminders limit is the only gate. It cuts against the catalogue, which is mostly repeating tasks. Not yet confirmed.
+- **Name:** "Stuff You Should Do" or "Stuff You Can Do". A trademark check is needed either way ("Stuff You Should Know" is a well-known podcast).
+- **Catalogue scope:** Australian-first (rego, state smoke alarm rules) or global.
+- **Spec 9 groundwork and the cloud agent API** are still not approved, and no hosting account may be used until Tim names one.
+
+## What this changes in the code (for a later spec, not done here)
+
+- Spec 7's one-time `do_unlock` product is replaced by an annual subscription in `billing`.
+- Entitlement gains an "expired" state, which keeps existing reminders working and only blocks adding beyond 5.
+- `FreeTier` changes depend on the repeating-cap decision above.
+- Test prices before launch, with Play Console price experiments or a single-market launch.
+
+## Reference prices (from research, not tested on Do users)
+
+- Due (iOS): A$12.99 one-time plus an optional A$6.99 a year Annual Upgrade Pass. One reviewer reported widgets need the pass.
+- Tody (chores): about US$10 a year.
+- Home maintenance apps: mostly US$59 to US$199 a year.
+- Android reminder rivals price low (for example BZ Reminder, US$2.49 to US$4.99 per item).
