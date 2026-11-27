@@ -1,9 +1,9 @@
 # Do: weekend build status
 
-Last updated: Fri 27 Nov 2026, about 11:30 pm (AWST). Updated by Claude as work lands.
+Last updated: Fri 27 Nov 2026, about 4 pm (AWST). Updated by Claude as work lands.
 
 ## Running now
-**Paused until about 4:10 pm AWST Saturday 28 Nov.** The usage limit was reached around 11 pm Friday; it resets at 4 pm AWST. A scheduled task resumes the work then:
+A short pause for a usage limit at about 4 pm AWST Friday; resumed straight after. Running:
 - **Spec 9 QA**: an independent Claude test agent reviewing Spec 9 (had just started).
 - **Spec 10, subscription billing**: being built on `do/spec-10-subscription-billing` (had just started).
 
