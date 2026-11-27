@@ -17,6 +17,10 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Shared
+    dependencies:
+      # Embeds the widget extension that draws the AlarmKit Live Activity.
+      - target: DoEngineTestWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest
@@ -27,6 +31,21 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: YES
         # Tim sets his own team in Xcode (Signing and Capabilities).
+        DEVELOPMENT_TEAM: ""
+  DoEngineTestWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest.widget
+        PRODUCT_NAME: DoEngineTestWidget
+        INFOPLIST_FILE: Widget/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
         DEVELOPMENT_TEAM: ""
   DoEngineTestTests:
     type: bundle.unit-test
@@ -46,7 +65,22 @@ schemes:
     build:
       targets:
         DoEngineTest: all
-        DoEngineTestTests: [test]
+        DoEngineTestWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.evansappstudio.doenginetest.widget
+        PRODUCT_NAME: DoEngineTestWidget
+        INFOPLIST_FILE: Widget/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        DEVELOPMENT_TEAM: ""
+  DoEngineTestTests: [test]
     run:
       config: Debug
     test:

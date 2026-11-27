@@ -26,12 +26,19 @@ This gets the test app onto your iPhone and walks through the test matrix. Allow
 2. In Xcode, click the blue **DoEngineTest** project at the top of the left sidebar, then the **DoEngineTest** target, then **Signing & Capabilities**.
 3. Tick **Automatically manage signing** and pick your team under **Team**.
 4. If Xcode says the Time Sensitive Notifications capability is missing, click **+ Capability** and add **Time Sensitive Notifications**. Do not add Critical Alerts.
-5. If the bundle id `com.evansappstudio.doenginetest` is taken or refused, change it to something like `com.evansappstudio.doenginetest.tim`.
-6. Plug in the phone and unlock it. Trust the Mac if asked. If the phone asks for Developer Mode, turn it on (Settings > Privacy & Security > Developer Mode) and let it restart.
-7. Choose your iPhone at the top of the Xcode window and press **Run** (the play button).
-8. If the phone says the developer is not trusted: Settings > General > VPN & Device Management, tap your account, then **Trust**.
+5. Now select the **DoEngineTestWidget** target (the AlarmKit lock screen and Dynamic Island views) and do step 3 for it too, with the same team.
+6. If the bundle id `com.evansappstudio.doenginetest` is taken or refused, change it to something like `com.evansappstudio.doenginetest.tim`, and change the widget's to the same plus `.widget` (for example `com.evansappstudio.doenginetest.tim.widget`). The widget's id must start with the app's.
+7. Plug in the phone and unlock it. Trust the Mac if asked. If the phone asks for Developer Mode, turn it on (Settings > Privacy & Security > Developer Mode) and let it restart.
+8. Choose your iPhone at the top of the Xcode window and press **Run** (the play button).
+9. If the phone says the developer is not trusted: Settings > General > VPN & Device Management, tap your account, then **Trust**.
 
-If you run `xcodegen generate` again later (after a `git pull`), repeat steps 2 to 4.
+If you run `xcodegen generate` again later (after a `git pull`), repeat steps 2 to 6.
+
+### If mechanism B shows nothing
+
+1. In Xcode, select the **DoEngineTest** target, open **General**, and check **Frameworks, Libraries, and Embedded Content** (or **Build Phases > Embed Foundation Extensions**) lists **DoEngineTestWidget.appex**. If not, run `xcodegen generate` again.
+2. Check both targets are signed with your team (step 5).
+3. Check AlarmKit is allowed in Settings in the app, and look for "AlarmKit schedule failed" or "AlarmKit not allowed" in the log.
 
 ## 2. First launch
 

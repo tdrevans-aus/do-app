@@ -14,6 +14,7 @@ It is not product code and will not ship. The plan is in the docs repo at `docs/
 - `Sources/Engine/NagPlan.swift`: the nag maths, mirroring Do's Kotlin `NagSchedule` (fires at due + k * interval, no drift, catch up after a miss), plus the queue-ahead and budget logic.
 - `Sources/Engine/Engine.swift`: re-planning, the rolling top-up within the notification budget, Done and Snooze, the event log export.
 - `Sources/Engine/AlarmKitEngine.swift`, `AlarmIntents.swift`: mechanism B.
+- `Widget/`: a small widget extension with the Live Activity views (lock screen and Dynamic Island) for the AlarmKit alarms. `Shared/DoAlarmMetadata.swift` is compiled into both the app and the extension.
 - `Sources/Engine/Store.swift`: reminders, settings and log in one JSON file in Application Support.
 - `Sources/UI/`: the list, Add form, Settings and Event log screens.
 - `Tests/NagPlanTests.swift`: unit tests for the nag maths.

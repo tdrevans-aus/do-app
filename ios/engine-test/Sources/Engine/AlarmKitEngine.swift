@@ -4,12 +4,6 @@ import AlarmKit
 import ActivityKit
 import Combine
 
-/// Metadata attached to every AlarmKit alarm the app schedules.
-struct DoAlarmMetadata: AlarmMetadata {
-    var reminderID: String
-    var planned: Int64
-}
-
 /// Mechanism B: each fire is its own fixed-date AlarmKit alarm. The stop
 /// button is Done (runs `DoneAlarmIntent`); the secondary button is Snooze
 /// 10 min (custom behaviour, runs `SnoozeAlarmIntent`).
@@ -155,7 +149,7 @@ final class AlarmKitEngine: ObservableObject {
         )
         let attributes = AlarmAttributes<DoAlarmMetadata>(
             presentation: AlarmPresentation(alert: alert),
-            metadata: DoAlarmMetadata(reminderID: r.id.uuidString, planned: fireAt),
+            metadata: DoAlarmMetadata(reminderID: r.id.uuidString, title: r.title, mechanism: r.mechanism.rawValue, planned: fireAt),
             tintColor: .orange
         )
         return .alarm(
