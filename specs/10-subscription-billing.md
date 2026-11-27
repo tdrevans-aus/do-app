@@ -93,6 +93,10 @@ Phone (Mark with Tim, debug build with the fake):
 4. Debug fake starts active.
 5. The old `do_unlock` code path is removed, not kept alongside.
 
+Open items for Gareth and Tim (raised by QA, not yet decided):
+6. **Resubscribe and Pause on the `annual` base plan.** A resubscribe from the Play Store after expiry is a new purchase that must be acknowledged within three days; Do has no backend, so it acknowledges only when the user next opens Do (Play would refund otherwise). A paused subscription reads as ended in Do (only adding past 5 is blocked). Either turn both off in Play Console, or accept them and test both in AT-11 (resubscribe in the Play Store, then don't open Do for a day; pause, then resume).
+7. **Auto Backup and `everSubscribed`.** Android Auto Backup includes `do_entitlement.xml` (since Spec 7), so `everSubscribed` comes back on a new phone, and a restored cache can read ACTIVE until the first successful Play query. Section F is read as "not in Do's own backup file". Please confirm that is acceptable, or say if the entitlement file should leave the Auto Backup rules.
+
 ## Build notes (Claude build agent, 27 Nov 2026)
 
 ### Play Billing facts checked
@@ -134,3 +138,17 @@ Checked against Google's Play Billing docs (integrate, subscriptions, subscripti
 - Create subscription `do_unlimited`, base plan `annual` (auto-renewing, 1 year, A$9.99), offer `first-year` on it (new customers only, one 1-year phase at A$3.99). The ids must match exactly.
 - Grace period and account hold are on by default; the app needs no change for either. Consider turning **pause** off for this plan: a paused subscription reads as ended in the app (only adding past 5 is blocked).
 - Add a licence tester and an internal testing track for AT-11.
+
+### Fixes after QA
+QA (`specs/10-qa-report.md`, `Spec10QaTest`, 18 tests) found one medium and four low bugs. All fixed; the 3 failing QA tests now pass unchanged.
+1. **Settings row showed the intro price alone (medium).** The row now shows the renewal line (`priceDetail`, "then A$9.99 a year...") under the intro headline whenever there is no status line, so an intro price never appears without its renewal price. Paywall unchanged (it already did this).
+2. **ITEM_ALREADY_OWNED from `launchBillingFlow`** now re-queries purchases instead of showing "Purchase failed", as `onPurchasesUpdated` already did.
+3. **Callback threading.** Every Play callback body (setup, purchases, details, purchases updated) and `restore`, `clearCelebrate` and `connect` now run on the main thread through `onMain`, so the billing fields have one owner and `publish()` can't publish a stale snapshot. `buy()` was already main-only. The details callback reads Play's result off-thread and hands only the chosen `ProductDetails` to the main thread.
+4. **Cached active record without `ever_subscribed`.** `EntitlementPolicy` now sets `everSubscribed = cache.everSubscribed || cache.active || active`, so a Spec 7-era or restored active cache revokes to EXPIRED, not FREE.
+5. **Play unreachable.** A failed `onBillingSetupFinished` or details query sets `SubscriptionUiState.storeUnavailable`. With no price loaded the paywall and Settings row say "Can't reach Google Play right now" (new string `paywall_store_unavailable`) in place of "Price loading"; Buy stays disabled. A failed refresh keeps the last good price, offer token and `ProductDetails`, and a later successful query clears the flag. Each resume retries. Google advises against caching `ProductDetails`; if the kept one has gone stale, `launchBillingFlow` fails and the paywall shows "Purchase failed", and the next successful refresh replaces it. New fields have defaults (`storeUnavailable = false`, `PaywallTemplates.unavailable = null`), so QA's constructor calls are unchanged.
+New test: `SubscriptionLogicTest.anUnreachablePlayStoreSaysSoAndKeepsALoadedPrice` (AT-6, bug 5). Bugs 2 and 3 are release-only code and are covered by QA's source check (bug 2) and AT-11 (bug 3).
+
+**Spec 9 merged.** `origin/do/spec-9-data-foundation` (Spec 9 QA tests and fixes, 3235db6) was merged with a merge commit, not a rebase, because this branch is already pushed. No textual conflicts. Spec 9's move of pure types into `alarm/CommandTypes.kt` and its Scheduler changes needed no Spec 10 edits: `Origin`, `Actor` and `EditResult` keep their package, and the cap path in `Scheduler.add` is unchanged.
+
+**Checks after the fixes and merge.** `assembleDebug testDebugUnitTest lintDebug`: 193 tests, 0 failures, 0 skipped (Spec 9 QA 19, Spec 10 QA 18), lint 0 errors. `assembleDebug -PexactAlarmMode=SCHEDULE` and `assembleRelease` (unsigned APK) both succeed.
+
