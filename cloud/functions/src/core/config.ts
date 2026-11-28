@@ -18,6 +18,13 @@ function listFrom(name: string, fallback: string[]): string[] {
     .filter((it) => it.length > 0);
 }
 
+/**
+ * The one region for every function (callables, the api function, the
+ * scheduled clean-up and the Pub/Sub trigger). Sydney: Do is Australia-first.
+ * firebase.json's Hosting rewrites must name the same region; a test checks it.
+ */
+export const REGION = "australia-southeast1";
+
 /** True only inside the Firebase Emulator Suite. Test seams check this. */
 export function inEmulator(): boolean {
   return process.env.FUNCTIONS_EMULATOR === "true" || process.env.FIRESTORE_EMULATOR_HOST !== undefined;

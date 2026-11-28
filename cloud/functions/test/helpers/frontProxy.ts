@@ -1,11 +1,12 @@
 import http from "node:http";
+import { REGION } from "../../src/core/config";
 
 // Stands in for Firebase Hosting in tests: every path on 127.0.0.1:5002 goes
 // to the `api` function in the Functions emulator, as the rewrites in
 // firebase.json do in production. (The Hosting emulator's own proxy honours
 // HTTPS_PROXY but not NO_PROXY, so it can't be used behind a proxy.)
 
-const TARGET = { host: "127.0.0.1", port: 5001, prefix: "/demo-do-cloud/us-central1/api" };
+const TARGET = { host: "127.0.0.1", port: 5001, prefix: `/demo-do-cloud/${REGION}/api` };
 
 export default async function setup(): Promise<() => Promise<void>> {
   const server = http.createServer((req, res) => {

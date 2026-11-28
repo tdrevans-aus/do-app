@@ -2,7 +2,7 @@
 
 This is what the Android client (Spec 13, section 4) must send and expect. The server half lives in `cloud/functions`; the simulated phone in `cloud/functions/test/helpers/phone.ts` follows this file and is the executable version of it.
 
-All phone calls are Firebase **callable functions** (region `us-central1`), made with the Firebase SDK after **Anonymous Auth** sign-in. The anonymous uid is the device id. Every call needs that sign-in; a call without it fails with `unauthenticated`. Times are epoch milliseconds (UTC) unless a field says ISO 8601.
+All phone calls are Firebase **callable functions** (region `australia-southeast1`, Sydney; get them with `Firebase.functions("australia-southeast1")`, not the default instance, which points at `us-central1`), made with the Firebase SDK after **Anonymous Auth** sign-in. The anonymous uid is the device id. Every call needs that sign-in; a call without it fails with `unauthenticated`. Times are epoch milliseconds (UTC) unless a field says ISO 8601.
 
 Errors from callables use the standard callable codes: `invalid-argument` (the request was malformed: a client bug), `not-found`, `unauthenticated`, `unavailable` (try again later) and `internal`.
 

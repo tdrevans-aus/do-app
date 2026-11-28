@@ -1,10 +1,11 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
+import { REGION } from "../../src/core/config";
 
 export const PROJECT = "demo-do-cloud";
 export const BASE = "http://127.0.0.1:5002";
-export const FUNCTIONS = `http://127.0.0.1:5001/${PROJECT}/us-central1`;
+export const FUNCTIONS = `http://127.0.0.1:5001/${PROJECT}/${REGION}`;
 export const AUTH = "http://127.0.0.1:9099";
 export const FIRESTORE = "http://127.0.0.1:8080";
 export const PUBSUB = "http://127.0.0.1:8085";

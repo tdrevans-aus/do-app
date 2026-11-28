@@ -1,7 +1,7 @@
 import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onMessagePublished } from "firebase-functions/v2/pubsub";
-import { settings } from "./core/config";
+import { REGION, settings } from "./core/config";
 import { createPairingCode as makePairingCode } from "./core/pairing";
 import { logError, logInfo } from "./core/log";
 import { handle } from "./http/app";
@@ -17,7 +17,6 @@ import { runCleanup } from "./maintenance/cleanup";
 
 // Do Cloud v1 (Spec 13). Every export is a Cloud Function (2nd gen).
 
-const REGION = "us-central1";
 const callOptions = { region: REGION, memory: "256MiB" as const, maxInstances: 10 };
 
 function deviceUid(request: CallableRequest<unknown>): string {

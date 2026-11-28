@@ -29,14 +29,14 @@
         "regex": "^/\\.well-known/.*$",
         "function": {
           "functionId": "api",
-          "region": "us-central1"
+          "region": "australia-southeast1"
         }
       },
       {
         "source": "**",
         "function": {
           "functionId": "api",
-          "region": "us-central1"
+          "region": "australia-southeast1"
         }
       }
     ]
