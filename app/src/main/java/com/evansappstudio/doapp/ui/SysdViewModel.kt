@@ -122,7 +122,7 @@ class SysdViewModel(private val container: AppContainer) : ViewModel() {
         val groups = Picks.grouped(itemsState.value, areasState.value, added, ReminderCategory.ALL)
         val active = container.reminderDao().activeCount()
         val unlocked = unlocked()
-        val pre = Picks.preTicked(groups.flatMap { it.second }, active, unlocked, FreeTier.ACTIVE_REMINDER_CAP)
+        val pre = Picks.preTicked(groups.flatMap { it.second }, active, unlocked, FreeTier.ACTIVE_REMINDER_CAP, areasState.value)
         return PicksStart(groups, pre, active, unlocked)
     }
 

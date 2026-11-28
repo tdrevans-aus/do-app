@@ -502,7 +502,7 @@ fun CatalogueScreen(
     var askDateFor by remember { mutableStateOf<LocalItem?>(null) }
     val needle = KeywordMatch.normalise(query)
     val shown = items
-        .filter { area == null || it.item.category == area }
+        .filter { area == null || area in it.item.areas }
         .filter { local ->
             needle.isEmpty() ||
                 KeywordMatch.normalise(local.title).contains(needle) ||

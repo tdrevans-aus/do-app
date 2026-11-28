@@ -91,6 +91,17 @@ class RegionTest {
         assertTrue(safety.why.contains("NSW"))
     }
 
+    // AT-3 (Tim, 28 Nov 2026: energy plan comparison hidden in WA, Tasmania and the NT only)
+    @Test
+    fun at3EnergyPlanHiddenInWaTasAndNt() {
+        val catalogue = bundled()
+        RegionResolver.STATES.forEach { state ->
+            val shown = CatalogueFilter.forRegion(catalogue, Region(state)).any { it.id == "money-energy-plan-compare" }
+            assertEquals(state, state !in setOf("AU-WA", "AU-TAS", "AU-NT"), shown)
+        }
+        assertTrue(CatalogueFilter.forRegion(catalogue, Region("AU")).any { it.id == "money-energy-plan-compare" })
+    }
+
     // AT-3 (a state rule for WA applies in WA and nowhere else)
     @Test
     fun at3StateRulesApplyOnlyInTheirState() {
