@@ -52,8 +52,11 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         /** Opens Add from a capture surface. The add saves with [entry]'s Origin. */
+        /** Non-exported alias of this activity: only Do itself (widgets, tile) can start it. */
+        const val INTERNAL_ALIAS = "com.evansappstudio.doapp.InternalAdd"
+
         fun addIntent(context: Context, entry: CaptureEntry, text: String? = null): Intent =
-            Intent(context, MainActivity::class.java)
+            Intent().setClassName(context, INTERNAL_ALIAS)
                 .setAction(LaunchRequests.ACTION_ADD)
                 .putExtra(LaunchRequests.EXTRA_ENTRY, entry.name)
                 .apply { if (text != null) putExtra(LaunchRequests.EXTRA_TEXT, text) }
@@ -66,6 +69,7 @@ class MainActivity : ComponentActivity() {
                 data = intent.dataString,
                 entryName = intent.getStringExtra(LaunchRequests.EXTRA_ENTRY),
                 text = intent.getStringExtra(LaunchRequests.EXTRA_TEXT),
+                trusted = intent.component?.className == INTERNAL_ALIAS,
             )
         }
 

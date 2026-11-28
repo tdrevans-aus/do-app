@@ -175,6 +175,37 @@ class Scheduler(
         DoAlarmLog.alert(id, level.name)
     }
 
+    /** The level in force, or null when the row is missing, deleted or done. */
+    internal suspend fun alertLevelOf(id: Long): AlertLevel? = liveById(id)?.takeIf { !it.isDone }?.alert()
+
+    /**
+     * Spec 12 agent hold after create: records the level an agent asked for and
+     * sets approval PENDING, leaving the level in force as it is.
+     */
+    internal suspend fun holdAlertLevel(id: Long, requested: AlertLevel, origin: Origin) = guarded {
+        check(unlocked()) { "Cannot save a reminder before unlock" }
+        val existing = liveById(id) ?: return@guarded
+        if (existing.isDone) return@guarded
+        if (existing.requestedAlertLevel == requested.name && existing.approval == Approval.PENDING.name) return@guarded
+        val now = clock()
+        val held = existing.copy(
+            requestedAlertLevel = requested.name,
+            approval = Approval.PENDING.name,
+            updatedAt = now,
+            version = existing.version + 1,
+        )
+        tx {
+            dao().update(held)
+            record(
+                existing.uuid,
+                EventType.LEVEL_CHANGED,
+                origin,
+                EventLog.detail("held" to requested.name, "level" to existing.alertLevel, "approval" to Approval.PENDING.name),
+            )
+        }
+        changed()
+    }
+
     internal suspend fun markDone(id: Long, origin: Origin = Origin(Actor.USER)) = guarded {
         alarms.cancel(id)
         notifications.dismiss(id)

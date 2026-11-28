@@ -72,11 +72,16 @@ class DeepLinksTest {
         assertEquals(LaunchRequest.Today, LaunchRequests.from("android.intent.action.VIEW", "do://today", "SHORTCUT", null))
         assertEquals(
             LaunchRequest.Add(CaptureEntry.WIDGET, null),
-            LaunchRequests.from(LaunchRequests.ACTION_ADD, null, "WIDGET", null),
+            LaunchRequests.from(LaunchRequests.ACTION_ADD, null, "WIDGET", null, trusted = true),
         )
         assertEquals(
             LaunchRequest.Add(CaptureEntry.APP, "x"),
-            LaunchRequests.from(LaunchRequests.ACTION_ADD, null, "NOPE", " x \n y"),
+            LaunchRequests.from(LaunchRequests.ACTION_ADD, null, "NOPE", " x \n y", trusted = true),
+        )
+        // From outside the app (not through the internal alias) the entry is ignored.
+        assertEquals(
+            LaunchRequest.Add(CaptureEntry.APP, null),
+            LaunchRequests.from(LaunchRequests.ACTION_ADD, null, "WIDGET", null),
         )
         assertNull(LaunchRequests.from("android.intent.action.MAIN", null, null, null))
         assertNull(LaunchRequests.from("android.intent.action.VIEW", "doapp://open/4", null, null))

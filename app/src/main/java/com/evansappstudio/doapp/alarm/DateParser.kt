@@ -489,7 +489,9 @@ object DateParser {
 
     private fun parseSimpleEvery(tokens: List<Tok>, index: Int): RepeatParse? {
         val every = parseEveryN(tokens, index) ?: return null
-        if (wordAt(tokens, every.next) == "on" || wordAt(tokens, every.next) == "after") return null
+        if (wordAt(tokens, every.next) == "on") return null
+        // "every day after work" is a repeat then a time (Spec 12); any other "after" stays unsupported.
+        if (wordAt(tokens, every.next) == "after" && phraseTime(tokens, every.next) == null) return null
         return when (every.unit) {
             RepeatUnit.MINUTE, RepeatUnit.HOUR -> plain(every.next, every.count, every.unit)
             RepeatUnit.DAY -> if (every.count == 1) plain(every.next, 1, RepeatUnit.DAY) else null

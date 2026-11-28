@@ -335,6 +335,8 @@ class WidgetRefresher(private val context: Context, private val scope: Coroutine
 
     private suspend fun refreshNow() {
         WidgetData.tick.value = System.currentTimeMillis()
+        // Before first unlock WorkManager (and so Glance) cannot run; BOOT_COMPLETED refreshes later.
+        if (!UserUnlock.isUnlocked(context)) return
         val manager = GlanceAppWidgetManager(context)
         for (widget in listOf(LargeWidget(), SmallWidget())) {
             for (id in manager.getGlanceIds(widget.javaClass)) {

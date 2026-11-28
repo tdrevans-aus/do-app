@@ -53,6 +53,38 @@ class AgentFunctionsTest {
         assertEquals("PENDING", direct.approval)
     }
 
+    // AT-4 (QA fix BUG-S12-04: update and setAlertLevel from an agent are held too; the level in force is kept)
+    @Test
+    fun at4HoldCoversUpdateAndSetAlertLevel() = runBlocking {
+        val cx = CaptureFixture()
+        val agent = cx.agent.origin("g")
+        val id = cx.fx.commands.add(Origin(Actor.USER), "Mine", cx.later, null, alertLevel = AlertLevel.CRITICAL)!!
+        cx.fx.commands.update(agent, id, "Mine, edited", cx.later, null, null, alertLevel = AlertLevel.PROMINENT)
+        var row = cx.fx.dao.getById(id)!!
+        assertEquals("Mine, edited", row.title)
+        assertEquals("CRITICAL", row.alertLevel)
+        assertEquals("PROMINENT", row.requestedAlertLevel)
+        assertEquals("PENDING", row.approval)
+        cx.fx.commands.setAlertLevel(agent, id, AlertLevel.STANDARD)
+        row = cx.fx.dao.getById(id)!!
+        assertEquals("STANDARD", row.alertLevel)
+        cx.fx.commands.setAlertLevel(Origin(Actor.USER), id, AlertLevel.PROMINENT)
+        assertEquals("PROMINENT", cx.fx.dao.getById(id)!!.alertLevel)
+    }
+
+    @Test
+    fun agentDueAtBounds() = runBlocking {
+        val cx = CaptureFixture()
+        val tenYears = AgentRequests.latestDue(cx.fx.clockMillis, PERTH)
+        assertEquals(tenYears, cx.agent.createReminder("g", AgentCreateRequest("Edge", tenYears)).dueAt)
+        try {
+            cx.agent.createReminder("g", AgentCreateRequest("Past edge", tenYears + 1))
+            fail("expected InvalidArgument")
+        } catch (expected: AgentError.InvalidArgument) {
+            assertTrue(expected.message!!.contains("10 years"))
+        }
+    }
+
     @Test
     fun agentRequestsAreChecked() = runBlocking {
         val cx = CaptureFixture()

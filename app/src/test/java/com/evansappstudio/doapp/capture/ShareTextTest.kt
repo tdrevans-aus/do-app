@@ -30,6 +30,18 @@ class ShareTextTest {
         assertEquals(200, ShareText.clean("b".repeat(200))!!.length)
     }
 
+    // AT-1 (QA fix BUG-S12-06: joined emoji are kept whole or dropped whole; links are never read as dates)
+    @Test
+    fun at1CutKeepsJoinedEmojiAndLinksStayWhole() {
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
+        assertEquals("a".repeat(195), ShareText.clean("a".repeat(195) + family + "x"))
+        assertEquals("a".repeat(192) + family, ShareText.clean("a".repeat(192) + family + "x"))
+        val draft = CaptureDrafts.fromText("Read https://example.com/2026/12/05/news tomorrow 5pm", now, PERTH)!!
+        assertEquals("Read https://example.com/2026/12/05/news", draft.title)
+        assertEquals("tomorrow 5pm", draft.matched)
+        assertEquals(perth(2023, 11, 16, 17, 0), draft.dueAt)
+    }
+
     // AT-1 (empty text is refused)
     @Test
     fun at1EmptyTextIsRefused() {

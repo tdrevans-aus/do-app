@@ -14,7 +14,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.evansappstudio.doapp.alarm.cutText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -77,41 +86,41 @@ class ShareActivity : ComponentActivity() {
             return
         }
         val caller = callerPackage()
+        val saves = ViewModelProvider(this)[ShareSaveModel::class.java]
         setContent {
-            MaterialTheme {
+            val dark = isSystemInDarkTheme()
+            MaterialTheme(colorScheme = if (dark) ShareColours.dark else ShareColours.light) {
+                val outcome by saves.outcome.collectAsStateWithLifecycle()
+                LaunchedEffect(outcome) {
+                    when (outcome) {
+                        ShareOutcome.SAVED -> {
+                            Toast.makeText(this@ShareActivity, R.string.share_saved, Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                        ShareOutcome.FAILED -> {
+                            Toast.makeText(this@ShareActivity, R.string.share_failed, Toast.LENGTH_SHORT).show()
+                            finish()
+                        }
+                        else -> Unit
+                    }
+                }
                 ShareSheet(
                     draft = draft,
-                    onSave = { title, dueAt, onCap ->
+                    outcome = outcome,
+                    onSave = { title, dueAt ->
                         // dueAt is null while the parsed (or default) date is kept.
-                        container.scope.launch {
-                            val result = try {
-                                container.capture.saveShare(
-                                    draft = draft,
-                                    title = title,
-                                    dueAt = dueAt,
-                                    nagMinutes = container.settings.defaultNagMinutes(),
-                                    alertLevel = container.settings.defaultAlertLevel(),
-                                    callerPackage = caller,
-                                )
-                            } catch (error: Throwable) {
-                                DoAlarmLog.handlingFailed(id = -1, error)
-                                null
-                            }
-                            runOnUiThread {
-                                when (result) {
-                                    null -> {
-                                        Toast.makeText(this@ShareActivity, R.string.share_failed, Toast.LENGTH_SHORT).show()
-                                        finish()
-                                    }
-                                    is CaptureResult.Saved -> {
-                                        Toast.makeText(this@ShareActivity, R.string.share_saved, Toast.LENGTH_SHORT).show()
-                                        finish()
-                                    }
-                                    CaptureResult.NeedsUnlock -> onCap()
-                                }
-                            }
+                        saves.save(container.scope) {
+                            container.capture.saveShare(
+                                draft = draft,
+                                title = title,
+                                dueAt = dueAt,
+                                nagMinutes = container.settings.defaultNagMinutes(),
+                                alertLevel = container.settings.defaultAlertLevel(),
+                                callerPackage = caller,
+                            )
                         }
                     },
+                    onUnlockShown = saves::clear,
                     onCancel = { finish() },
                     unlocked = { container.entitlement.read().unlocked },
                     unlockScreen = { onBack ->
@@ -154,11 +163,67 @@ class ShareActivity : ComponentActivity() {
 
 private enum class ShareChoice { PARSED, TONIGHT, TOMORROW, WEEKEND, CHOSEN }
 
+enum class ShareOutcome { SAVING, SAVED, NEEDS_UNLOCK, FAILED }
+
+/**
+ * Holds a save across rotation: the write runs on the app scope and its result
+ * lands here, so a recreated sheet still finishes or shows the paywall.
+ */
+class ShareSaveModel : ViewModel() {
+    val outcome = MutableStateFlow<ShareOutcome?>(null)
+
+    fun save(scope: CoroutineScope, block: suspend () -> CaptureResult) {
+        if (outcome.value == ShareOutcome.SAVING) return
+        outcome.value = ShareOutcome.SAVING
+        scope.launch {
+            outcome.value = try {
+                when (block()) {
+                    is CaptureResult.Saved -> ShareOutcome.SAVED
+                    CaptureResult.NeedsUnlock -> ShareOutcome.NEEDS_UNLOCK
+                }
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+                ShareOutcome.FAILED
+            }
+        }
+    }
+
+    fun clear() {
+        outcome.value = null
+    }
+}
+
+/** Design pass 1 colours for the sheet, with a dark set that follows the system. */
+private object ShareColours {
+    val light = lightColorScheme(
+        primary = Color(0xFF111827),
+        onPrimary = Color(0xFFFFFFFF),
+        surface = Color(0xFFF7F8FA),
+        onSurface = Color(0xFF111827),
+        surfaceContainerLow = Color(0xFFF7F8FA),
+        onSurfaceVariant = Color(0xFF4B5563),
+        background = Color(0xFFF7F8FA),
+        onBackground = Color(0xFF111827),
+    )
+    val dark = darkColorScheme(
+        primary = Color(0xFFF3F4F6),
+        onPrimary = Color(0xFF111827),
+        surface = Color(0xFF111827),
+        onSurface = Color(0xFFF3F4F6),
+        surfaceContainerLow = Color(0xFF111827),
+        onSurfaceVariant = Color(0xFFC7CCD4),
+        background = Color(0xFF111827),
+        onBackground = Color(0xFFF3F4F6),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ShareSheet(
     draft: CaptureDraft,
-    onSave: (title: String, dueAt: Long?, onCap: () -> Unit) -> Unit,
+    outcome: ShareOutcome?,
+    onSave: (title: String, dueAt: Long?) -> Unit,
+    onUnlockShown: () -> Unit,
     onCancel: () -> Unit,
     unlocked: () -> Boolean,
     unlockScreen: @Composable (onBack: () -> Unit) -> Unit,
@@ -166,7 +231,6 @@ private fun ShareSheet(
     var title by rememberSaveable { mutableStateOf(draft.title) }
     var dueAt by rememberSaveable { mutableLongStateOf(draft.dueAt) }
     var choice by rememberSaveable { mutableStateOf(ShareChoice.PARSED) }
-    var saving by rememberSaveable { mutableStateOf(false) }
     var showUnlock by rememberSaveable { mutableStateOf(false) }
     var showDate by rememberSaveable { mutableStateOf(false) }
     var showTime by rememberSaveable { mutableStateOf(false) }
@@ -175,6 +239,14 @@ private fun ShareSheet(
     val is24Hour = rememberIs24Hour()
     val locale = deviceLocale()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(outcome) {
+        if (outcome == ShareOutcome.NEEDS_UNLOCK) {
+            showUnlock = true
+            onUnlockShown()
+        }
+    }
+    val saving = outcome == ShareOutcome.SAVING || outcome == ShareOutcome.SAVED
 
     if (showUnlock) {
         unlockScreen {
@@ -193,7 +265,7 @@ private fun ShareSheet(
     ModalBottomSheet(
         onDismissRequest = onCancel,
         sheetState = sheetState,
-        containerColor = Color(0xFFF7F8FA),
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -203,10 +275,10 @@ private fun ShareSheet(
                 .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(R.string.share_heading), style = MaterialTheme.typography.titleLarge, color = Color(0xFF111827))
+            Text(stringResource(R.string.share_heading), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
             OutlinedTextField(
                 value = title,
-                onValueChange = { title = it },
+                onValueChange = { title = cutText(it, ShareText.MAX_LENGTH) },
                 label = { Text(stringResource(R.string.add_field_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -214,7 +286,7 @@ private fun ShareSheet(
             Text(
                 text = QuickTimes.formatDateTime(dueAt, zone, is24Hour, locale),
                 style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFF111827),
+                color = MaterialTheme.colorScheme.onSurface,
             )
             val source = when {
                 choice != ShareChoice.PARSED -> null
@@ -222,7 +294,7 @@ private fun ShareSheet(
                 else -> stringResource(R.string.share_no_date)
             }
             if (source != null) {
-                Text(source, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4B5563))
+                Text(source, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             val now = System.currentTimeMillis()
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -252,13 +324,7 @@ private fun ShareSheet(
                 )
             }
             Button(
-                onClick = {
-                    saving = true
-                    onSave(title.trim(), if (choice == ShareChoice.PARSED) null else dueAt) {
-                        saving = false
-                        showUnlock = true
-                    }
-                },
+                onClick = { onSave(title.trim(), if (choice == ShareChoice.PARSED) null else dueAt) },
                 enabled = !saving && title.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             ) { Text(stringResource(R.string.share_save)) }

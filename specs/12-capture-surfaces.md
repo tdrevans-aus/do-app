@@ -122,3 +122,20 @@ Also: `agentRequestsAreChecked`, `listAndCompleteFollowTheirLimits`, `commandLis
 - AT-10: long-press the icon, both shortcuts. Optional: `adb shell am start -a android.intent.action.VIEW -d "do://add?text=Buy%20milk%20tomorrow"`.
 - AT-11: NOT RUN (no AppFunctions service in this build; see above).
 - Worth a look: Share at the free cap (paywall, back returns to the sender), and that Do does not appear when sharing a photo or a contact.
+
+### Fixes after QA (28 Nov 2026, QA report `specs/12-qa-report.md`, tests `capture/Spec12QaTest.kt`)
+All 8 failing QA tests now pass with production changes only; no QA or earlier test was changed, except `at5LaunchRequestsPickTheEntry`, which now passes `trusted = true` for the internal Add action and also checks that an untrusted one is ignored.
+- **BUG-S12-01 (links read as dates).** `CaptureDrafts.fromText` hides each `http://`, `https://` or `www.` link from the parser with a same-length run of `x`, so parser spans still index the original line. A link on its own is the title as it was, with the default due; text plus a link parses only the rest, and the link stays in the title.
+- **BUG-S12-02/03 (agent dueAt).** A negative `dueAt` is refused (only null or 0 mean omitted). A `dueAt` more than 10 years ahead (`AgentRequests.MAX_YEARS_AHEAD`) is refused. The past limit stays at one minute of grace, stricter than the suggested day, because an agent has no reason to set a past time.
+- **BUG-S12-04 (hold on every agent path).** `ReminderCommands.update` and `setAlertLevel` with `Actor.AGENT` and a level above Normal now keep the level in force (update saves the other fields with the current level) and call the new `Scheduler.holdAlertLevel`, which stores `requestedAlertLevel` and `approval=PENDING`, bumps the version and writes a `LEVEL_CHANGED` event with `held=<level>`. An agent setting Normal is applied as usual (it can only lower). Spec 13 can rely on this.
+- **BUG-S12-05 (invisible text).** `ShareText.clean` treats a line as blank when nothing is left after removing format characters (`\p{Cf}`: directional marks, isolates, zero-width characters). They are not removed from the kept text, because joined emoji need the zero-width joiner.
+- **BUG-S12-06 (grapheme cut). This changes Spec 9 code:** `cutText` in `alarm/CommandTypes.kt` now cuts at the last `java.text.BreakIterator.getCharacterInstance()` boundary at or before the limit, so flags and joined emoji are never split. That also changes `Origin.clipSourceId` and `EventLog.clipDetail`, which use it. `BreakIterator` is fully qualified so the file still has no imports (CorePurityTest).
+- **BUG-S12-07 (links claiming a surface).** A `do://` link may claim only `SHORTCUT`; any other `entry` extra is recorded as `DEEP_LINK` (source USER). The widgets and the tile now open Add through a non-exported `activity-alias` (`.InternalAdd`), and `ACTION_ADD` honours its entry only when it arrives through that alias. From any other app it is `APP`.
+- **BUG-S12-08 ("every day after work").** `parseSimpleEvery` no longer stops at "after" when it is "after work", so "every day after work" repeats daily at 5:30 pm. Other "every N after ..." phrases stay refused, and the whole DateParser suite passes.
+- **Smaller fixes.**
+  - The share sheet follows dark mode: design colours, dark ground #111827.
+  - The title field stops at 200 characters (grapheme-safe).
+  - A save survives rotation: the result is held in a `ShareSaveModel` ViewModel and the write runs on the app scope.
+  - The misplaced `DebugReceiver` doc comment is back on `unlockedLaunch`.
+  - `WidgetRefresher` skips the refresh before first unlock instead of logging a failure on every locked fire.
+- **Not changed:** `callerPackage` through the system Sharesheet is often null or the chooser's package. The phone check stays in place.

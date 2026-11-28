@@ -26,12 +26,26 @@ object ShareText {
         if (raw == null) return null
         val line = raw.lineSequence()
             .map { it.replace(WHITE, " ").trim() }
-            .firstOrNull { it.isNotEmpty() }
+            .firstOrNull { visible(it) }
             ?: return null
-        return cutText(line, MAX_LENGTH).trim().ifEmpty { null }
+        return cutText(line, MAX_LENGTH).trim().takeIf { visible(it) }
     }
 
+    /**
+     * False when nothing is left once format characters (directional marks and
+     * isolates, zero-width joiners and the like) are taken away. They are kept in
+     * the text itself, because joined emoji need them.
+     */
+    fun visible(text: String): Boolean = text.replace(FORMAT, "").isNotBlank()
+
+    /** Links in shared text: kept in the title, never read for dates. */
+    val URL: Regex = Regex("""(?i)\b(?:https?://|www\.)\S+""")
+
+    /** [text] with each link replaced by a same-length run of "x", so parser spans still index [text]. */
+    fun maskUrls(text: String): String = URL.replace(text) { match -> "x".repeat(match.value.length) }
+
     private val WHITE = Regex("[\\s\\u00a0\\u200b\\u2028\\u2029\\ufeff]+")
+    private val FORMAT = Regex("\\p{Cf}")
 }
 
 /**
@@ -54,12 +68,27 @@ object CaptureDrafts {
     fun fromText(raw: String?, now: Long, zone: ZoneId, parseDates: Boolean = true): CaptureDraft? {
         val text = ShareText.clean(raw) ?: return null
         val fallback = CaptureTimes.defaultDue(now, zone)
-        val match = if (parseDates) DateParser.parse(text, now, fallback, zone) else null
+        // Links are hidden from the parser (Spec 12 QA, BUG-S12-01): a path like /2026/nov/27/ is not a date.
+        val masked = ShareText.maskUrls(text)
+        val match = if (parseDates) DateParser.parse(masked, now, fallback, zone) else null
         if (match == null) {
             return CaptureDraft(text = text, title = text, dueAt = fallback, rule = null, matched = null)
         }
-        val title = match.title.trim().ifEmpty { text }
-        return CaptureDraft(text = text, title = title, dueAt = match.dueAt, rule = match.rule, matched = match.matched)
+        val title = leftover(text, match.start, match.end).ifEmpty { text }
+        return CaptureDraft(
+            text = text,
+            title = title,
+            dueAt = match.dueAt,
+            rule = match.rule,
+            matched = text.substring(match.start, match.end),
+        )
+    }
+
+    /** The same tidy as DateParser's title: both sides of the match, trimmed, single-spaced. */
+    private fun leftover(text: String, start: Int, end: Int): String {
+        val left = text.substring(0, start).trim()
+        val right = text.substring(end).trim()
+        return listOf(left, right).filter { it.isNotEmpty() }.joinToString(" ").replace(Regex("\\s+"), " ")
     }
 }
 

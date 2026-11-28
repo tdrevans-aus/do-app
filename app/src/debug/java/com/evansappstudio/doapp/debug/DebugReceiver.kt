@@ -1114,7 +1114,6 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
-    /** Runs [block] off the main thread once the user is unlocked, as the other Room hooks do. */
     /**
      * Spec 12: the AppFunctions layer without the AppFunctions service, so QA can
      * drive createReminder, completeReminder and listReminders over adb. The
@@ -1162,6 +1161,7 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    /** Runs [block] off the main thread once the user is unlocked, as the other Room hooks do. */
     private fun unlockedLaunch(context: Context, label: String, id: Long, block: suspend (DoApp) -> Unit) {
         val pending = goAsync()
         val app = context.applicationContext as DoApp

@@ -43,6 +43,7 @@ class ReminderCommands(private val scheduler: Scheduler) {
     /**
      * An [Actor.AGENT] add above Standard is held: it is created at Standard with
      * [Reminder.requestedAlertLevel] set and [Approval.PENDING] (see [AgentHold]).
+     * [update] and [setAlertLevel] hold agent requests the same way.
      */
     suspend fun add(
         origin: Origin,
@@ -80,7 +81,15 @@ class ReminderCommands(private val scheduler: Scheduler) {
         rule: RepeatRule?,
         dueShift: DueShiftMode? = null,
         alertLevel: AlertLevel = AlertLevel.STANDARD,
-    ): EditResult = scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alertLevel, origin).committed()
+    ): EditResult {
+        if (!heldForAgent(origin, alertLevel)) {
+            return scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, alertLevel, origin).committed()
+        }
+        val inForce = scheduler.alertLevelOf(id) ?: AlertLevel.STANDARD
+        val result = scheduler.update(id, title, dueAt, nagMinutes, rule, dueShift, inForce, origin)
+        scheduler.holdAlertLevel(id, alertLevel, origin)
+        return result.committed()
+    }
 
     suspend fun markDone(origin: Origin, id: Long) = scheduler.markDone(id, origin).committed()
 
@@ -92,8 +101,17 @@ class ReminderCommands(private val scheduler: Scheduler) {
 
     suspend fun stopAlert(origin: Origin, id: Long) = scheduler.stopAlert(id, origin).committed()
 
-    suspend fun setAlertLevel(origin: Origin, id: Long, level: AlertLevel) =
-        scheduler.setAlertLevel(id, level, origin).committed()
+    /** An agent asking for above Normal is held: the level in force stays, approval goes PENDING. */
+    suspend fun setAlertLevel(origin: Origin, id: Long, level: AlertLevel) {
+        if (heldForAgent(origin, level)) {
+            scheduler.holdAlertLevel(id, level, origin).committed()
+        } else {
+            scheduler.setAlertLevel(id, level, origin).committed()
+        }
+    }
+
+    private fun heldForAgent(origin: Origin, level: AlertLevel): Boolean =
+        AgentHold.apply(origin.actor == Actor.AGENT, level).approval == Approval.PENDING
 
     suspend fun setRepeat(origin: Origin, id: Long, rule: RepeatRule?) = scheduler.setRepeat(id, rule, origin).committed()
 

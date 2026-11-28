@@ -47,16 +47,21 @@ object LaunchRequests {
 
     /**
      * [action], [data] (the intent's data URI as a string) and the two extras.
-     * A do:// link with no [EXTRA_ENTRY] is a deep link; the static shortcuts
-     * send the same links with entry SHORTCUT. Anything else is null.
+     * A do:// link is a deep link; the static shortcuts send the same links with
+     * entry SHORTCUT, the only entry a link may claim, so links always save as
+     * the person (Spec 12 QA, BUG-S12-07). [ACTION_ADD] honours its entry only when
+     * [trusted], that is, when it came through the app's own non-exported alias
+     * (the widgets and the tile); from anyone else it is APP. Anything else is null.
      */
-    fun from(action: String?, data: String?, entryName: String?, text: String?): LaunchRequest? {
+    fun from(action: String?, data: String?, entryName: String?, text: String?, trusted: Boolean = false): LaunchRequest? {
         val entry = CaptureEntry.fromName(entryName)
         if (action == ACTION_ADD) {
-            return LaunchRequest.Add(entry ?: CaptureEntry.APP, ShareText.clean(text))
+            val chosen = if (trusted) entry ?: CaptureEntry.APP else CaptureEntry.APP
+            return LaunchRequest.Add(chosen, ShareText.clean(text))
         }
+        val linkEntry = if (entry == CaptureEntry.SHORTCUT) CaptureEntry.SHORTCUT else CaptureEntry.DEEP_LINK
         return when (val link = DeepLinks.parse(data)) {
-            is DeepLink.Add -> LaunchRequest.Add(entry ?: CaptureEntry.DEEP_LINK, link.text)
+            is DeepLink.Add -> LaunchRequest.Add(linkEntry, link.text)
             DeepLink.Today -> LaunchRequest.Today
             null -> null
         }

@@ -60,6 +60,12 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Spec 12: the widgets and the tile open Add through this, so their entry can be trusted. -->
+        <activity-alias
+            android:name=".InternalAdd"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
+
         <!-- Spec 12: Share to Do. Plain text only, so Do stays off image and contact shares. -->
         <activity
             android:name=".capture.ShareActivity"

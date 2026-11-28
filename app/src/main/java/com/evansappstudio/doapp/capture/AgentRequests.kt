@@ -52,13 +52,25 @@ object AgentRequests {
     /** How far in the past a dueAt may be and still count as "now" (clock skew). */
     const val PAST_GRACE_MS = 60_000L
 
+    /** A dueAt further ahead than this is refused: it would never fire but would hold a free slot. */
+    const val MAX_YEARS_AHEAD = 10L
+
+    fun latestDue(now: Long, zone: ZoneId): Long =
+        java.time.Instant.ofEpochMilli(now).atZone(zone).plusYears(MAX_YEARS_AHEAD).toInstant().toEpochMilli()
+
     fun plan(request: AgentCreateRequest, now: Long, zone: ZoneId): AgentPlanResult {
         val text = ShareText.clean(request.text) ?: return AgentPlanResult.Invalid("text is required")
         val level = alertLevel(request.alertLevel)
             ?: return AgentPlanResult.Invalid("alertLevel must be Normal, Loud or Alarm")
-        val asked = request.dueAt?.takeIf { it > 0L }
+        val raw = request.dueAt
+        if (raw != null && raw < 0L) return AgentPlanResult.Invalid("dueAt must be a time in epoch milliseconds")
+        // 0 is how AppFunctions sends an omitted Long.
+        val asked = raw?.takeIf { it > 0L }
         if (asked != null && asked < now - PAST_GRACE_MS) {
             return AgentPlanResult.Invalid("dueAt is in the past")
+        }
+        if (asked != null && asked > latestDue(now, zone)) {
+            return AgentPlanResult.Invalid("dueAt is more than $MAX_YEARS_AHEAD years ahead")
         }
         var title = text
         var due = asked
