@@ -29,6 +29,8 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 
 12. **Restoring a deleted reminder and the free limit:** an immediate undo (within 30 seconds of deleting) always works; a later restore respects the free limit of 5, like adding. Imports are unchanged (allowed above the limit).
 
+13. **Android Auto Backup restoring "has subscribed before":** acceptable. It only changes the paywall wording ("Renew" rather than "Get"); Google Play still decides whether a subscription is active, at the first successful query.
+
 ## Still open
 
 - **Free trial:** whether to add a short free trial of the paid tier on top of the A$3.99 first year. Probably not needed, since the free tier already lets people try everything. Not decided.
