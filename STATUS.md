@@ -1,10 +1,10 @@
 # Do: weekend build status
 
-Last updated: Sat 28 Nov 2026, about 1 pm (AWST). Updated by Claude as work lands.
+Last updated: Sat 28 Nov 2026, about 9 pm (AWST). Updated by Claude as work lands.
 
 ## Running now
 Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
-- **Do Cloud fixes after the security review.** Verdict: core design sound (assistants can't bypass the free 5 or the approval hold, cloud failures never touch alarms, Firestore rules hold), but not ready to deploy until one High and three Mediums are fixed: the authorise page's security policy would block pairing in real browsers; a purchase token isn't tied to its buyer; a malicious assistant could push a huge metadata file; no rate limits on the OAuth endpoints (pairing-code guessing at scale). Server fixes first, then the phone side.
+- **Do Cloud fixes after the security review.** Server side done (`988f528`): pairing redirect now allowed by the page policy; purchases tied to the phone that made them; the metadata fetch capped, timed out and refused for private addresses; rate limits on the OAuth endpoints with the wrong-code counter in a transaction; plus the lows. 82 of 83 tests pass; the last is a QA test that can't pass as written (Linux buffers about 4 MB before any program can hang up), so the reviewer is reworking it and checking the builder's test edits. Phone-side fixes next.
 
 
 ## Done
