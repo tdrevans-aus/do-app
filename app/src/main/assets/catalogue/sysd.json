@@ -6,6 +6,10 @@
       "id": "home-smoke-alarm-test",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home",
+        "renter"
+      ],
       "title": "Test the smoke alarms",
       "why": "A working alarm gives you early warning of a fire. Rules on alarm type and placement vary, so check your state's.",
       "interval": {
@@ -24,6 +28,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 95,
+      "preTick": true,
       "related": [
         "home-smoke-alarm-expiry",
         "home-safety-switch-test"
@@ -31,7 +36,8 @@
       "keywords": [
         "smoke alarm",
         "smoke detector",
-        "fire alarm"
+        "fire alarm",
+        "smoke alarm rental"
       ],
       "health": false,
       "link": null
@@ -40,6 +46,9 @@
       "id": "home-smoke-alarm-expiry",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Check smoke alarm expiry dates",
       "why": "Alarms lose sensitivity with age and are usually replaced after 10 years. Check your state's rules.",
       "interval": {
@@ -58,6 +67,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 80,
+      "preTick": true,
       "related": [
         "home-smoke-alarm-test"
       ],
@@ -72,6 +82,9 @@
       "id": "home-safety-switch-test",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Test the safety switches",
       "why": "Pressing the test button confirms the switch will cut power in a fault. Check your state's recommended interval.",
       "interval": {
@@ -98,6 +111,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 88,
+      "preTick": true,
       "related": [
         "home-smoke-alarm-test"
       ],
@@ -113,6 +127,9 @@
       "id": "home-gutters-clean",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Clean out the gutters",
       "why": "Blocked gutters can overflow into the house and add fuel in bushfire season.",
       "interval": {
@@ -131,6 +148,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 64,
+      "preTick": true,
       "related": [
         "home-roof-check"
       ],
@@ -145,6 +163,9 @@
       "id": "home-aircon-filter-clean",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Clean the air-con filters",
       "why": "Clean filters help the unit run efficiently. Check your manual for how often.",
       "interval": {
@@ -163,6 +184,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 60,
+      "preTick": true,
       "related": [
         "home-aircon-service"
       ],
@@ -178,6 +200,9 @@
       "id": "home-aircon-service",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Book an air-con service",
       "why": "A regular service can catch faults early and keep the system running well.",
       "interval": {
@@ -196,6 +221,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 52,
+      "preTick": true,
       "related": [
         "home-aircon-filter-clean"
       ],
@@ -211,6 +237,9 @@
       "id": "home-hot-water-check",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Check the hot water system",
       "why": "A quick check for leaks and the relief valve can catch problems early. Follow the maker's guide.",
       "interval": {
@@ -229,6 +258,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 40,
+      "preTick": false,
       "related": [
         "home-safety-switch-test"
       ],
@@ -243,6 +273,9 @@
       "id": "home-termite-inspection",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Book a termite inspection",
       "why": "Termite damage can go unseen for a long time, and a yearly inspection is the common advice.",
       "interval": {
@@ -261,6 +294,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 72,
+      "preTick": true,
       "related": [
         "home-roof-check"
       ],
@@ -276,6 +310,9 @@
       "id": "home-dryer-vent-clean",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Clean the dryer vent and duct",
       "why": "Lint build-up is a fire risk and makes the dryer work harder. Clear the lint filter every load too.",
       "interval": {
@@ -294,6 +331,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 34,
+      "preTick": false,
       "related": [
         "home-aircon-filter-clean"
       ],
@@ -309,6 +347,9 @@
       "id": "home-roof-check",
       "version": 1,
       "category": "home",
+      "areas": [
+        "home"
+      ],
       "title": "Check the roof for damage",
       "why": "Spotting a loose tile or rusted sheet early can prevent leaks and bigger repairs.",
       "interval": {
@@ -327,6 +368,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 36,
+      "preTick": false,
       "related": [
         "home-gutters-clean"
       ],
@@ -342,6 +384,9 @@
       "id": "renter-inspection-prep",
       "version": 1,
       "category": "renter",
+      "areas": [
+        "renter"
+      ],
       "title": "Get ready for the rental inspection",
       "why": "A tidy home and a list of issues makes inspections easier. How often they happen varies by state.",
       "interval": {
@@ -360,6 +405,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 44,
+      "preTick": false,
       "related": [
         "renter-repairs-list",
         "renter-condition-photos"
@@ -376,6 +422,9 @@
       "id": "renter-lease-end-check",
       "version": 1,
       "category": "renter",
+      "areas": [
+        "renter"
+      ],
       "title": "Check when your lease ends",
       "why": "Knowing the end date gives you time to renew, negotiate or plan a move. Notice rules vary by state.",
       "interval": {
@@ -394,6 +443,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 70,
+      "preTick": true,
       "related": [
         "renter-condition-photos",
         "renter-contents-insurance"
@@ -410,6 +460,9 @@
       "id": "renter-contents-insurance",
       "version": 1,
       "category": "renter",
+      "areas": [
+        "renter"
+      ],
       "title": "Review your contents insurance",
       "why": "Your landlord's insurance usually won't cover your belongings, so check your cover still fits.",
       "interval": {
@@ -428,6 +481,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 58,
+      "preTick": true,
       "related": [
         "money-insurance-renewals"
       ],
@@ -438,40 +492,12 @@
       "link": null
     },
     {
-      "id": "renter-smoke-alarm-test",
-      "version": 1,
-      "category": "renter",
-      "title": "Test the smoke alarms",
-      "why": "Report a faulty alarm to your agent quickly. Who tests and replaces them varies by state.",
-      "interval": {
-        "every": 1,
-        "unit": "MONTH"
-      },
-      "repeatFrom": "COMPLETION",
-      "suggestedMonth": null,
-      "suggestedTime": "09:00",
-      "alertLevel": "NORMAL",
-      "regions": [
-        "AU"
-      ],
-      "stateVaries": true,
-      "stateRules": {},
-      "hiddenIn": [],
-      "needsDate": false,
-      "priority": 90,
-      "related": [
-        "renter-repairs-list"
-      ],
-      "keywords": [
-        "smoke alarm rental"
-      ],
-      "health": false,
-      "link": null
-    },
-    {
       "id": "renter-repairs-list",
       "version": 1,
       "category": "renter",
+      "areas": [
+        "renter"
+      ],
       "title": "Send your repairs list to the agent",
       "why": "Reporting issues in writing keeps a record and gets small problems fixed before they grow.",
       "interval": {
@@ -490,6 +516,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 42,
+      "preTick": false,
       "related": [
         "renter-inspection-prep"
       ],
@@ -505,6 +532,9 @@
       "id": "renter-condition-photos",
       "version": 1,
       "category": "renter",
+      "areas": [
+        "renter"
+      ],
       "title": "Take dated photos of the rental",
       "why": "Photos of the condition can help if there is a dispute about your bond later.",
       "interval": {
@@ -523,6 +553,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 38,
+      "preTick": false,
       "related": [
         "renter-lease-end-check"
       ],
@@ -537,6 +568,9 @@
       "id": "car-rego-renewal",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Renew the car registration",
       "why": "Driving unregistered can mean fines and no compulsory third party cover. Check your state's rules.",
       "interval": {
@@ -555,6 +589,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 93,
+      "preTick": true,
       "related": [
         "car-insurance-renewal",
         "money-drivers-licence"
@@ -571,6 +606,9 @@
       "id": "car-service",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Book the car service",
       "why": "Regular servicing keeps the car safe and may protect your warranty. Follow your logbook.",
       "interval": {
@@ -589,6 +627,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 78,
+      "preTick": true,
       "related": [
         "car-tyre-rotation",
         "car-rego-renewal"
@@ -605,6 +644,9 @@
       "id": "car-tyre-pressure",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Check the tyre pressures",
       "why": "Correct pressure helps braking, handling and fuel use. Check when cold, spare included.",
       "interval": {
@@ -623,6 +665,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 84,
+      "preTick": true,
       "related": [
         "car-tyre-rotation",
         "car-fluids-check"
@@ -639,6 +682,9 @@
       "id": "car-tyre-rotation",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Check tread and rotate the tyres",
       "why": "Rotating tyres helps them wear evenly. Your manual or tyre shop can say how often.",
       "interval": {
@@ -657,6 +703,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 58,
+      "preTick": true,
       "related": [
         "car-tyre-pressure"
       ],
@@ -672,6 +719,9 @@
       "id": "car-wiper-blades",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Check the wiper blades",
       "why": "Worn blades smear the windscreen and make it hard to see in rain.",
       "interval": {
@@ -690,6 +740,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 50,
+      "preTick": true,
       "related": [
         "car-fluids-check"
       ],
@@ -704,6 +755,9 @@
       "id": "car-fluids-check",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Check oil, coolant and washer fluid",
       "why": "Low fluids can damage the engine or leave you stranded. Your manual shows how.",
       "interval": {
@@ -722,6 +776,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 56,
+      "preTick": true,
       "related": [
         "car-tyre-pressure",
         "car-wiper-blades"
@@ -739,6 +794,9 @@
       "id": "car-insurance-renewal",
       "version": 1,
       "category": "car",
+      "areas": [
+        "car"
+      ],
       "title": "Review your car insurance",
       "why": "Renewal is a good time to compare cover and price before it rolls over.",
       "interval": {
@@ -757,6 +815,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 66,
+      "preTick": true,
       "related": [
         "car-rego-renewal"
       ],
@@ -770,6 +829,9 @@
       "id": "kids-health-check",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Book a health check for the kids",
       "why": "Regular checks help spot issues early. Ask your GP or child health nurse how often.",
       "interval": {
@@ -788,6 +850,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 46,
+      "preTick": false,
       "related": [
         "kids-immunisation-check",
         "kids-dentist"
@@ -803,6 +866,9 @@
       "id": "kids-dentist",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Book the kids' dental check-up",
       "why": "Regular check-ups catch problems early. Your dentist can advise how often.",
       "interval": {
@@ -821,6 +887,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 74,
+      "preTick": true,
       "related": [
         "kids-health-check"
       ],
@@ -835,6 +902,9 @@
       "id": "kids-immunisation-check",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Check the kids' immunisations",
       "why": "Make sure they are up to date. Your GP can check their record and the schedule.",
       "interval": {
@@ -853,6 +923,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 45,
+      "preTick": false,
       "related": [
         "kids-health-check"
       ],
@@ -868,8 +939,11 @@
       "id": "kids-school-forms",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Sort out school and care forms",
-      "why": "New school years bring permission, medical and contact forms that are easy to miss.",
+      "why": "New school years bring permission, medical and contact forms that are easy to miss. Check your state's rules.",
       "interval": {
         "every": 1,
         "unit": "YEAR"
@@ -886,6 +960,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 48,
+      "preTick": false,
       "related": [
         "kids-emergency-contacts"
       ],
@@ -901,6 +976,9 @@
       "id": "kids-emergency-contacts",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Update emergency contacts at school",
       "why": "Schools and carers need current numbers and medical details if something happens.",
       "interval": {
@@ -919,6 +997,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 41,
+      "preTick": false,
       "related": [
         "kids-school-forms"
       ],
@@ -932,6 +1011,9 @@
       "id": "kids-car-seat-check",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Check the kids' car seats",
       "why": "Restraints should be checked often to make sure they are fitted and adjusted correctly.",
       "interval": {
@@ -950,6 +1032,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 47,
+      "preTick": false,
       "related": [
         "kids-clothes-shoes-sizes"
       ],
@@ -964,6 +1047,9 @@
       "id": "kids-clothes-shoes-sizes",
       "version": 1,
       "category": "kids",
+      "areas": [
+        "kids"
+      ],
       "title": "Check shoe and clothing sizes",
       "why": "Kids grow fast, and shoes that are too small can be uncomfortable.",
       "interval": {
@@ -982,6 +1068,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 35,
+      "preTick": false,
       "related": [
         "kids-car-seat-check"
       ],
@@ -997,6 +1084,9 @@
       "id": "pets-worming",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Worm the pets",
       "why": "Regular worming protects your pet and your family. Ask your vet which product and how often.",
       "interval": {
@@ -1015,6 +1105,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 68,
+      "preTick": true,
       "related": [
         "pets-flea-tick"
       ],
@@ -1031,6 +1122,9 @@
       "id": "pets-flea-tick",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Give flea and tick treatment",
       "why": "Fleas and ticks can make pets very sick. How often depends on the product, so check the label.",
       "interval": {
@@ -1049,6 +1143,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 67,
+      "preTick": true,
       "related": [
         "pets-worming"
       ],
@@ -1065,6 +1160,9 @@
       "id": "pets-vaccinations",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Check the pets' vaccinations",
       "why": "Vaccines protect against serious disease. Your vet will say when boosters are due.",
       "interval": {
@@ -1083,6 +1181,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 63,
+      "preTick": true,
       "related": [
         "pets-vet-check"
       ],
@@ -1098,6 +1197,9 @@
       "id": "pets-vet-check",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Book the yearly vet check",
       "why": "A regular check-up can find problems before they become serious.",
       "interval": {
@@ -1116,6 +1218,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 85,
+      "preTick": true,
       "related": [
         "pets-vaccinations",
         "pets-worming"
@@ -1132,8 +1235,11 @@
       "id": "pets-microchip-details",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Check microchip contact details",
-      "why": "An up-to-date chip record is how a lost pet gets back to you.",
+      "why": "An up-to-date chip record is how a lost pet gets back to you. Check your state's rules.",
       "interval": {
         "every": 1,
         "unit": "YEAR"
@@ -1150,6 +1256,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 54,
+      "preTick": true,
       "related": [
         "pets-council-registration"
       ],
@@ -1163,6 +1270,9 @@
       "id": "pets-council-registration",
       "version": 1,
       "category": "pets",
+      "areas": [
+        "pets"
+      ],
       "title": "Renew pet registration",
       "why": "Many councils require cats and dogs to be registered. Rules and renewal dates vary by state.",
       "interval": {
@@ -1181,6 +1291,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 60,
+      "preTick": true,
       "related": [
         "pets-microchip-details"
       ],
@@ -1196,6 +1307,9 @@
       "id": "health-dentist",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Book a dental check-up",
       "why": "Regular check-ups catch problems early. Your dentist can tell you how often you need one.",
       "interval": {
@@ -1214,6 +1328,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 89,
+      "preTick": true,
       "related": [
         "health-gp-checkup"
       ],
@@ -1228,6 +1343,9 @@
       "id": "health-skin-check",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Book a skin check",
       "why": "Skin cancer is common in Australia. Ask your GP how often you should have a check.",
       "interval": {
@@ -1246,6 +1364,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 45,
+      "preTick": false,
       "related": [
         "health-gp-checkup"
       ],
@@ -1259,6 +1378,9 @@
       "id": "health-eye-test",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Book an eye test",
       "why": "Eye tests check your vision and eye health. Ask your optometrist how often.",
       "interval": {
@@ -1277,6 +1399,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 43,
+      "preTick": false,
       "related": [
         "health-gp-checkup"
       ],
@@ -1292,6 +1415,9 @@
       "id": "health-gp-checkup",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Book a GP check-up",
       "why": "A regular check-up is a chance to review your health. Ask your GP how often is right for you.",
       "interval": {
@@ -1310,6 +1436,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 65,
+      "preTick": true,
       "related": [
         "health-prescriptions-check",
         "health-skin-check"
@@ -1327,6 +1454,9 @@
       "id": "health-flu-vaccine",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Get your flu vaccine",
       "why": "The vaccine is updated each year for new strains. Talk to your GP or pharmacist.",
       "interval": {
@@ -1345,6 +1475,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 86,
+      "preTick": true,
       "related": [
         "health-gp-checkup"
       ],
@@ -1359,6 +1490,9 @@
       "id": "health-prescriptions-check",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Check your prescriptions and repeats",
       "why": "Checking early means you won't run out. Ask your GP or pharmacist about your medicines.",
       "interval": {
@@ -1377,6 +1511,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 39,
+      "preTick": false,
       "related": [
         "health-first-aid-kit"
       ],
@@ -1392,6 +1527,9 @@
       "id": "health-first-aid-kit",
       "version": 1,
       "category": "health",
+      "areas": [
+        "health"
+      ],
       "title": "Check the first aid kit and medicines",
       "why": "Replace used items and take expired medicines to a pharmacy for safe disposal.",
       "interval": {
@@ -1410,6 +1548,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 52,
+      "preTick": true,
       "related": [
         "health-prescriptions-check"
       ],
@@ -1424,6 +1563,9 @@
       "id": "money-tax-return",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Do your tax return",
       "why": "Tax time runs from 1 July, and returns you lodge yourself are due by 31 October.",
       "interval": {
@@ -1442,6 +1584,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 91,
+      "preTick": true,
       "related": [
         "money-super-check"
       ],
@@ -1457,6 +1600,9 @@
       "id": "money-insurance-renewals",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Review your insurance renewals",
       "why": "Renewal is the time to check your cover still fits and compare prices.",
       "interval": {
@@ -1475,6 +1621,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 57,
+      "preTick": true,
       "related": [
         "money-health-insurance-review"
       ],
@@ -1490,6 +1637,9 @@
       "id": "money-health-insurance-review",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Review your health insurance",
       "why": "Your needs and the policies on offer change, so check you have the cover you want.",
       "interval": {
@@ -1508,6 +1658,7 @@
       "hiddenIn": [],
       "needsDate": true,
       "priority": 59,
+      "preTick": true,
       "related": [
         "money-insurance-renewals"
       ],
@@ -1522,6 +1673,9 @@
       "id": "money-drivers-licence",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Check your driver's licence expiry",
       "why": "Driving on an expired licence can mean fines. Renewal periods vary by state, so check yours.",
       "interval": {
@@ -1540,6 +1694,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 62,
+      "preTick": true,
       "related": [
         "money-passport-expiry"
       ],
@@ -1555,6 +1710,9 @@
       "id": "money-passport-expiry",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Check your passport expiry",
       "why": "Some countries need months left on your passport, and processing takes time.",
       "interval": {
@@ -1573,6 +1731,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 64,
+      "preTick": true,
       "related": [
         "money-drivers-licence"
       ],
@@ -1586,6 +1745,9 @@
       "id": "money-subscriptions-review",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Review your subscriptions",
       "why": "Small recurring charges add up. Cancel the ones you no longer use.",
       "interval": {
@@ -1604,6 +1766,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 63,
+      "preTick": true,
       "related": [
         "money-energy-plan-compare"
       ],
@@ -1619,6 +1782,9 @@
       "id": "money-super-check",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Check your super",
       "why": "Checking your balance, fees and insurance, and finding lost super, can make a big difference.",
       "interval": {
@@ -1637,6 +1803,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 61,
+      "preTick": true,
       "related": [
         "money-tax-return"
       ],
@@ -1652,6 +1819,9 @@
       "id": "money-will-review",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Review your will",
       "why": "Wills can need updating after big life changes. Talk to a lawyer or trustee service.",
       "interval": {
@@ -1670,6 +1840,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 37,
+      "preTick": false,
       "related": [
         "money-super-check"
       ],
@@ -1686,6 +1857,9 @@
       "id": "money-energy-plan-compare",
       "version": 1,
       "category": "money",
+      "areas": [
+        "money"
+      ],
       "title": "Compare your energy plan",
       "why": "Comparing plans may save you money. Retail choice varies by state, so check what applies.",
       "interval": {
@@ -1702,10 +1876,13 @@
       "stateVaries": true,
       "stateRules": {},
       "hiddenIn": [
-        "AU-WA"
+        "AU-WA",
+        "AU-TAS",
+        "AU-NT"
       ],
       "needsDate": false,
       "priority": 55,
+      "preTick": true,
       "related": [
         "money-subscriptions-review"
       ],
@@ -1722,6 +1899,9 @@
       "id": "digital-password-check",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Check your passwords",
       "why": "Changing reused or leaked passwords protects your accounts. A password manager helps.",
       "interval": {
@@ -1740,6 +1920,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 44,
+      "preTick": false,
       "related": [
         "digital-account-recovery"
       ],
@@ -1755,6 +1936,9 @@
       "id": "digital-phone-backup",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Back up your phone",
       "why": "A recent backup means you won't lose photos and contacts if your phone is lost or broken.",
       "interval": {
@@ -1773,6 +1957,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 76,
+      "preTick": true,
       "related": [
         "digital-computer-backup"
       ],
@@ -1787,6 +1972,9 @@
       "id": "digital-computer-backup",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Back up your computer",
       "why": "A recent backup protects your files from failure, theft and ransomware.",
       "interval": {
@@ -1805,6 +1993,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 62,
+      "preTick": true,
       "related": [
         "digital-phone-backup"
       ],
@@ -1820,6 +2009,9 @@
       "id": "digital-update-devices",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Update your devices",
       "why": "Updates fix security holes. Turning on automatic updates is even better.",
       "interval": {
@@ -1838,6 +2030,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 66,
+      "preTick": true,
       "related": [
         "digital-app-permissions"
       ],
@@ -1852,6 +2045,9 @@
       "id": "digital-app-permissions",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Review app permissions",
       "why": "Apps can collect more than they need. Remove access to location, camera and contacts you don't want to share.",
       "interval": {
@@ -1870,6 +2066,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 36,
+      "preTick": false,
       "related": [
         "digital-password-check"
       ],
@@ -1883,6 +2080,9 @@
       "id": "digital-account-recovery",
       "version": 1,
       "category": "digital",
+      "areas": [
+        "digital"
+      ],
       "title": "Check account recovery details",
       "why": "Up-to-date recovery email, phone and two-step codes help you get back into accounts.",
       "interval": {
@@ -1901,6 +2101,7 @@
       "hiddenIn": [],
       "needsDate": false,
       "priority": 42,
+      "preTick": false,
       "related": [
         "digital-password-check"
       ],

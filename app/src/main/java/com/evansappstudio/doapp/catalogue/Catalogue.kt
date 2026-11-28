@@ -35,6 +35,7 @@ data class StateRule(
 data class CatalogueItem(
     val id: String,
     val version: Int,
+    /** The primary life area: stored on the reminder, and orders the item in lists. */
     val category: String,
     val title: String,
     val why: String,
@@ -57,6 +58,10 @@ data class CatalogueItem(
     val related: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     val health: Boolean = false,
+    /** Every life area it shows under, [category] first. One item, one id, however many areas. */
+    val areas: List<String> = listOf(category),
+    /** False for low-confidence items: shown and tickable by hand, never pre-ticked. */
+    val preTick: Boolean = true,
 )
 
 data class Catalogue(
@@ -170,7 +175,19 @@ object CatalogueParser {
             related = strings(f["related"]).orEmpty(),
             keywords = strings(f["keywords"]).orEmpty().map { it.trim().lowercase() }.filter { it.isNotEmpty() },
             health = bool(f["health"]),
+            areas = areas(f["areas"], category),
+            preTick = (f["preTick"] as? JsonValue.Bool)?.value ?: true,
         )
+    }
+
+    /** [category] first, then the other known areas listed; unknown ones are dropped. */
+    private fun areas(value: JsonValue?, category: String): List<String> {
+        val listed = when (value) {
+            null, JsonValue.Null -> emptyList()
+            else -> strings(value) ?: bad("bad areas")
+        }
+        val known = listed.map { ReminderCategory.normalize(it) ?: bad("bad area $it") }
+        return (listOf(category) + known).distinct()
     }
 
     private fun stateRule(state: String, value: JsonValue): StateRule {
