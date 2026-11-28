@@ -114,7 +114,7 @@ class ReminderCommandsTest {
             fx.commands.delete(user, id)
         }
         expectOne(fx, id, EventType.RESTORED, user) {
-            assertTrue(fx.commands.restore(user, id))
+            assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, id))
         }
 
         val plain = fx.commands.add(user, "Milk", fx.clockMillis + 3_600_000L, null)!!
@@ -225,7 +225,7 @@ class ReminderCommandsTest {
         fx.commands.delete(user, id)
         val deleted = fx.dao.getById(id)!!
         fx.clockMillis += 2 * SoftDelete.DAY_MS
-        assertTrue(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, id))
         val row = fx.dao.getById(id)!!
         assertNull(row.deletedAt)
         assertEquals(deleted.version + 1, row.version)
@@ -236,11 +236,65 @@ class ReminderCommandsTest {
         assertEquals(1, fx.dao.activeCount())
 
         // Not deleted, or past the window: refused.
-        assertFalse(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.REFUSED, fx.commands.restore(user, id))
         fx.commands.delete(user, id)
         fx.clockMillis += 31 * SoftDelete.DAY_MS
-        assertFalse(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.REFUSED, fx.commands.restore(user, id))
         assertNotNull(fx.dao.getById(id)!!.deletedAt)
+    }
+
+    // AT-7 (restore and the free cap, Tim 28 Nov 2026): an undo within 30 s always works
+    @Test
+    fun at7UndoWithin30SecondsWorksAtTheCap() = runBlocking {
+        val fx = schedulerFixture()
+        fx.paid = false
+        val ids = (1..5).map { fx.commands.add(user, "R$it", fx.clockMillis + it * 60_000L, null)!! }
+        fx.commands.delete(user, ids[0])
+        assertNotNull(fx.commands.add(user, "Six", fx.clockMillis + 600_000L, null))
+        fx.clockMillis += SoftDelete.UNDO_WINDOW_MS
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, ids[0]))
+        assertEquals(6, fx.dao.activeCount())
+        assertNotNull(fx.alarms.at(ids[0]))
+    }
+
+    // AT-7 (restore and the free cap): after 30 s a free user at the cap is refused, a paid user is not
+    @Test
+    fun at7RestoreAfterTheUndoWindowAtTheCapIsBlockedForFreeAndAllowedWhenPaid() = runBlocking {
+        val fx = schedulerFixture()
+        fx.paid = false
+        val ids = (1..5).map { fx.commands.add(user, "R$it", fx.clockMillis + it * 60_000L, null)!! }
+        fx.commands.delete(user, ids[0])
+        assertNotNull(fx.commands.add(user, "Six", fx.clockMillis + 600_000L, null))
+        fx.clockMillis += SoftDelete.UNDO_WINDOW_MS + 1L
+        val before = fx.dao.getById(ids[0])!!
+        val seen = fx.events.forUuid(before.uuid).size
+        assertEquals(RestoreResult.BLOCKED_BY_CAP, fx.commands.restore(user, ids[0]))
+        assertEquals(before, fx.dao.getById(ids[0]))
+        assertEquals(seen, fx.events.forUuid(before.uuid).size)
+        assertNull(fx.alarms.at(ids[0]))
+        assertEquals(5, fx.dao.activeCount())
+        fx.paid = true
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, ids[0]))
+        assertEquals(6, fx.dao.activeCount())
+    }
+
+    // AT-7 (restore and the free cap): after 30 s below the cap, restore works; done rows do not count
+    @Test
+    fun at7RestoreAfterTheUndoWindowBelowTheCapWorks() = runBlocking {
+        val fx = schedulerFixture()
+        fx.paid = false
+        val ids = (1..5).map { fx.commands.add(user, "R$it", fx.clockMillis + it * 60_000L, null)!! }
+        fx.commands.markDone(user, ids[4])
+        fx.commands.delete(user, ids[0])
+        fx.clockMillis += SoftDelete.DAY_MS
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, ids[0]))
+        assertEquals(4, fx.dao.activeCount())
+        // A done row being restored adds nothing active, so the cap does not apply to it.
+        assertNotNull(fx.commands.add(user, "Five", fx.clockMillis + 60_000L, null))
+        fx.commands.delete(user, ids[4])
+        fx.clockMillis += SoftDelete.DAY_MS
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, ids[4]))
+        assertTrue(fx.dao.getById(ids[4])!!.isDone)
     }
 
     // AT-8

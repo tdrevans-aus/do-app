@@ -63,6 +63,7 @@ Add to `Reminder`, all with defaults so existing rows and old backups keep worki
 ### D. Soft delete
 - `delete(origin, id)` sets `deletedAt = now`, bumps `updatedAt` and `version`, cancels the alarm and the notification, and removes the mirror entry, exactly as hard delete does today for the alarm side. The row stays.
 - `restore(origin, id)` clears `deletedAt` and re-arms the reminder through the existing schedule path (a past due catches up as today), if the row is not done. Only valid within the purge window.
+- **Restore and the free cap** (decided by Tim, 28 Nov 2026). An undo within `SoftDelete.UNDO_WINDOW_MS = 30_000` (30 seconds) of the delete always works, even at the cap. A later restore of a not-done row, for a user who is not paid-unlocked, is refused when the active count is already at or above the cap (the same `FreeTier.blocksAdd` check and `DoAlarm unlock blocked` log line as `add`). `restore` returns a `RestoreResult`: `RESTORED`, `BLOCKED_BY_CAP` (the UI opens the paywall, as it does for a blocked add) or `REFUSED` (missing, not deleted, or past the purge window). Done rows are not active and do not count, and restoring a done row is never blocked. A merge import that restores a soft-deleted match is not capped (imports may exceed the cap, as in Spec 7).
 - Every query that feeds the UI, counts, scheduling, health, backup export or the free-tier cap ignores rows with `deletedAt IS NOT NULL`: `observeAll`, `active`, `activeCount`, `all` (rename the raw one `allIncludingDeleted` for internal use), and anything else that reads reminders. `getById` keeps returning deleted rows (needed for restore) but every caller that acts on a reminder checks `deletedAt` and treats a deleted row as gone.
 - **Purge:** rows deleted more than 30 days ago are removed for good, with their events, on `rescheduleAll` (app start, boot, update). One constant, `SoftDelete.PURGE_AFTER_DAYS = 30`.
 - The free-tier cap of 5 does not count deleted rows.
@@ -166,7 +167,7 @@ Claude's defaults for Gareth to confirm or change:
 7. No UI change.
 
 Open questions for Gareth (raised by QA, left as built):
-8. **Restore and the free cap (QA N3).** `restore` does not check the free-tier cap, so a free user at 5 can delete one, add one, then restore and have 6 active. Restore is debug-only today; the planned undo-delete would expose it. Refuse restore at the cap, or allow it as an undo?
+8. **Restore and the free cap (QA N3). Decided by Tim, 28 Nov 2026:** an immediate undo (within 30 seconds of the delete) always works; a later restore respects the free limit of 5. See section D.
 9. **Event failure after the alarm is cancelled (QA N5).** Done, snooze and Stop cancel the alarm and dismiss the notification before the Room write (unchanged order). If the event insert fails (for example a full disk), the reminder stays active in Room with no alarm until the next reschedule. Accept, or re-arm on failure?
 
 ## Build notes
@@ -245,4 +246,12 @@ Every write query that changes a live row (`markDone`, `updateDueAt`, `updateDue
 7. **N6.** Debug `ADD --es source IMPORT` is refused (`DoAlarm debug-add bad source`).
 8. **HELD.** Behaviour unchanged; section E and AT-5 now describe `HELD` as a Do Not Disturb hold, with quiet-hours deferrals visible as the `quiet-defer` log line.
 9. **N3 and N5** are left as built and added to section 7 as open questions 8 and 9.
+
+### Restore and the free cap (Tim, 28 Nov 2026)
+- `SoftDelete.UNDO_WINDOW_MS = 30_000` and `SoftDelete.isUndo` in `alarm/CommandTypes.kt`, with a new `RestoreResult` enum (`RESTORED`, `BLOCKED_BY_CAP`, `REFUSED`).
+- `restore` returns `RestoreResult` instead of `Boolean`, so the UI can tell a capped restore (open the paywall) from one that cannot happen. Past the undo window, a free user at or above the cap is refused with the add-blocked log line, and nothing is written (no version bump, no event). Done rows are not counted and are never blocked.
+- Debug `RESTORE` logs `DoAlarm restore blocked id=<id> cap=5` for a capped restore.
+- Merge import restoring a soft-deleted match is unchanged.
+- Tests: `ReminderCommandsTest.at7UndoWithin30SecondsWorksAtTheCap`, `at7RestoreAfterTheUndoWindowAtTheCapIsBlockedForFreeAndAllowedWhenPaid`, `at7RestoreAfterTheUndoWindowBelowTheCapWorks`.
+- Because the return type changed, the existing `restore` assertions (four in `ReminderCommandsTest`, five in `Spec9QaTest`) now compare against `RestoreResult.RESTORED` or `RestoreResult.REFUSED` instead of `assertTrue` and `assertFalse`. They assert the same outcomes; the fixture is paid by default, so the cap does not apply to them.
 

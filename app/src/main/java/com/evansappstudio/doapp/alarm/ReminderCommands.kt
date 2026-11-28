@@ -69,8 +69,12 @@ class ReminderCommands(private val scheduler: Scheduler) {
     /** Soft delete. The row stays for [SoftDelete.PURGE_AFTER_DAYS] days. */
     suspend fun delete(origin: Origin, id: Long) = scheduler.delete(id, origin)
 
-    /** False when the row is missing, not deleted, or past the purge window. */
-    suspend fun restore(origin: Origin, id: Long): Boolean = scheduler.restore(id, origin)
+    /**
+     * [RestoreResult.BLOCKED_BY_CAP] when a free user is at the cap and the undo window
+     * has passed (open the paywall, as for a null add). [RestoreResult.REFUSED] when the
+     * row is missing, not deleted, or past the purge window.
+     */
+    suspend fun restore(origin: Origin, id: Long): RestoreResult = scheduler.restore(id, origin)
 
     suspend fun replaceAll(origin: Origin, reminders: List<Reminder>): List<Long> =
         scheduler.replaceAll(reminders, origin)

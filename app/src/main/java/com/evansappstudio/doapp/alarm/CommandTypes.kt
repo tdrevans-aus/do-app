@@ -115,11 +115,30 @@ object SoftDelete {
     const val PURGE_AFTER_DAYS = 30
     const val DAY_MS = 24L * 60L * 60L * 1000L
 
+    /**
+     * An undo within this long of the delete always works, even at the free cap.
+     * A later restore respects the cap like an add (Tim, 28 Nov 2026).
+     */
+    const val UNDO_WINDOW_MS = 30_000L
+
+    fun isUndo(deletedAt: Long, now: Long): Boolean = now - deletedAt <= UNDO_WINDOW_MS
+
     fun cutoff(now: Long, days: Int = PURGE_AFTER_DAYS): Long = now - days.toLong() * DAY_MS
 
     /** Restore is valid only while the row would not yet be purged. */
     fun canRestore(deletedAt: Long, now: Long, days: Int = PURGE_AFTER_DAYS): Boolean =
         deletedAt >= cutoff(now, days)
+}
+
+/** What a restore did. [BLOCKED_BY_CAP] is the UI's cue to open the paywall, as a null add is. */
+enum class RestoreResult {
+    RESTORED,
+
+    /** A free user already at the active cap, and the undo window has passed. Nothing changed. */
+    BLOCKED_BY_CAP,
+
+    /** Missing, not deleted, or past the purge window. Nothing changed. */
+    REFUSED,
 }
 
 /** The append-only event log. Only the newest [MAX_PER_REMINDER] events per reminder are kept. */

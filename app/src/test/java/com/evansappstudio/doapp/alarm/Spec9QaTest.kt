@@ -72,7 +72,7 @@ class Spec9QaTest {
         val uuid = fx.dao.getById(id)!!.uuid
         fx.commands.delete(user, id)
         fx.clockMillis = due + day
-        assertTrue(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, id))
         val armed = fx.alarms.at(id)!!
         fx.clockMillis = armed
         fx.scheduler.onFire(id, armed, armed)
@@ -92,7 +92,7 @@ class Spec9QaTest {
         val id = fx.commands.add(user, "Bins", due, 5)!!
         fx.commands.delete(user, id)
         fx.clockMillis = due + day
-        assertTrue(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, id))
         fx.quiet = fx.quiet.copy(followDnd = true)
         fx.dnd = true
         val armed = fx.alarms.at(id)!!
@@ -228,10 +228,10 @@ class Spec9QaTest {
         fx.clockMillis = start + 30 * day
         fx.scheduler.rescheduleAll()
         assertNotNull("exactly 30 days: kept", fx.dao.getById(id))
-        assertTrue("exactly 30 days: restorable", fx.commands.restore(user, id))
+        assertEquals("exactly 30 days: restorable", RestoreResult.RESTORED, fx.commands.restore(user, id))
         fx.commands.delete(user, id)
         fx.clockMillis += 30 * day + 1
-        assertFalse(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.REFUSED, fx.commands.restore(user, id))
         fx.scheduler.rescheduleAll()
         assertNull(fx.dao.getById(id))
     }
@@ -243,7 +243,7 @@ class Spec9QaTest {
         fx.commands.markDone(tap, id)
         fx.commands.delete(user, id)
         assertNotNull(fx.dao.getById(id)!!.deletedAt)
-        assertTrue(fx.commands.restore(user, id))
+        assertEquals(RestoreResult.RESTORED, fx.commands.restore(user, id))
         val row = fx.dao.getById(id)!!
         assertTrue(row.isDone)
         assertNull(row.deletedAt)

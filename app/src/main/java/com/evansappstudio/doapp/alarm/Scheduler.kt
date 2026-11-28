@@ -443,29 +443,38 @@ class Scheduler(
     }
 
     /**
-     * Clears deletedAt and re-arms a not-done row through the add path (a past due
-     * catches up). False when the row is missing, not deleted, or past the purge window.
+     * Clears deletedAt and re-arms a not-done row through the first-fire path (a past
+     * due catches up). An undo within [SoftDelete.UNDO_WINDOW_MS] of the delete always
+     * works. A later restore of a not-done row is blocked for a free user already at the
+     * active cap, with the same check and log line as [add]. Done rows do not count.
      */
-    internal suspend fun restore(id: Long, origin: Origin = Origin(Actor.USER)): Boolean = guarded {
+    internal suspend fun restore(id: Long, origin: Origin = Origin(Actor.USER)): RestoreResult = guarded {
         check(unlocked()) { "Cannot save a reminder before unlock" }
         alignRoomLocked(zone())
-        val existing = dao().getById(id) ?: return@guarded false
-        val deletedAt = existing.deletedAt ?: return@guarded false
+        val existing = dao().getById(id) ?: return@guarded RestoreResult.REFUSED
+        val deletedAt = existing.deletedAt ?: return@guarded RestoreResult.REFUSED
         val now = clock()
-        if (!SoftDelete.canRestore(deletedAt, now)) return@guarded false
+        if (!SoftDelete.canRestore(deletedAt, now)) return@guarded RestoreResult.REFUSED
+        if (!existing.isDone && !SoftDelete.isUndo(deletedAt, now)) {
+            val active = dao().activeCount()
+            if (FreeTier.blocksAdd(active, paidUnlocked())) {
+                DoAlarmLog.unlockBlocked(active, FreeTier.capLabel())
+                return@guarded RestoreResult.BLOCKED_BY_CAP
+            }
+        }
         val restored = tx {
             val count = dao().restore(id, now)
             if (count > 0) record(existing.uuid, EventType.RESTORED, origin)
             count > 0
         }
-        if (!restored) return@guarded false
-        val stored = dao().getById(id) ?: return@guarded false
+        if (!restored) return@guarded RestoreResult.REFUSED
+        val stored = dao().getById(id) ?: return@guarded RestoreResult.REFUSED
         if (!stored.isDone) {
             alarms.cancel(id)
             armFirstFire(stored, now)
         }
         changed()
-        true
+        RestoreResult.RESTORED
     }
 
     /**

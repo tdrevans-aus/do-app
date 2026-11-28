@@ -16,6 +16,7 @@ import com.evansappstudio.doapp.alarm.EventLog
 import com.evansappstudio.doapp.alarm.Origin
 import com.evansappstudio.doapp.alarm.ReminderCategory
 import com.evansappstudio.doapp.alarm.ReminderSource
+import com.evansappstudio.doapp.alarm.RestoreResult
 import com.evansappstudio.doapp.alarm.SoftDelete
 import com.evansappstudio.doapp.alarm.DndState
 import com.evansappstudio.doapp.alarm.QuietConfig
@@ -1085,10 +1086,10 @@ class DebugReceiver : BroadcastReceiver() {
             return
         }
         unlockedLaunch(context, "restore", id) { app ->
-            if (app.container.commands.restore(DEBUG, id)) {
-                DoAlarmLog.restored(id)
-            } else {
-                Log.e(DoAlarmLog.TAG, "DoAlarm restore refused id=$id")
+            when (app.container.commands.restore(DEBUG, id)) {
+                RestoreResult.RESTORED -> DoAlarmLog.restored(id)
+                RestoreResult.BLOCKED_BY_CAP -> Log.e(DoAlarmLog.TAG, "DoAlarm restore blocked id=$id cap=${FreeTier.capLabel()}")
+                RestoreResult.REFUSED -> Log.e(DoAlarmLog.TAG, "DoAlarm restore refused id=$id")
             }
         }
     }
