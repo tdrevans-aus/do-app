@@ -3,8 +3,9 @@
 Last updated: Sat 28 Nov 2026, about 9 pm (AWST). Updated by Claude as work lands.
 
 ## Running now
-Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
+- **Spec 14, the new UI.** Every remaining screen to the design pass (four tabs: Today, All, Catalogue, Settings; Edit with History; Settings with the subscription card), and every Due-derived name and layout replaced: "What needs doing?", Normal / Loud / Alarm, Do's own time shortcuts instead of the 4 x 3 grid, a tidy-as-you-type preview with Undo, Done / +10 min / Later... on notifications, Stop sound that keeps nagging, a dark theme, and a test that fails if Due wording comes back. Building on `do/spec-14-new-ui` (on top of the full stack). Draft: `specs-drafts/14-new-ui.md`.
 
+Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
 
 ## Done
 - **Do Cloud: built, security-reviewed and fixed, both halves.** `do/spec-13-android-client` at `870a8f6` holds the whole stack (Specs 9 to 13 plus the catalogue tweaks): 408 Android unit tests, 0 failures; 84 server tests; the end-to-end test against the local Firebase emulator passes. Purchases are now tied to the phone that made them; only paired assistants can act; assistant names are cleaned for display; CI now also builds the SCHEDULE variant and the release build.
@@ -23,10 +24,10 @@ Usage limits paused agents twice (Fri afternoon, Sat late morning); each time th
 - Earlier build: on GitHub's Mac runners (Xcode 26.6, iOS 26.5 simulator), branch `ios/engine-test` at `2db43bc`. Not yet run on a real iPhone. Runbook: `ios/engine-test/RUNBOOK.md`. Things only a real phone can show: whether AlarmKit alarms appear without a widget extension, whether the Done and Snooze buttons work with the app closed, and whether AlarmKit has a cap. In AlarmKit mode the buttons are Done and Snooze 10 min (AlarmKit allows two).
 
 ## Next, in order
-1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
-2. Fold the catalogue tweaks into the Do Cloud branch (draft: `specs-drafts/12-capture-surfaces.md`).
+1. Spec 14 QA, then fixes.
+2. Write up a Monday handover: what's on which branch, the merge order (PR #8, then 9, 10, 11, 12, 13, 14), and the phone tests for each spec.
 
-Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
+Specs 9 to 14 are Claude drafts built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
 
 ## Waiting on Tim (from Monday night)
 - PR #8: phone rerun (AT-20 to AT-28) and hands-on AT-05, AT-10, AT-12, then your OK to merge.
