@@ -3,12 +3,12 @@
 Last updated: Sat 28 Nov 2026, about 1 pm (AWST). Updated by Claude as work lands.
 
 ## Running now
-- **Catalogue tweaks (approved by you, 28 Nov):** one smoke-alarm item for Home and Renting; low-confidence items never pre-ticked; energy plan comparison hidden in WA, Tas and NT (Tas and NT to be source-checked).
 Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
 - **Do Cloud, phone side.** Pairing screen, receiving assistant requests by push, applying them on the phone, reporting back, purchase checks. Being built on `do/spec-13-android-client` (the integrated Specs 9 to 12 plus the Do Cloud server).
 
 
 ## Done
+- **Catalogue tweaks (your 28 Nov decisions): done.** Spec 11 at `0cb2f22`, 241 tests, 0 failures. One smoke alarm item for Home and Renting (now 57 items); the 19 low-confidence items are never pre-ticked; energy plan comparison hidden in WA, Tas and NT (Tas and NT flagged for a source check); every state-varying item now says to check your state's rules.
 - **Integration check: Specs 9 to 12 fit together.** Trial branch `do/integration-specs-9-to-12` (`6935715`): 334 unit tests, 0 failures; debug, SCHEDULE and release builds green. Conflicts were in the paywall (Spec 11's "Keep 5 for free" now uses Spec 10's paywall), restore results, and shared files (strings, debug hooks, navigation). Five behaviour questions for Gareth in `specs/integration-9-to-12.md` (for example, when first-run steps appear if the first reminder came from a widget or share).
 - **Do Cloud server now in Sydney** (`australia-southeast1`), `64f2690`, 38 of 38 tests green on GitHub (run 46109596957). Create the Firestore database in Sydney too; its location can't be changed later.
 - **Spec 13, Do Cloud v1, server half: built.** `cloud/` on `do/spec-13-do-cloud` (`0c46786`). 36 tests pass on GitHub (run 46090573321), all against Firebase's local emulator with a demo project: no real account used, nothing deployed. MCP (current spec revision, and older clients) plus a REST mirror; OAuth with an 8-character pairing code shown in Do; inbox and push to the phone; assistants see only their own reminders; rate limits; server-side Play purchase checks; daily clean-up; no reminder titles in logs. Phone contract: `cloud/CONTRACT.md`. **Your deploy checklist:** `cloud/README.md` (Firebase project in Sydney, Blaze plan with a budget alert, Anonymous sign-in, Play API access for the functions' service account, a Pub/Sub topic for Play notifications, then deploy). Not needed until you want it live.
