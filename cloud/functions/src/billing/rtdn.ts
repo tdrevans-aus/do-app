@@ -4,7 +4,8 @@ import { logInfo, logWarn } from "../core/log";
 import { isRecord } from "../core/text";
 import { entitlementFrom } from "./entitlement";
 import { PlayError, type PlayClient } from "./play";
-import { acknowledgeIfNeeded, purchaseRef, storeEntitlement } from "./verify";
+import { acknowledgeIfNeeded, clearIfFrom, purchaseRef, storeEntitlement } from "./verify";
+import { accountIdFor, boundTo } from "./binding";
 
 // Real-time developer notifications (Pub/Sub). The notification only says
 // that something changed; the state is always read back from the Play API.
@@ -21,11 +22,17 @@ function seenRef(messageId: string) {
   return db().collection(paths.rtdnSeen).doc(messageId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 100));
 }
 
-async function deviceFor(tokens: Array<string | null | undefined>): Promise<{ uid: string; productId: string } | null> {
+interface Owner {
+  uid: string;
+  productId: string;
+  token: string;
+}
+
+async function deviceFor(tokens: Array<string | null | undefined>): Promise<Owner | null> {
   for (const token of tokens) {
     if (!token) continue;
     const data = (await purchaseRef(token).get()).data();
-    if (data) return { uid: data.deviceUid, productId: data.productId };
+    if (data) return { uid: data.deviceUid, productId: data.productId, token };
   }
   return null;
 }
@@ -52,11 +59,25 @@ async function handleOnce(payload: unknown, now: number, play: PlayClient): Prom
   const packageName = payload.packageName as string;
 
   if (isRecord(payload.voidedPurchaseNotification)) {
-    const token = payload.voidedPurchaseNotification.purchaseToken;
+    const voided = payload.voidedPurchaseNotification;
+    const token = voided.purchaseToken;
     if (typeof token !== "string") return { handled: false, reason: "no_token" };
+    if (Number(voided.productType) !== 1) return { handled: false, reason: "not_subscription" };
     const owner = await deviceFor([token]);
     if (!owner) return { handled: false, reason: "unknown_purchase" };
-    await storeEntitlement(owner.uid, { state: "revoked", entitled: false, expiryTime: null, autoRenewing: false, productId: owner.productId }, now, "rtdn");
+    // Re-check with Play before acting (QA L6): a forged void for a live subscription changes nothing.
+    let stillEntitled = false;
+    try {
+      const purchase = await play.getSubscription(packageName, token);
+      stillEntitled = entitlementFrom(purchase, owner.productId, now).entitled;
+    } catch (error) {
+      if (!(error instanceof PlayError && error.kind === "not_found")) throw error; // Pub/Sub retries.
+    }
+    if (stillEntitled) {
+      logWarn("rtdn.void_not_confirmed", {});
+      return { handled: false, reason: "not_confirmed" };
+    }
+    await storeEntitlement(owner.uid, { state: "revoked", entitled: false, expiryTime: null, autoRenewing: false, productId: owner.productId }, now, "rtdn", token);
     logInfo("rtdn.voided", {});
     return { handled: true, state: "revoked" };
   }
@@ -84,12 +105,23 @@ async function handleOnce(payload: unknown, now: number, play: PlayClient): Prom
     logWarn("rtdn.unknown_purchase", { type });
     return { handled: false, reason: "unknown_purchase" };
   }
-  if (purchase.linkedPurchaseToken) {
-    await purchaseRef(token).set({ deviceUid: owner.uid, packageName, productId, updatedAt: now });
-    await purchaseRef(purchase.linkedPurchaseToken).delete();
+  if (!boundTo(purchase, owner.uid)) {
+    // A newer token (resubscribe or upgrade) bound to another installation: the old
+    // owner loses it, and the new installation gets it when it verifies.
+    await clearIfFrom(owner.uid, owner.token, now, "transferred");
+    logInfo("rtdn.transferred", { type });
+    return { handled: true, state: "transferred" };
   }
-  const entitlement = entitlementFrom(purchase, productId, now, type === SUBSCRIPTION_REVOKED);
-  await storeEntitlement(owner.uid, entitlement, now, "rtdn");
+  if (owner.token !== token) {
+    await purchaseRef(token).set({ deviceUid: owner.uid, packageName, productId, accountId: accountIdFor(owner.uid), updatedAt: now });
+    await purchaseRef(owner.token).delete();
+  }
+  // Type 12 (revoked) is never taken on trust (QA L6): Play reports a revoked
+  // subscription as no longer entitled, and only then is it marked revoked.
+  const fromPlay = entitlementFrom(purchase, productId, now);
+  const revoked = type === SUBSCRIPTION_REVOKED && !fromPlay.entitled;
+  const entitlement = revoked ? entitlementFrom(purchase, productId, now, true) : fromPlay;
+  await storeEntitlement(owner.uid, entitlement, now, "rtdn", token);
   logInfo("rtdn.updated", { type, state: entitlement.state, entitled: entitlement.entitled });
   return { handled: true, state: entitlement.state };
 }

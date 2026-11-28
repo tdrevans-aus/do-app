@@ -5,6 +5,7 @@ import { REGION, settings } from "./core/config";
 import { createPairingCode as makePairingCode } from "./core/pairing";
 import { logError, logInfo } from "./core/log";
 import { handle } from "./http/app";
+import { clientIp } from "./http/ip";
 import type { HttpRequest } from "./http/types";
 import { registerDevice as register, setAssistantsEnabled as setEnabled } from "./phone/device";
 import { completeRequest as complete, pullInbox as pull } from "./phone/inbox";
@@ -61,6 +62,7 @@ export const api = onRequest({ region: REGION, memory: "256MiB", timeoutSeconds:
     query,
     body: req.body,
     rawBody: req.rawBody ? req.rawBody.toString("utf8") : undefined,
+    ip: clientIp(headers["x-forwarded-for"], req.socket?.remoteAddress),
   };
   const response = await handle(request, { now: () => Date.now() });
   res.status(response.status);

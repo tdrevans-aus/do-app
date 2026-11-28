@@ -77,7 +77,8 @@ export interface CleanupReport {
 export async function runCleanup(now: number): Promise<CleanupReport> {
   const expired = await expireRequests(now);
   const inbox = await deleteAll(db().collectionGroup(paths.inbox).where("finishedAt", "<=", now - limits.inboxKeepMs));
-  const events = await deleteAll(db().collectionGroup(paths.events).where("at", "<=", now - limits.eventKeepMs));
+  // By the server's receivedAt, never the phone's `at`: a phone with a wrong clock can't keep events for ever.
+  const events = await deleteAll(db().collectionGroup(paths.events).where("receivedAt", "<=", now - limits.eventKeepMs));
 
   let devices = 0;
   for (;;) {

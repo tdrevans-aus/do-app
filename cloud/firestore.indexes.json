@@ -68,7 +68,7 @@
     },
     {
       "collectionGroup": "events",
-      "fieldPath": "at",
+      "fieldPath": "receivedAt",
       "indexes": [
         { "order": "ASCENDING", "queryScope": "COLLECTION" },
         { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }

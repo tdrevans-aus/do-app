@@ -72,7 +72,7 @@ export function appendEvents(tx: Transaction, batch: EventBatch, events: NewEven
       seq,
       type: event.type,
       at: event.at,
-      storedAt: now,
+      receivedAt: now,
       reminderUuid: event.reminderUuid ?? null,
       requestId: event.requestId ?? null,
       status: event.status ?? null,

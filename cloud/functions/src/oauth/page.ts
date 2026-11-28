@@ -1,4 +1,4 @@
-import { escapeHtml } from "../core/text";
+import { escapeHtml, escapeText } from "../core/text";
 
 // The authorise page: plain, accessible HTML with no scripts. Australian English.
 
@@ -52,7 +52,7 @@ export interface CodePageInput {
 
 export function codePage(input: CodePageInput): string {
   const error = input.error
-    ? `<p class="error" id="code-error" role="alert">${escapeHtml(input.error)}</p>`
+    ? `<p class="error" id="code-error" role="alert">${escapeText(input.error)}</p>`
     : "";
   const described = input.error ? "code-hint code-error" : "code-hint";
   return shell(

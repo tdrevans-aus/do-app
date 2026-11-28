@@ -13,7 +13,32 @@ export interface CreateArgs {
   alertLevel: "normal" | "loud" | "alarm";
 }
 
-const ISO_WITH_OFFSET = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/i;
+const ISO_WITH_OFFSET = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|([+-])(\d{2}):(\d{2}))$/i;
+
+/**
+ * Strict ISO 8601 with an offset: every field must be a real calendar value
+ * (no 30 February, no hour 24, offsets up to 14:00), so nothing rolls over
+ * into a day the assistant did not ask for. Epoch ms, or null.
+ */
+export function parseStrictIso(raw: string): number | null {
+  const m = ISO_WITH_OFFSET.exec(raw);
+  if (!m) return null;
+  const [year, month, day, hour, minute] = [m[1], m[2], m[3], m[4], m[5]].map(Number) as [number, number, number, number, number];
+  const second = m[6] ? Number(m[6]) : 0;
+  const ms = m[7] ? Number(m[7].padEnd(3, "0").slice(0, 3)) : 0;
+  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59 || second > 59) return null;
+  const local = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+  const check = new Date(local);
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+  let offsetMinutes = 0;
+  if (m[8]!.toUpperCase() !== "Z") {
+    const oh = Number(m[10]);
+    const om = Number(m[11]);
+    if (oh > 14 || om > 59 || (oh === 14 && om > 0)) return null;
+    offsetMinutes = (m[9] === "-" ? -1 : 1) * (oh * 60 + om);
+  }
+  return local - offsetMinutes * 60_000;
+}
 
 function argsObject(raw: unknown): Record<string, unknown> {
   if (raw === undefined || raw === null) return {};
@@ -33,8 +58,8 @@ export function parseCreate(raw: unknown, now: number): CreateArgs {
     if (typeof args.due_at !== "string" || !ISO_WITH_OFFSET.test(args.due_at)) {
       throw new AgentFailure("invalid_argument", "due_at must be ISO 8601 with an offset, for example 2026-12-01T18:00:00+08:00.");
     }
-    const ms = Date.parse(args.due_at);
-    if (!Number.isFinite(ms)) throw new AgentFailure("invalid_argument", "due_at is not a real date and time.");
+    const ms = parseStrictIso(args.due_at);
+    if (ms === null) throw new AgentFailure("invalid_argument", "due_at is not a real date and time.");
     if (ms < now - 60_000) throw new AgentFailure("invalid_argument", "due_at is in the past.");
     dueAt = ms;
   }

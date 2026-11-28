@@ -1,4 +1,6 @@
 import { inEmulator } from "../core/config";
+import { isIpLiteral, isLocalName, normaliseHost } from "../core/hosts";
+import { fetchMetadataDocument } from "./fetchMetadata";
 import { randomId, sha256 } from "../core/crypto";
 import { db, paths } from "../core/db";
 import { cleanText, isRecord } from "../core/text";
@@ -116,24 +118,21 @@ export async function registerClient(body: unknown, now: number): Promise<Record
 /** Fetches a Client ID Metadata Document. Injected so tests and production can differ. */
 export type MetadataFetcher = (url: string) => Promise<unknown>;
 
-const MAX_DOC_BYTES = 5 * 1024;
-
+/** The production fetcher: streamed, capped, no redirects, public addresses only (see fetchMetadata.ts). */
 export const defaultFetcher: MetadataFetcher = async (url) => {
-  const response = await fetch(url, {
-    redirect: "error",
-    headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok) throw new ClientError("invalid_client", "The client metadata document could not be fetched");
-  const text = await response.text();
-  if (text.length > MAX_DOC_BYTES) throw new ClientError("invalid_client", "The client metadata document is too large");
-  return JSON.parse(text);
+  try {
+    return await fetchMetadataDocument(url);
+  } catch {
+    throw new ClientError("invalid_client", "The client metadata document could not be fetched");
+  }
 };
 
 /**
  * True for a client_id that is a metadata document URL: https with a path,
- * and no IP-literal or local host. In the emulator a loopback http URL is
- * also allowed so the test client can host its own document.
+ * and a public DNS name (not an IP literal, loopback or local name, after
+ * normalising case, trailing dots and IDNA). In the emulator a loopback http
+ * URL is also allowed so the test client can host its own document. Names
+ * that resolve to private addresses are refused when fetched.
  */
 export function isMetadataClientId(clientId: string): boolean {
   let url: URL;
@@ -144,12 +143,12 @@ export function isMetadataClientId(clientId: string): boolean {
   }
   if (url.hash || url.username || url.password) return false;
   if (url.pathname === "/" || url.pathname === "") return false;
-  if (url.protocol === "http:" && inEmulator() && LOOPBACK.has(url.hostname)) return true;
+  const host = normaliseHost(url.hostname);
+  if (url.protocol === "http:" && inEmulator() && LOOPBACK.has(host)) return true;
   if (url.protocol !== "https:") return false;
-  const host = url.hostname;
-  if (LOOPBACK.has(host) || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
-  if (/^[0-9.]+$/.test(host) || host.startsWith("[")) return false;
-  return host.includes(".");
+  if (url.port !== "" && url.port !== "443") return false;
+  if (isIpLiteral(host) || isLocalName(host)) return false;
+  return true;
 }
 
 const METADATA_CACHE_MS = 60 * 60 * 1000;

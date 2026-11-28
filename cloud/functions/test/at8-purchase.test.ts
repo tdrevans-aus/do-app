@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { accountIdFor } from "../src/billing/binding";
 import { FakePlayClient } from "../src/billing/play";
 import { handleRtdn } from "../src/billing/rtdn";
 import { adminDb } from "./helpers/admin";
@@ -23,8 +24,10 @@ function purchase(state: string, ack = "ACKNOWLEDGEMENT_STATE_PENDING", expiry =
   };
 }
 
-async function seed(token: string, body: ReturnType<typeof purchase>) {
-  await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: body, ackCount: 0 });
+/** Seeds Play's record of a purchase, bound to [owner] as the app's setObfuscatedAccountId would. */
+async function seed(token: string, body: ReturnType<typeof purchase>, owner?: Phone) {
+  const bound = owner ? { ...body, externalAccountIdentifiers: { obfuscatedExternalAccountId: accountIdFor(owner.uid) } } : body;
+  await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: bound, ackCount: 0 });
 }
 
 async function setState(token: string, state: string, extra: Record<string, unknown> = {}) {
@@ -67,7 +70,14 @@ async function publish(notification: Record<string, unknown>) {
 }
 
 function verify(phone: Phone, token: string, extra: Record<string, unknown> = {}) {
-  return phone.call<Record<string, any>>("verifyPurchase", { platform: "play", packageName: PACKAGE, productId: PRODUCT, purchaseToken: token, ...extra });
+  return phone.call<Record<string, any>>("verifyPurchase", {
+    platform: "play",
+    packageName: PACKAGE,
+    productId: PRODUCT,
+    purchaseToken: token,
+    obfuscatedAccountId: accountIdFor(phone.uid),
+    ...extra,
+  });
 }
 
 async function waitForState(uid: string, state: string) {
@@ -81,7 +91,7 @@ describe("AT-8 purchase verification", () => {
   it("purchased and acknowledged once, then grace period, account hold, recovered and expired via RTDN", async () => {
     const phone = await Phone.create();
     const token = `tok-${randomUUID()}`;
-    await seed(token, purchase("ACTIVE"));
+    await seed(token, purchase("ACTIVE"), phone);
 
     const first = await verify(phone, token);
     expect(first).toMatchObject({ state: "active", entitled: true, autoRenewing: true, productId: PRODUCT });
@@ -120,7 +130,7 @@ describe("AT-8 purchase verification", () => {
   it("revoked via RTDN, and a voided purchase is revoked too", async () => {
     const phone = await Phone.create();
     const token = `tok-${randomUUID()}`;
-    await seed(token, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"));
+    await seed(token, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"), phone);
     expect(await verify(phone, token)).toMatchObject({ state: "active", entitled: true });
     expect(await ackCount(token)).toBe(0);
 
@@ -130,8 +140,10 @@ describe("AT-8 purchase verification", () => {
 
     const other = await Phone.create();
     const token2 = `tok-${randomUUID()}`;
-    await seed(token2, purchase("ACTIVE"));
+    await seed(token2, purchase("ACTIVE"), other);
     await verify(other, token2);
+    // A refund ends the subscription at Play; the handler re-reads Play before revoking.
+    await setState(token2, "EXPIRED");
     await publish({ voidedPurchaseNotification: { purchaseToken: token2, orderId: "GPA.0000", productType: 1, refundType: 1 } });
     expect(await waitForState(other.uid, "revoked")).toMatchObject({ entitled: false });
   });
@@ -140,9 +152,9 @@ describe("AT-8 purchase verification", () => {
     const phone = await Phone.create();
     const oldToken = `tok-${randomUUID()}`;
     const newToken = `tok-${randomUUID()}`;
-    await seed(oldToken, purchase("EXPIRED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"));
+    await seed(oldToken, purchase("EXPIRED", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"), phone);
     await verify(phone, oldToken);
-    await seed(newToken, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_PENDING", Date.now() + 30 * DAY, true, oldToken));
+    await seed(newToken, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_PENDING", Date.now() + 30 * DAY, true, oldToken), phone);
     await publish({ subscriptionNotification: { version: "1.0", notificationType: 4, purchaseToken: newToken } });
     expect(await waitForState(phone.uid, "active")).toMatchObject({ entitled: true });
     expect(await ackCount(newToken)).toBe(1);
@@ -162,7 +174,7 @@ describe("AT-8 purchase verification", () => {
   it.skipIf(!viaPubSub)("RTDN arrives through the Pub/Sub topic and the playRtdn function", async () => {
     const phone = await Phone.create();
     const token = `tok-${randomUUID()}`;
-    await seed(token, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"));
+    await seed(token, purchase("ACTIVE", "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"), phone);
     await verify(phone, token);
     await setState(token, "ON_HOLD");
     await publish({ subscriptionNotification: { version: "1.0", notificationType: 5, purchaseToken: token } });

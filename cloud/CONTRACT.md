@@ -29,7 +29,7 @@ There is no notification block and nothing about any reminder. On receipt, enque
 ## 2. Pairing and assistants
 
 ### `createPairingCode()`
-Returns `{ code, expiresAt }`. `code` is 8 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no 0, O, 1, I or L). It is valid for 10 minutes and works once; making a new code drops the previous unused one. Show it as `ABCD EFGH` if you like: the authorise page ignores spaces, hyphens and case.
+Returns `{ code, expiresAt }`. `code` is 8 characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (no 0, O, 1, I or L). It is valid for 10 minutes and works once; making a new code drops the previous unused one. Show it as `ABCD EFGH` if you like: the authorise page ignores spaces, hyphens and case. The page gives one message for every code that fails (wrong, used or expired): "That code didn't work. Check the code in Do, or make a new one there, and try again." After 5 tries on one page, or too many tries from one network, the assistant gets `access_denied` or a "Too many tries" page and the person starts again from the assistant.
 
 Show the MCP URL with it: `https://<site>/mcp` (see section 6 of `cloud/README.md`).
 
@@ -38,7 +38,7 @@ Read them directly from Firestore (the rules allow a device to read its own docu
 
 | field | meaning |
 | --- | --- |
-| `clientName` | what the assistant called itself (max 60 characters, untrusted: show it as plain text) |
+| `clientName` | what the assistant called itself (max 60 characters; the server removes control and format characters such as bidirectional overrides; still untrusted: show it as plain text) |
 | `clientId` | its OAuth client id |
 | `createdAt` | when it was connected |
 | `lastUsedAt` | last create or complete request, or null |
@@ -157,18 +157,32 @@ Returns `{ ok: true, reminders, events, skipped }` (counts written and skipped);
 
 ## 5. Purchases
 
-### `verifyPurchase({ platform: "play", packageName, productId, purchaseToken })`
+### Binding a purchase to this installation (changed after QA, M1)
+Every Play purchase must carry the installation's **obfuscated account id**, or the server will not entitle it:
+
+```
+obfuscatedAccountId = base64url( SHA-256( "do-account:" + uid ) )   // no padding, 43 characters
+```
+
+`uid` is the Anonymous Auth uid. The prefix `do-account:` is part of the hashed text (UTF-8). Example in Kotlin: `Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest("do-account:$uid".toByteArray()))`. Play allows up to 64 characters; this is 43 and is not reversible to the uid.
+
+- When launching the purchase: `BillingFlowParams.newBuilder()...setObfuscatedAccountId(obfuscatedAccountId)`. This means the phone must sign in (Anonymous Auth) **before** it starts a purchase.
+- Play returns it to the server with the purchase; a purchase without it, or with another installation's, never entitles this device (`state: "other_device"`). There is no fallback for unbound purchases: none have shipped.
+- After a reinstall the uid is new, so an existing subscription is `other_device` on the server. Keep Spec 10's local result for it (the server has no opinion about this installation). Renewals keep the same token, so server-side verification comes back only for a purchase made from this installation, for example after a resubscribe.
+
+### `verifyPurchase({ platform: "play", packageName, productId, purchaseToken, obfuscatedAccountId })`
 - `packageName`: `com.evansappstudio.doapp`.
 - `productId`: a Do subscription id (`do_unlimited` by default; the server's `PLAY_PRODUCT_IDS`).
 - `purchaseToken`: from Play Billing.
+- `obfuscatedAccountId`: required, exactly as above. A missing or different value is `invalid-argument`.
 
-The server reads the subscription from the Play Developer API, acknowledges it if Play says it is still pending, and stores `devices/{uid}/entitlement/current`, which the phone may also read directly. Returns the same record:
+The server reads the subscription from the Play Developer API. If the purchase is bound to this installation, it acknowledges it if Play says it is still pending and stores `devices/{uid}/entitlement/current`, which the phone may also read directly. Returns the same record:
 
 ```json
 { "state": "active", "entitled": true, "expiryTime": 1766900000000, "autoRenewing": true, "productId": "do_unlimited", "lastCheckedAt": 1764300000000 }
 ```
 
-`state` is one of `active`, `canceled` (still entitled until `expiryTime`), `grace_period` (entitled), `on_hold`, `paused`, `pending`, `expired`, `revoked` or `unknown`. Use `entitled` to switch Do Unlimited on or off. Play's notifications (RTDN) keep the record up to date afterwards. Errors: `invalid-argument` (wrong package or product), `not-found` (Play does not know the token), `unavailable` (Play could not be reached: keep the local Spec 10 result and try later).
+`state` is one of `active`, `canceled` (Play's spelling; still entitled until `expiryTime`), `grace_period` (entitled), `on_hold`, `paused`, `pending`, `expired`, `revoked`, `transferred` (a resubscribe or upgrade moved it to another installation), `other_device` (the purchase is bound to another installation, or to none) or `unknown`. Use `entitled` to switch Do Unlimited on or off, except that `other_device` means "no server opinion": keep the local Spec 10 result. Play's notifications (RTDN) keep the record up to date afterwards; a revoke or refund is acted on only when Play confirms it. The stored record also has `source` and `purchaseTokenHash` (ignore them). Errors: `invalid-argument` (wrong package, product or account id), `not-found` (Play does not know the token), `unavailable` (Play could not be reached: keep the local Spec 10 result and try later).
 
 ## 6. What assistants see (for the Assistants screen help text)
 

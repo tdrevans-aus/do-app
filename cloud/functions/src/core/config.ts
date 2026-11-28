@@ -66,6 +66,24 @@ export const settings = {
   playPackageName: () => process.env.PLAY_PACKAGE_NAME ?? "com.evansappstudio.doapp",
   playProductIds: () => listFrom("PLAY_PRODUCT_IDS", ["do_unlimited"]),
   rtdnTopic: () => process.env.RTDN_TOPIC ?? "play-rtdn",
+  /**
+   * Limits on the unauthenticated OAuth endpoints, per client IP and for the
+   * whole service. A global ceiling is the real bound on pairing-code guesses
+   * (IPs are cheap); when it is hit, the endpoint fails closed and logs
+   * do.oauth.limited with scope "global", which should page someone.
+   */
+  registerPerIpHour: () => intFrom("LIMIT_REGISTER_PER_IP_HOUR", 20),
+  registerGlobalHour: () => intFrom("LIMIT_REGISTER_GLOBAL_HOUR", 500),
+  authorizePagePerIpMinute: () => intFrom("LIMIT_AUTHORIZE_PAGE_PER_IP_MINUTE", 20),
+  authorizePageGlobalHour: () => intFrom("LIMIT_AUTHORIZE_PAGE_GLOBAL_HOUR", 3000),
+  authorizePostPerIpTenMinutes: () => intFrom("LIMIT_AUTHORIZE_POST_PER_IP_10MIN", 20),
+  authorizePostGlobalHour: () => intFrom("LIMIT_AUTHORIZE_POST_GLOBAL_HOUR", 1000),
+  /**
+   * How many proxies append to X-Forwarded-For after the client: the client
+   * IP is that many entries from the right (Firebase Hosting then Cloud Run's
+   * front end: 1). Check at deploy (README).
+   */
+  clientIpHops: () => intFrom("CLIENT_IP_HOPS", 1),
   /** Browser origins allowed to call /mcp. Requests with no Origin header are always allowed. */
   allowedOrigins: () => listFrom("ALLOWED_ORIGINS", [new URL(baseUrl()).origin]),
 };

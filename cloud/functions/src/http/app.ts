@@ -4,6 +4,7 @@ import { finishAuthorization, startAuthorization } from "../oauth/authorize";
 import { ClientError, registerClient, type MetadataFetcher } from "../oauth/clients";
 import { authorizationServerMetadata, bearerChallenge, protectedResourceMetadata } from "../oauth/metadata";
 import { tokenEndpoint } from "../oauth/token";
+import { limitOAuth } from "../oauth/limits";
 import { verifyAccessToken } from "../oauth/tokens";
 import { handleMcpMessage, originAllowed } from "./mcp";
 import { handleRest } from "./rest";
@@ -49,6 +50,10 @@ async function route(req: HttpRequest, deps: AppDeps): Promise<HttpResponse> {
   }
   if (path === "/oauth/register") {
     if (method !== "POST") return json(405, { error: "invalid_request" }, { allow: "POST" });
+    const wait = await limitOAuth("register", req.ip, now);
+    if (wait > 0) {
+      return json(429, { error: "too_many_requests", error_description: "Too many registrations; try again later" }, { "retry-after": String(wait) });
+    }
     try {
       const body = await registerClient(req.body, now);
       logInfo("oauth.registered", {});

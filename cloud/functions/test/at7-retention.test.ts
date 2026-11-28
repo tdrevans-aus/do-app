@@ -30,8 +30,8 @@ describe("AT-7 retention clean-up", () => {
     await inbox.doc("rq_recent_done").set({ agentId, status: "failed", createdAt: now - 6 * DAY, finishedAt: now - 6 * DAY, expiresAt: now - 5 * DAY });
     await inbox.doc("rq_old_expired").set({ agentId, status: "expired", createdAt: now - 10 * DAY, finishedAt: now - 8 * DAY, expiresAt: now - 9 * DAY });
     await inbox.doc("rq_stale_pending").set({ agentId, status: "pending", createdAt: now - 2 * DAY, finishedAt: null, expiresAt: now - DAY, kind: "create_reminder", args: {} });
-    await events.doc("p_old").set({ seq: 900, type: "fired", at: now - 31 * DAY, storedAt: now - 31 * DAY });
-    await events.doc("p_recent").set({ seq: 901, type: "nagged", at: now - 29 * DAY, storedAt: now - 29 * DAY });
+    await events.doc("p_old").set({ seq: 900, type: "fired", at: now - 31 * DAY, receivedAt: now - 31 * DAY });
+    await events.doc("p_recent").set({ seq: 901, type: "nagged", at: now - 29 * DAY, receivedAt: now - 29 * DAY });
 
     const report = await runCleanup(now);
     expect(report.expired).toBeGreaterThanOrEqual(1);

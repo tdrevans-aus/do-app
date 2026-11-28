@@ -4,7 +4,8 @@ import { randomId, randomToken, sha256 } from "../core/crypto";
 import { db, agentRef, paths } from "../core/db";
 import { logInfo } from "../core/log";
 import { redeemPairingCode } from "../core/pairing";
-import { field, html, redirect, type HttpRequest, type HttpResponse } from "../http/types";
+import { cspSourceFor, field, html, redirect, type HttpRequest, type HttpResponse } from "../http/types";
+import { limitOAuth } from "./limits";
 import { ClientError, markClientUsed, redirectMatches, resolveClient, type MetadataFetcher } from "./clients";
 import { canonicalResource, SCOPE } from "./metadata";
 import { codePage, messagePage } from "./page";
@@ -41,7 +42,15 @@ function hostOf(uri: string): string {
   }
 }
 
+/** form-action sources for the code page: the assistant's redirect target, exactly. */
+function formActionFor(redirectUri: string): string[] {
+  const source = cspSourceFor(redirectUri);
+  return source ? [source] : [];
+}
+
 export async function startAuthorization(req: HttpRequest, now: number, fetcher?: MetadataFetcher): Promise<HttpResponse> {
+  const wait = await limitOAuth("authorize_page", req.ip, now);
+  if (wait > 0) return tooMany(wait);
   const q = req.query;
   let client;
   try {
@@ -80,45 +89,73 @@ export async function startAuthorization(req: HttpRequest, now: number, fetcher?
       createdAt: now,
       expiresAt: now + limits.authRequestMs,
     });
-  return html(200, codePage({ requestId, clientName: client.clientName, returnHost: hostOf(redirectUri) }));
+  return html(200, codePage({ requestId, clientName: client.clientName, returnHost: hostOf(redirectUri) }), {}, formActionFor(redirectUri));
 }
 
-const WRONG_CODE = "That code didn't work. Check the code in Do and try again.";
+/**
+ * One message for a wrong, unknown, used, expired or burnt code (QA L8), so
+ * the page never tells a guesser that a code was live.
+ */
+export const WRONG_CODE = "That code didn't work. Check the code in Do, or make a new one there, and try again.";
+
+const EXPIRED_PAGE = "This page has expired. Go back to your assistant and connect again.";
+
+function tooMany(wait: number): HttpResponse {
+  return html(429, messagePage("Too many tries", "There have been too many attempts. Wait a few minutes, then go back to your assistant and connect again."), {
+    "retry-after": String(wait),
+  });
+}
+
+type Reserved =
+  | { kind: "gone" }
+  | { kind: "cancel"; pending: FirebaseFirestore.DocumentData }
+  | { kind: "spent"; pending: FirebaseFirestore.DocumentData }
+  | { kind: "try"; pending: FirebaseFirestore.DocumentData; tries: number };
 
 export async function finishAuthorization(req: HttpRequest, now: number, fetcher?: MetadataFetcher): Promise<HttpResponse> {
   const requestId = field(req.body, "request_id");
-  if (!requestId || requestId.length > 100) {
-    return html(400, messagePage("Can't connect", "This page has expired. Go back to your assistant and connect again."));
-  }
+  if (!requestId || requestId.length > 100) return html(400, messagePage("Can't connect", EXPIRED_PAGE));
+  const wait = await limitOAuth("authorize_post", req.ip, now);
+  if (wait > 0) return tooMany(wait);
   const requestRef = db().collection(paths.authRequests).doc(sha256(`authreq:${requestId}`));
-  const pending = (await requestRef.get()).data();
-  if (!pending || pending.expiresAt <= now) {
-    return html(400, messagePage("Can't connect", "This page has expired. Go back to your assistant and connect again."));
-  }
+  const cancel = field(req.body, "action") === "cancel";
+
+  // Charge the try before checking the code, in one transaction, so parallel
+  // posts on one page can't each get a guess beyond the limit.
+  const reserved = await db().runTransaction(async (tx): Promise<Reserved> => {
+    const snap = await tx.get(requestRef);
+    const pending = snap.data();
+    if (!pending || pending.expiresAt <= now) return { kind: "gone" };
+    if (cancel) {
+      tx.delete(requestRef);
+      return { kind: "cancel", pending };
+    }
+    const tries = (pending.tries ?? 0) as number;
+    if (tries >= limits.pairingTries) {
+      tx.delete(requestRef);
+      return { kind: "spent", pending };
+    }
+    tx.update(requestRef, { tries: tries + 1 });
+    return { kind: "try", pending, tries: tries + 1 };
+  });
+  if (reserved.kind === "gone") return html(400, messagePage("Can't connect", EXPIRED_PAGE));
+  const pending = reserved.pending;
   const state = pending.state ?? undefined;
-  if (field(req.body, "action") === "cancel") {
-    await requestRef.delete();
-    return errorRedirect(pending.redirectUri, "access_denied", "The person cancelled", state);
-  }
+  if (reserved.kind === "cancel") return errorRedirect(pending.redirectUri, "access_denied", "The person cancelled", state);
+  if (reserved.kind === "spent") return errorRedirect(pending.redirectUri, "access_denied", "Too many wrong codes", state);
 
   const result = await redeemPairingCode(field(req.body, "code"), now);
   if (!result.ok) {
-    const tries = (pending.tries ?? 0) + 1;
-    logInfo("pairing.rejected", { reason: result.reason, tries });
-    if (tries >= limits.pairingTries) {
+    logInfo("pairing.rejected", { reason: result.reason, tries: reserved.tries });
+    if (reserved.tries >= limits.pairingTries) {
       await requestRef.delete();
       return errorRedirect(pending.redirectUri, "access_denied", "Too many wrong codes", state);
     }
-    await requestRef.update({ tries });
-    const message =
-      result.reason === "burnt"
-        ? "That code has been used up after too many tries. Make a new code in Do and try again."
-        : result.reason === "expired"
-          ? "That code has expired or was already used. Make a new code in Do and try again."
-          : WRONG_CODE;
     return html(
       400,
-      codePage({ requestId, clientName: pending.clientName, returnHost: hostOf(pending.redirectUri), error: message }),
+      codePage({ requestId, clientName: pending.clientName, returnHost: hostOf(pending.redirectUri), error: WRONG_CODE }),
+      {},
+      formActionFor(pending.redirectUri),
     );
   }
 

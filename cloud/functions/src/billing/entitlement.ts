@@ -11,6 +11,10 @@ export type EntitlementState =
   | "pending"
   | "expired"
   | "revoked"
+  /** The purchase moved to another installation (a resubscribe or upgrade bound to it). */
+  | "transferred"
+  /** This purchase is bound to another installation of Do: not entitled here. */
+  | "other_device"
   | "unknown";
 
 export interface Entitlement {

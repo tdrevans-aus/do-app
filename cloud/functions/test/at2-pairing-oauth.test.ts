@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -103,6 +104,15 @@ describe("AT-2 full OAuth flow", () => {
     assistant.tokens = rotated;
     expect((await assistant.rpc("tools/list")).status).toBe(200);
 
+    // Within 30 seconds a retry with the old refresh token gets the same new pair (a lost response).
+    const retry = await assistant.refresh(firstRefresh);
+    expect(retry.status).toBe(200);
+    const retried = (await retry.json()) as any;
+    expect(retried.refresh_token).toBe(rotated.refresh_token);
+    expect(retried.access_token).toBe(rotated.access_token);
+    // After the grace window, reuse is theft: the grant is revoked.
+    const oldDoc = adminDb().collection("tokens").doc(createHash("sha256").update(`token:${firstRefresh}`).digest("hex"));
+    await oldDoc.update({ rotatedAt: Date.now() - 31_000 });
     const reuse = await assistant.refresh(firstRefresh);
     expect(reuse.status).toBe(400);
     expect((await reuse.json() as any).error).toBe("invalid_grant");
@@ -129,7 +139,7 @@ describe("AT-2 full OAuth flow", () => {
     const page = await second.openAuthorize();
     const again = await second.submitCode(page.requestId!, code);
     expect(again.response.status).toBe(400);
-    expect(again.html).toContain("expired or was already used");
+    expect(again.html).toContain("That code didn't work");
 
     // Expiry: move the stored expiry into the past (the 10 minutes have passed).
     const fresh = await phone.pairingCode();
@@ -144,7 +154,7 @@ describe("AT-2 full OAuth flow", () => {
     const latePage = await late.openAuthorize();
     const lateSubmit = await late.submitCode(latePage.requestId!, fresh);
     expect(lateSubmit.response.status).toBe(400);
-    expect(lateSubmit.html).toContain("expired");
+    expect(lateSubmit.html).toContain("That code didn't work");
   });
 
   it("five wrong tries burn the code", async () => {
@@ -167,7 +177,7 @@ describe("AT-2 full OAuth flow", () => {
     const page = await last.openAuthorize();
     const submit = await last.submitCode(page.requestId!, code);
     expect(submit.response.status).toBe(400);
-    expect(submit.html).toContain("used up after too many tries");
+    expect(submit.html).toContain("That code didn't work");
   });
 
   it("five wrong codes on one page end the authorisation with access_denied", async () => {

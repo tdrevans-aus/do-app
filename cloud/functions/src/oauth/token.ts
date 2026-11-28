@@ -1,4 +1,4 @@
-import { sha256 } from "../core/crypto";
+import { openWith, sealWith, sha256 } from "../core/crypto";
 import { db, paths } from "../core/db";
 import { logInfo, logWarn } from "../core/log";
 import { field, json, type HttpRequest, type HttpResponse } from "../http/types";
@@ -52,6 +52,14 @@ async function exchangeCode(req: HttpRequest, now: number): Promise<TokenPair> {
   });
 }
 
+/**
+ * A client that loses the token response (a dropped connection) will retry
+ * with the same refresh token. Within this window it gets the same new pair
+ * again instead of losing the grant; after it, reuse still revokes (QA L7).
+ */
+export const REFRESH_GRACE_MS = 30_000;
+const GRACE_PURPOSE = "do-refresh-grace";
+
 async function rotateRefresh(req: HttpRequest, now: number): Promise<TokenPair> {
   const refresh = field(req.body, "refresh_token");
   const clientId = field(req.body, "client_id");
@@ -61,8 +69,19 @@ async function rotateRefresh(req: HttpRequest, now: number): Promise<TokenPair> 
     const data = (await tx.get(ref)).data();
     if (!data || data.type !== "refresh") throw new GrantRejected("The refresh token is not valid");
     if (data.clientId !== clientId) throw new GrantRejected("The refresh token was issued to another client");
-    // Reuse of a rotated refresh token: treat the whole grant as stolen (OAuth 2.1 section 4.3.1).
-    if (data.rotatedAt) throw new GrantRejected("The refresh token was already used", data.grantId);
+    if (data.rotatedAt) {
+      if (now - (data.rotatedAt as number) <= REFRESH_GRACE_MS && typeof data.graceCipher === "string") {
+        const plain = openWith(refresh, GRACE_PURPOSE, data.graceCipher);
+        const grant = (await tx.get(db().collection(paths.grants).doc(data.grantId))).data();
+        if (plain && grant && !grant.revokedAt) {
+          const pair = JSON.parse(plain) as TokenPair & { issuedAt: number };
+          const { issuedAt, ...rest } = pair;
+          return { ...rest, expires_in: Math.max(1, rest.expires_in - Math.floor((now - issuedAt) / 1000)) };
+        }
+      }
+      // Reuse of a rotated refresh token after the grace window: treat the whole grant as stolen (OAuth 2.1 section 4.3.1).
+      throw new GrantRejected("The refresh token was already used", data.grantId);
+    }
     if (data.expiresAt <= now) throw new GrantRejected("The refresh token has expired");
     const resourceRaw = field(req.body, "resource");
     if (resourceRaw !== undefined && canonicalResource(resourceRaw) !== data.resource) {
@@ -71,8 +90,9 @@ async function rotateRefresh(req: HttpRequest, now: number): Promise<TokenPair> 
     const grantSnap = await tx.get(db().collection(paths.grants).doc(data.grantId));
     const grantData = grantSnap.data();
     if (!grantData || grantData.revokedAt) throw new GrantRejected("The grant was revoked");
-    tx.update(ref, { rotatedAt: now });
-    return issueTokens(tx, grantFrom(grantSnap.id, grantData), now);
+    const pair = issueTokens(tx, grantFrom(grantSnap.id, grantData), now);
+    tx.update(ref, { rotatedAt: now, graceCipher: sealWith(refresh, GRACE_PURPOSE, JSON.stringify({ ...pair, issuedAt: now })) });
+    return pair;
   });
 }
 

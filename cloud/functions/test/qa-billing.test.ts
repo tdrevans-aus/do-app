@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { accountIdFor } from "../src/billing/binding";
 import { FakePlayClient } from "../src/billing/play";
 import { handleRtdn } from "../src/billing/rtdn";
 import { adminDb } from "./helpers/admin";
@@ -12,8 +13,11 @@ import { Phone } from "./helpers/phone";
 const PRODUCT = "do_unlimited";
 const DAY = 24 * 60 * 60 * 1000;
 
-function purchase(state: string, expiry = Date.now() + 30 * DAY) {
+// Fix for M1: purchases are bound to the installation that made them (the app passes
+// accountIdFor(uid) as BillingFlowParams.setObfuscatedAccountId), so fixtures name an owner.
+function purchase(state: string, expiry = Date.now() + 30 * DAY, owner?: string) {
   return {
+    ...(owner ? { externalAccountIdentifiers: { obfuscatedExternalAccountId: accountIdFor(owner) } } : {}),
     subscriptionState: `SUBSCRIPTION_STATE_${state}`,
     acknowledgementState: "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
     lineItems: [{ productId: PRODUCT, expiryTime: new Date(expiry).toISOString(), autoRenewingPlan: { autoRenewEnabled: true } }],
@@ -21,7 +25,13 @@ function purchase(state: string, expiry = Date.now() + 30 * DAY) {
 }
 
 const verify = (phone: Phone, token: string) =>
-  phone.call<Record<string, any>>("verifyPurchase", { platform: "play", packageName: PACKAGE, productId: PRODUCT, purchaseToken: token });
+  phone.call<Record<string, any>>("verifyPurchase", {
+    platform: "play",
+    packageName: PACKAGE,
+    productId: PRODUCT,
+    purchaseToken: token,
+    obfuscatedAccountId: accountIdFor(phone.uid),
+  });
 
 const entitlement = async (uid: string) => (await adminDb().doc(`devices/${uid}/entitlement/current`).get()).data();
 
@@ -35,11 +45,13 @@ describe("QA purchase verification", () => {
     // (a token copied off a rooted phone or shared) entitles any number of devices,
     // and the earlier ones stay entitled server-side after it expires.
     const token = `qa-shared-${randomUUID()}`;
-    await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: purchase("ACTIVE"), ackCount: 0 });
     const first = await Phone.create();
     const second = await Phone.create();
+    await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: purchase("ACTIVE", undefined, first.uid), ackCount: 0 });
     expect((await verify(first, token)).entitled).toBe(true);
-    expect((await verify(second, token)).entitled).toBe(true);
+    // After the M1 fix the second device can't take the token at all (stricter than handing it over).
+    expect((await verify(second, token)).entitled).toBe(false);
+    expect((await entitlement(first.uid))!.entitled).toBe(true);
 
     await FakePlayClient.ref(token).update({ "purchase.subscriptionState": "SUBSCRIPTION_STATE_EXPIRED" });
     await rtdn({ subscriptionNotification: { version: "1.0", notificationType: 13, purchaseToken: token, subscriptionId: PRODUCT } });
@@ -49,18 +61,19 @@ describe("QA purchase verification", () => {
 
   it("an RTDN's claimed state is never trusted: the state is read back from Play", async () => {
     const token = `qa-forged-${randomUUID()}`;
-    await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: purchase("ACTIVE"), ackCount: 0 });
     const phone = await Phone.create();
+    await FakePlayClient.ref(token).set({ packageName: PACKAGE, purchase: purchase("ACTIVE", undefined, phone.uid), ackCount: 0 });
     await verify(phone, token);
     // A forged "expired" or "on hold" subscription notification: Play still says active, so it stays active.
     for (const type of [13, 5]) {
       await rtdn({ subscriptionNotification: { version: "1.0", notificationType: type, purchaseToken: token, subscriptionId: PRODUCT } });
     }
     expect((await entitlement(phone.uid))!).toMatchObject({ state: "active", entitled: true });
-    // Documented trust (Low, see the report): type 12 (revoked) and voidedPurchaseNotification are
-    // taken from the notification itself, so only the topic's IAM stops a forged one.
+    // After the L6 fix, type 12 (revoked) and a voided purchase are re-checked with Play too,
+    // so forged ones change nothing while Play says the subscription is active.
     await rtdn({ subscriptionNotification: { version: "1.0", notificationType: 12, purchaseToken: token, subscriptionId: PRODUCT } });
-    expect((await entitlement(phone.uid))!.state).toBe("revoked");
+    await rtdn({ voidedPurchaseNotification: { purchaseToken: token, orderId: "GPA.1", productType: 1, refundType: 1 } });
+    expect((await entitlement(phone.uid))!).toMatchObject({ state: "active", entitled: true });
     // Another package's notification is ignored.
     const other = await handleRtdn(
       { version: "1.0", packageName: "com.example.other", subscriptionNotification: { notificationType: 2, purchaseToken: token } },

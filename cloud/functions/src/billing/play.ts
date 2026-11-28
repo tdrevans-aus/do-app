@@ -12,6 +12,8 @@ export interface SubscriptionPurchaseV2 {
   subscriptionState?: string | null;
   acknowledgementState?: string | null;
   linkedPurchaseToken?: string | null;
+  /** Set when the app passed BillingFlowParams.setObfuscatedAccountId. */
+  externalAccountIdentifiers?: { obfuscatedExternalAccountId?: string | null; obfuscatedExternalProfileId?: string | null } | null;
   testPurchase?: unknown;
   lineItems?: Array<{
     productId?: string | null;
