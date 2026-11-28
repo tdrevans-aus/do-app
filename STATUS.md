@@ -28,7 +28,7 @@ Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, s
 - PR #8: phone rerun (AT-20 to AT-28) and hands-on AT-05, AT-10, AT-12, then your OK to merge.
 - iPhone engine test: build to your iPhone from your Mac (runbook will be at `ios/engine-test/RUNBOOK.md` on branch `ios/engine-test`).
 - Apply for Apple's Critical Alerts entitlement and Google's AppFunctions early access.
-- For Play Console later: consider turning off Resubscribe and Pause on the `annual` base plan (Do has no server, so a resubscribe from the Play Store is only acknowledged when Do is next opened, and a paused plan reads as ended).
+- Play Console (when you create Do Unlimited): **decided 28 Nov**, Resubscribe on, Pause off.
 - Do Cloud: create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
 
 ## Nothing merged, nothing published

@@ -23,6 +23,10 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 9. **A lapsed subscription never stops reminders.** Every existing reminder keeps nagging. The user cannot add more beyond 5 active until they renew. Backup and export always work.
 10. **Sponsors, affiliate and "Book it" links are a later, second revenue line**, not v1. They come after there is an audience in one region. Paid users can hide them. Health items are never sponsored. A sponsor never changes when or how a reminder fires.
 
+## Decided 28 Nov 2026 (Tim)
+
+11. **Play Console settings for the `annual` base plan:** Resubscribe **on** (lapsed users can rejoin from the Play Store in one tap; Do Cloud's server confirms the purchase straight away, so the 3-day acknowledgement gap closes once Do Cloud is live). Pause **off** (a paused plan would read as "ended" in Do, and pausing adds confusion on an annual plan; anyone wanting a break can cancel and resubscribe).
+
 ## Still open
 
 - **Free trial:** whether to add a short free trial of the paid tier on top of the A$3.99 first year. Probably not needed, since the free tier already lets people try everything. Not decided.
