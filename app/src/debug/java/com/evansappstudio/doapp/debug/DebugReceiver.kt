@@ -91,6 +91,12 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_DELETE -> delete(context, intent)
             ACTION_RESTORE -> restore(context, intent)
             ACTION_PURGE_NOW -> purgeNow(context, intent)
+            ACTION_CATALOGUE_DUMP -> SysdDebug.catalogueDump(context, goAsync())
+            ACTION_SET_REGION -> SysdDebug.setRegion(context, intent.getStringExtra(EXTRA_REGION))
+            ACTION_SUGGESTION_DUMP -> SysdDebug.suggestionDump(context, goAsync())
+            ACTION_SUGGESTION_RESET -> SysdDebug.suggestionReset(context, boolExtra(intent, EXTRA_FIRST_RUN))
+            ACTION_SET_PROFILE -> SysdDebug.setProfile(context, intent.getStringExtra(EXTRA_AREAS))
+            ACTION_SET_TODAY -> SysdDebug.setToday(context, intent.getStringExtra(EXTRA_DATE))
         }
     }
 
@@ -1181,6 +1187,16 @@ class DebugReceiver : BroadcastReceiver() {
         const val ACTION_DELETE = "com.evansappstudio.doapp.debug.DELETE"
         const val ACTION_RESTORE = "com.evansappstudio.doapp.debug.RESTORE"
         const val ACTION_PURGE_NOW = "com.evansappstudio.doapp.debug.PURGE_NOW"
+        const val ACTION_CATALOGUE_DUMP = "com.evansappstudio.doapp.debug.CATALOGUE_DUMP"
+        const val ACTION_SET_REGION = "com.evansappstudio.doapp.debug.SET_REGION"
+        const val ACTION_SUGGESTION_DUMP = "com.evansappstudio.doapp.debug.SUGGESTION_DUMP"
+        const val ACTION_SUGGESTION_RESET = "com.evansappstudio.doapp.debug.SUGGESTION_RESET"
+        const val ACTION_SET_PROFILE = "com.evansappstudio.doapp.debug.SET_PROFILE"
+        const val ACTION_SET_TODAY = "com.evansappstudio.doapp.debug.SET_TODAY"
+        const val EXTRA_REGION = "region"
+        const val EXTRA_AREAS = "areas"
+        const val EXTRA_DATE = "date"
+        const val EXTRA_FIRST_RUN = "firstRun"
         const val EXTRA_SOURCE = "source"
         const val EXTRA_SOURCE_ID = "sourceId"
         const val EXTRA_CATEGORY = "category"

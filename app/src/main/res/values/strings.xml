@@ -178,4 +178,116 @@
     <string name="backup_error_app">This file is not a Do backup.</string>
     <string name="backup_error_corrupt">Could not read that backup.</string>
     <string name="backup_folder_set">A backup folder is set.</string>
+    <!-- Spec 11: Stuff You Should Do -->
+    <string name="sysd_name">Stuff You Should Do</string>
+    <string name="sysd_chip">Catalogue</string>
+    <string name="tab_today">Today</string>
+    <string name="tab_catalogue">Catalogue</string>
+    <string name="sysd_skip">Skip</string>
+    <string name="sysd_next">Next</string>
+    <string name="sysd_step">Step %1$d of 4</string>
+    <string name="sysd_areas_title">What do you look after?</string>
+    <string name="sysd_areas_body">Pick any that apply. Do will suggest the regular jobs that are easy to forget.</string>
+    <string name="sysd_privacy">Your answers stay on this phone and only shape suggestions.</string>
+    <string name="sysd_area_home">Home</string>
+    <string name="sysd_area_renter">Renting</string>
+    <string name="sysd_area_car">Car</string>
+    <string name="sysd_area_kids">Kids</string>
+    <string name="sysd_area_pets">Pets</string>
+    <string name="sysd_area_health">Health</string>
+    <string name="sysd_area_money">Money and admin</string>
+    <string name="sysd_area_digital">Digital</string>
+    <string name="sysd_picks_title">Some picks for you</string>
+    <string name="sysd_picks_body">Each one repeats and nags until it is done. Untick anything you do not need.</string>
+    <string name="sysd_show_more">Show more</string>
+    <string name="sysd_show_less">Show less</string>
+    <plurals name="sysd_free_left">
+        <item quantity="one">%1$d free left, counting your first reminder</item>
+        <item quantity="other">%1$d free left, counting your first reminder</item>
+    </plurals>
+    <plurals name="sysd_over_free">
+        <item quantity="one">%1$d more than the free 5</item>
+        <item quantity="other">%1$d more than the free 5</item>
+    </plurals>
+    <plurals name="sysd_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="sysd_add_n">
+        <item quantity="one">Add %1$d reminder</item>
+        <item quantity="other">Add %1$d reminders</item>
+    </plurals>
+    <string name="sysd_nothing_ticked">Nothing ticked</string>
+    <string name="sysd_no_items">Nothing here for these areas where you are.</string>
+    <string name="sysd_check_state">Check your state</string>
+    <string name="sysd_needs_date">Pick the date</string>
+    <string name="sysd_due_on">Due %1$s</string>
+    <string name="sysd_change_date">Change date</string>
+    <string name="sysd_pick_date_title">When is it due?</string>
+    <plurals name="sysd_every_day">
+        <item quantity="one">Every day</item>
+        <item quantity="other">Every %1$d days</item>
+    </plurals>
+    <plurals name="sysd_every_week">
+        <item quantity="one">Every week</item>
+        <item quantity="other">Every %1$d weeks</item>
+    </plurals>
+    <plurals name="sysd_every_month">
+        <item quantity="one">Every month</item>
+        <item quantity="other">Every %1$d months</item>
+    </plurals>
+    <plurals name="sysd_every_year">
+        <item quantity="one">Every year</item>
+        <item quantity="other">Every %1$d years</item>
+    </plurals>
+    <string name="sysd_from_completion">%1$s, counted from when you last did it</string>
+    <string name="sysd_from_due">%1$s, on a fixed date</string>
+    <string name="sysd_region_line">Using %1$s rules.</string>
+    <string name="sysd_region_outside">Using rules for outside Australia.</string>
+    <string name="sysd_region_nsw_or_act">NSW or ACT?</string>
+    <string name="sysd_region_change">Change</string>
+    <string name="sysd_region_choose">Choose</string>
+    <string name="sysd_region_title">Where are you?</string>
+    <string name="sysd_region_body">Some jobs and intervals depend on your state or territory. Do never asks for your location.</string>
+    <string name="sysd_region_auto">Work it out from my time zone</string>
+    <string name="sysd_region_outside_option">Outside Australia</string>
+    <string name="sysd_state_nsw">New South Wales</string>
+    <string name="sysd_state_vic">Victoria</string>
+    <string name="sysd_state_qld">Queensland</string>
+    <string name="sysd_state_wa">Western Australia</string>
+    <string name="sysd_state_sa">South Australia</string>
+    <string name="sysd_state_tas">Tasmania</string>
+    <string name="sysd_state_act">Australian Capital Territory</string>
+    <string name="sysd_state_nt">Northern Territory</string>
+    <string name="sysd_short_nsw">NSW</string>
+    <string name="sysd_short_vic">Vic</string>
+    <string name="sysd_short_qld">Qld</string>
+    <string name="sysd_short_wa">WA</string>
+    <string name="sysd_short_sa">SA</string>
+    <string name="sysd_short_tas">Tas</string>
+    <string name="sysd_short_act">ACT</string>
+    <string name="sysd_short_nt">NT</string>
+    <string name="sysd_short_au">Australia-wide</string>
+    <string name="sysd_catalogue_title">Catalogue</string>
+    <string name="sysd_search">Search</string>
+    <string name="sysd_all_areas">All</string>
+    <string name="sysd_add_item">Add</string>
+    <string name="sysd_added_item">Added</string>
+    <string name="sysd_add_named">Add %1$s</string>
+    <string name="sysd_selected_mark">Selected: %1$s</string>
+    <string name="sysd_added_named">Added %1$s. Tap to remove.</string>
+    <string name="sysd_suggestions_setting">Stuff You Should Do suggestions</string>
+    <string name="sysd_suggestions_setting_subtitle">Cards on Today. Never a notification. The Catalogue tab stays either way.</string>
+    <string name="sysd_no_matches">No matches.</string>
+    <string name="sysd_card_head_start">A head start</string>
+    <string name="sysd_card_head_start_body">A few regular jobs people often forget. Add any you want.</string>
+    <string name="sysd_card_seasonal">Coming up this time of year</string>
+    <string name="sysd_card_seasonal_body">These are usually done around now.</string>
+    <string name="sysd_card_related">Next to look after</string>
+    <string name="sysd_card_related_body">You did "%1$s". This often goes with it.</string>
+    <string name="sysd_card_open">See the catalogue</string>
+    <string name="sysd_card_not_now">Not now</string>
+    <string name="sysd_card_stop">Stop suggesting</string>
+    <string name="sysd_related_line">Related:</string>
+    <string name="sysd_overdue">Overdue</string>
 </resources>

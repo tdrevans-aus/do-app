@@ -37,6 +37,28 @@ class CorePurityTest {
         assertTrue(androidImports(listOf("// import android.util.Log is not allowed")).isEmpty())
     }
 
+    // AT-10 (Spec 11: core purity covers the new pure files)
+    @Test
+    fun at10Spec11PureFilesAreInTheCoreAndImportNoAndroidCode() {
+        assertTrue(CORE_FILES.containsAll(SPEC11_CORE))
+        SPEC11_CORE.forEach { path ->
+            val file = sourceFile(path)
+            assertEquals(path, emptyList<String>(), androidImports(file.readLines()))
+            // Their app imports are themselves core files.
+            val appImports = file.readLines().map { it.trim() }
+                .filter { it.startsWith("import com.evansappstudio.doapp.") }
+            appImports.forEach { line ->
+                val name = line.removePrefix("import com.evansappstudio.doapp.")
+                val pkg = name.substringBeforeLast('.')
+                val coreOwner = CORE_FILES.any { core ->
+                    core.substringBeforeLast('/').replace('/', '.') == pkg &&
+                        sourceFile(core).readText().contains(name.substringAfterLast('.'))
+                }
+                assertTrue("$path: $line is not from a core file", coreOwner)
+            }
+        }
+    }
+
     private fun androidImports(lines: List<String>): List<String> = lines
         .map { it.trim() }
         .filter { it.startsWith("import android.") || it.startsWith("import androidx.") }
@@ -59,6 +81,22 @@ class CorePurityTest {
             "alarm/QuickTimes.kt",
             "data/RepeatRule.kt",
             "alarm/CommandTypes.kt",
+            // Spec 11: the catalogue model and parser, regions, picks and suggestions,
+            // and the small JSON codec the parser and suggestion state use.
+            "catalogue/Catalogue.kt",
+            "catalogue/Region.kt",
+            "catalogue/Picks.kt",
+            "catalogue/SuggestionPolicy.kt",
+            "backup/BackupJson.kt",
+        )
+
+        /** Spec 11 files that must stay in [CORE_FILES]. */
+        val SPEC11_CORE: List<String> = listOf(
+            "catalogue/Catalogue.kt",
+            "catalogue/Region.kt",
+            "catalogue/Picks.kt",
+            "catalogue/SuggestionPolicy.kt",
+            "backup/BackupJson.kt",
         )
     }
 }

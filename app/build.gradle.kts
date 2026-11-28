@@ -82,6 +82,8 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // QA: Robolectric renders the Spec 11 Compose screens on the JVM.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -151,6 +153,11 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.sqlite.jdbc)
     testImplementation("org.json:json:20240303")
+    // QA (Spec 11): render Compose screens on the JVM, test only.
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation("org.robolectric:robolectric:4.18.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 val checkAlarmManifests = tasks.register("checkAlarmManifests") {

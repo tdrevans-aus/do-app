@@ -103,6 +103,10 @@ import com.evansappstudio.doapp.data.RepeatPresets
 import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.RepeatRule
 import com.evansappstudio.doapp.data.WeekStart
+import com.evansappstudio.doapp.catalogue.CardKind
+import com.evansappstudio.doapp.catalogue.KeywordMatch
+import com.evansappstudio.doapp.catalogue.LocalItem
+import com.evansappstudio.doapp.catalogue.PlannedAdd
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalTime
@@ -121,6 +125,9 @@ private const val SCREEN_SNOOZE = "snooze"
 private const val SCREEN_HEALTH = "health"
 private const val SCREEN_UNLOCK = "unlock"
 private const val SCREEN_BACKUP = "backup"
+private const val SCREEN_AREAS = "sysd_areas"
+private const val SCREEN_PICKS = "sysd_picks"
+private const val SCREEN_CATALOGUE = "catalogue"
 
 private val nagChoices = listOf(1, 5, 10, 15, 30, 60, 0)
 
@@ -146,6 +153,37 @@ fun ReminderApp(
     var unlockFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var backupFrom by rememberSaveable { mutableStateOf(SCREEN_LIST) }
     var replaceCount by remember { mutableIntStateOf(0) }
+    val sysd: SysdViewModel = viewModel(factory = SysdViewModelFactory(container))
+    val card by sysd.card.collectAsStateWithLifecycle()
+    val sysdItems by sysd.items.collectAsStateWithLifecycle()
+    val sysdAdded by sysd.added.collectAsStateWithLifecycle()
+
+    fun catalogueAdd(item: LocalItem, date: java.time.LocalDate?, from: String, kind: CardKind? = null) {
+        sysd.addOne(item, date, kind) { blocked ->
+            if (blocked) {
+                unlockFrom = from
+                screen = SCREEN_UNLOCK
+            }
+        }
+    }
+
+    fun finishPicks(plans: List<PlannedAdd>) {
+        sysd.finishOnboarding()
+        sysd.addPlans(plans)
+        screen = SCREEN_LIST
+    }
+
+    // A Done on a catalogue reminder (from the list or a notification) can bring a related card.
+    LaunchedEffect(reminders) { sysd.refreshCard() }
+
+    // First run steps 3 and 4: once, the first time there is an active reminder
+    // (after the first reminder is saved, or on first launch with reminders).
+    LaunchedEffect(screen, reminders) {
+        if (screen == SCREEN_LIST && reminders.any { !it.isDone } && sysd.onboardingPending()) {
+            sysd.startOnboarding()
+            screen = SCREEN_AREAS
+        }
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -221,6 +259,7 @@ fun ReminderApp(
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshPermissions()
                 viewModel.reloadQuickTimes()
+                sysd.reload()
                 container.scope.launch {
                     if (UserUnlock.isUnlocked(context)) {
                         container.scheduler.rescheduleAll()
@@ -288,6 +327,8 @@ fun ReminderApp(
             initialAlert = viewModel.defaultAlertLevel(),
             parseDates = viewModel.parseDatesEnabled(),
             onParseDates = viewModel::setParseDatesEnabled,
+            related = { typed -> KeywordMatch.related(typed, sysdItems, sysdAdded) },
+            onAddRelated = { item, date -> catalogueAdd(item, date, SCREEN_ADD) },
             onSave = { title, dueAt, nagMinutes, rule, _, alert ->
                 viewModel.add(title, dueAt, nagMinutes, rule, alert) { created ->
                     screen = if (created) SCREEN_LIST else SCREEN_UNLOCK.also { unlockFrom = SCREEN_ADD }
@@ -323,17 +364,69 @@ fun ReminderApp(
             onBack = { screen = SCREEN_LIST },
             onOpenHealth = { openHealth(SCREEN_SNOOZE) },
             onUnlock = { openUnlock(SCREEN_SNOOZE) },
+            suggestionsOn = sysd::suggestionsOn,
+            onSuggestionsOn = sysd::setSuggestionsOn,
         )
         SCREEN_UNLOCK -> {
             val activity = context as? android.app.Activity
+            // First run picks waiting on the paywall (kept in the view model across rotation).
+            val waiting = sysd.pendingPlans
             UnlockScreen(
                 state = unlock,
-                onBack = { screen = unlockFrom },
+                onBack = {
+                    // Back never adds. From picks it returns to step 4 with the ticks as they were
+                    // (after buying, Add there adds them all).
+                    sysd.pendingPlans = null
+                    screen = unlockFrom
+                },
                 onBuy = { if (activity != null) container.billing.buy(activity) },
                 onRestore = { container.billing.restore() },
                 onManage = { openSubscriptionPage(context) },
+                onKeepFree = if (waiting == null) {
+                    null
+                } else {
+                    {
+                        sysd.pendingPlans = null
+                        finishPicks(waiting)
+                    }
+                },
             )
         }
+        SCREEN_AREAS -> AreasScreen(
+            initial = sysd.areas.collectAsStateWithLifecycle().value,
+            onNext = { areas ->
+                sysd.setAreas(areas)
+                screen = SCREEN_PICKS
+            },
+            onSkip = {
+                sysd.skipOnboarding()
+                screen = SCREEN_LIST
+            },
+        )
+        SCREEN_PICKS -> PicksScreen(
+            viewModel = sysd,
+            onAdd = { plans, overCap ->
+                if (overCap) {
+                    sysd.pendingPlans = plans
+                    unlockFrom = SCREEN_PICKS
+                    screen = SCREEN_UNLOCK
+                } else {
+                    finishPicks(plans)
+                }
+            },
+            onSkip = {
+                sysd.skipOnboarding()
+                screen = SCREEN_LIST
+            },
+        )
+        SCREEN_CATALOGUE -> CatalogueScreen(
+            viewModel = sysd,
+            onAdd = { item, date -> catalogueAdd(item, date, SCREEN_CATALOGUE) },
+            onRemove = { item -> sysd.remove(item.id) },
+            bottomBar = {
+                DoTabs(DoTab.CATALOGUE) { tab -> if (tab == DoTab.TODAY) screen = SCREEN_LIST }
+            },
+        )
         SCREEN_BACKUP -> BackupScreen(
             ui = backupUi,
             currentCount = replaceCount,
@@ -390,6 +483,25 @@ fun ReminderApp(
             onOpenNotificationSettings = { openNotificationSettings(context) },
             onSetAlert = viewModel::setAlertLevel,
             chooseAlert = chooseAlert,
+            card = card?.let { shown ->
+                {
+                    val doneTitle = shown.forItemId?.let { id -> container.catalogue.catalogue.item(id)?.title }
+                    TodayCard(
+                        card = shown,
+                        doneTitle = doneTitle,
+                        onAdd = { item, date -> catalogueAdd(item, date, SCREEN_LIST, shown.kind) },
+                        onOpenCatalogue = {
+                            sysd.followed(shown.kind)
+                            screen = SCREEN_CATALOGUE
+                        },
+                        onNotNow = { sysd.notNow(shown.kind) },
+                        onStop = sysd::stopSuggesting,
+                    )
+                }
+            },
+            bottomBar = {
+                DoTabs(DoTab.TODAY) { tab -> if (tab == DoTab.CATALOGUE) screen = SCREEN_CATALOGUE }
+            },
         )
     }
 }
@@ -413,8 +525,15 @@ private fun ReminderListScreen(
     onOpenNotificationSettings: () -> Unit,
     onSetAlert: (Long, AlertLevel) -> Unit,
     chooseAlert: (AlertLevel, () -> Unit) -> Unit,
+    card: (@Composable () -> Unit)? = null,
+    bottomBar: @Composable () -> Unit = {},
 ) {
+    val now = remember(reminders) { System.currentTimeMillis() }
+    // The Stuff You Should Do card sits below Overdue, at the top of the rest of the list.
+    val overdue = reminders.takeWhile { !it.isDone && it.dueAt < now }
+    val rest = reminders.drop(overdue.size)
     Scaffold(
+        bottomBar = bottomBar,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
@@ -478,7 +597,32 @@ private fun ReminderListScreen(
                     )
                 }
             }
-            items(reminders, key = { it.id }) { reminder ->
+            if (overdue.isNotEmpty()) {
+                item(key = "overdue-heading") {
+                    Text(
+                        text = stringResource(R.string.sysd_overdue),
+                        color = DoLook.Alarm,
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+            items(overdue, key = { it.id }) { reminder ->
+                ReminderRow(
+                    reminder = reminder,
+                    onOpen = { onOpen(reminder.id) },
+                    onDone = { onDone(reminder.id) },
+                    onDelete = { onDelete(reminder.id) },
+                    onSetAlert = { level ->
+                        chooseAlert(level) { onSetAlert(reminder.id, level) }
+                    },
+                    overdue = true,
+                )
+            }
+            if (card != null) {
+                item(key = "sysd-card") { card() }
+            }
+            items(rest, key = { it.id }) { reminder ->
                 ReminderRow(
                     reminder = reminder,
                     onOpen = { onOpen(reminder.id) },
@@ -516,6 +660,7 @@ private fun ReminderRow(
     onDone: () -> Unit,
     onDelete: () -> Unit,
     onSetAlert: (AlertLevel) -> Unit,
+    overdue: Boolean = false,
 ) {
     var menu by remember { mutableStateOf(false) }
     val level = reminder.alert()
@@ -533,7 +678,14 @@ private fun ReminderRow(
                 style = MaterialTheme.typography.titleMedium,
                 textDecoration = if (reminder.isDone) TextDecoration.LineThrough else null,
             )
-            Text(text = formatDue(reminder.dueAt), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = formatDue(reminder.dueAt),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (overdue) DoLook.Alarm else androidx.compose.ui.graphics.Color.Unspecified,
+            )
+            if (reminder.source == com.evansappstudio.doapp.alarm.ReminderSource.CATALOGUE.name) {
+                CatalogueChip(modifier = Modifier.padding(vertical = 2.dp))
+            }
             val repeatLine = reminder.repeatRule()?.let { rule ->
                 RepeatText.describe(
                     rule,
@@ -678,6 +830,8 @@ private fun ReminderFormScreen(
     postpone: PostponeMode,
     onQuickSlotChange: (Int, QuickTimeSlot) -> Unit,
     onPostponeChange: (PostponeMode) -> Unit,
+    related: ((String) -> List<LocalItem>)? = null,
+    onAddRelated: (LocalItem, java.time.LocalDate?) -> Unit = { _, _ -> },
 ) {
     val initialDraft = remember(formKey) { startingDraft(initialDueAt) }
     var title by rememberSaveable(formKey) { mutableStateOf(initialTitle) }
@@ -891,6 +1045,9 @@ private fun ReminderFormScreen(
                 singleLine = true,
                 visualTransformation = underlineMatch(parsed),
             )
+            if (related != null) {
+                RelatedLine(items = related(title), onAdd = onAddRelated)
+            }
             if (keepSource != null) {
                 TextButton(onClick = {
                     title = keepSource.orEmpty()

@@ -61,7 +61,11 @@ fun SnoozeSettingsScreen(
     onBack: () -> Unit,
     onOpenHealth: () -> Unit,
     onUnlock: () -> Unit,
+    /** Spec 11: the way back from "Stop suggesting". */
+    suggestionsOn: () -> Boolean = { true },
+    onSuggestionsOn: (Boolean) -> Unit = {},
 ) {
+    var suggestions by remember { mutableStateOf(suggestionsOn()) }
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
     val quiet by viewModel.quietHours.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
@@ -162,6 +166,19 @@ fun SnoozeSettingsScreen(
             }
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.sysd_suggestions_setting))
+                            Text(
+                                stringResource(R.string.sysd_suggestions_setting_subtitle),
+                                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Switch(checked = suggestions, onCheckedChange = {
+                            onSuggestionsOn(it)
+                            suggestions = it
+                        })
+                    }
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         Text(stringResource(R.string.parse_dates), modifier = Modifier.weight(1f))
                         Switch(checked = parseDates, onCheckedChange = {

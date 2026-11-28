@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -55,6 +56,11 @@ fun UnlockScreen(
     onBuy: () -> Unit,
     onRestore: () -> Unit,
     onManage: () -> Unit,
+    /**
+     * Spec 11: from first run picks, "Keep 5 for free" adds only what fits. Null (every
+     * other entry point) keeps Spec 10's behaviour: the button just closes the screen.
+     */
+    onKeepFree: (() -> Unit)? = null,
 ) {
     val text: PaywallText = PaywallCopy.build(state, paywallTemplates())
     Scaffold(
@@ -103,10 +109,11 @@ fun UnlockScreen(
                     onClick = onBuy,
                     enabled = text.buyEnabled,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = DoLook.Alarm),
                 ) {
                     Text(text.buyLabel)
                 }
-                OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onKeepFree ?: onBack, modifier = Modifier.fillMaxWidth()) {
                     Text(text.keepFree)
                 }
                 text.smallPrint?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }

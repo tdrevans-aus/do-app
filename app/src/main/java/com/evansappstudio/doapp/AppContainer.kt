@@ -30,6 +30,8 @@ import com.evansappstudio.doapp.billing.EntitlementStore
 import com.evansappstudio.doapp.billing.SubscriptionBilling
 import com.evansappstudio.doapp.billing.SubscriptionState
 import com.evansappstudio.doapp.billing.createSubscriptionBilling
+import com.evansappstudio.doapp.catalogue.CatalogueActions
+import com.evansappstudio.doapp.catalogue.CatalogueService
 import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.MIGRATION_1_2
 import com.evansappstudio.doapp.data.MIGRATION_2_3
@@ -107,6 +109,19 @@ class AppContainer(context: Context) {
             health = { health },
             scope = scope,
             versionName = BuildConfig.VERSION_NAME,
+        )
+    }
+
+    /** Stuff You Should Do. Adds and removes go through [commands]. */
+    val catalogue: CatalogueService by lazy {
+        CatalogueService(
+            context = appContext,
+            settings = settings,
+            actions = CatalogueActions(
+                commands = { commands },
+                dao = { reminderDao() },
+                events = { reminderEventDao() },
+            ),
         )
     }
 
