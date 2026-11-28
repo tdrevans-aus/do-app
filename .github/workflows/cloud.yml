@@ -1,0 +1,45 @@
+name: Cloud
+
+on:
+  push:
+    paths:
+      - "cloud/**"
+      - ".github/workflows/cloud.yml"
+  pull_request:
+    paths:
+      - "cloud/**"
+      - ".github/workflows/cloud.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cloud/functions/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache emulator downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('cloud/functions/package-lock.json') }}
+
+      - run: npm ci
+
+      - name: Type-check tests
+        run: npm run typecheck
+
+      - name: Test against the Firebase Emulator Suite (demo-do-cloud)
+        run: npm test
