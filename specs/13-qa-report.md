@@ -161,3 +161,37 @@ On the phone (Mark with Tim, as the Android build notes list, plus):
 11. With a licence tester: buy, verify (`entitled=true`), then verify the same token from a second test device and confirm the first loses it once M1 is fixed.
 12. On a release build with blank values: no Assistants entry, no Firebase traffic in a proxy capture.
 13. An assistant name containing right-to-left override characters shows plainly once L2 is fixed.
+
+## 7. Re-test after fixes (server, 28 Nov 2026, about 16:00 to 16:45 AWST)
+
+Re-tested at `988f528` (the server builder's fixes) plus this QA commit. Android fixes are not in yet and were not reviewed here; `app/` is unchanged by this pass, so `Spec13QaTest` (L5) still fails until they land.
+
+**`npm test`: 15 files, 84 passed, 1 skipped (the local Pub/Sub path), 0 failed.** AT-9: 31 titles against 267,954 characters of function logs, none found.
+
+**QA test changes in this pass:**
+- `qa-oauth.test.ts`, M2: the old check (bytes the test server wrote) could not pass for any fetcher, because Linux loopback buffers megabytes in the kernel before a client can react; the builder was right. Rewritten as "the fetcher (M2)": (1) a server that drips 1 KiB every 10 ms and never ends; the production `defaultFetcher` must refuse it in under a second and close the connection itself after under 32 KiB. The old `response.text()` fetcher takes the full 5 s timeout against this server (checked with a copy of the old code), so the test separates the two. (2) An 8 MiB blast must stop, by the fetcher's own `bytesRead`, within one 64 KiB chunk of the 5 KB cap. (3) A declared 10 MiB `content-length` is refused without reading. (4) A control: a 3 KB document is still read. The builder's `qa-fixes.test.ts` M2 check (fetcher-side `bytesRead`) is sound too; it complements these.
+- `qa-billing.test.ts`: the builder's edits test the right behaviour (strict binding: a second device is refused; revoke and void act only when Play confirms). Tightened: the refused device's record is `other_device`, it cannot pass the first device's account id (`invalid-argument`, because the server derives the id from the caller's uid and ignores the claim otherwise), and `purchases/{token}` still names the first device, so RTDN keeps reaching the real owner. Retitled, since it now passes.
+- Tests that used to fail keep their "QA: fails until ..." names as a record; all of them now pass.
+
+**Spot checks against the report:**
+
+| Id | Fix | Verdict |
+| --- | --- | --- |
+| H1 | The code page adds exactly the redirect's origin (or its private-use scheme) to `form-action`; other pages keep `'self'`; `script-src 'none'`, `img-src 'none'` and `nosniff` added. The error and cancel redirects come from the same page, so they are covered. | Fixed. Still to confirm in real browsers (section 6, item 1). |
+| M1 | Purchases bound with `obfuscatedAccountId = base64url(SHA-256("do-account:" + uid))`, compared with Play's `externalAccountIdentifiers`; the caller's claim is only checked against the server's own derivation. Unbound or foreign tokens answer `other_device`; a token moving to another installation clears the old owner (`transferred`). | Fixed on the server. Depends on the Android client: it must sign in before a purchase, pass the id in `BillingFlowParams`, and treat `other_device` as "no server opinion" (keep Spec 10's local result, as `CONTRACT.md` says). Until it does, a server verdict would switch real buyers off. Known cost: after a reinstall or a new phone the uid changes and the server can't verify that subscription any more (local Play result only). |
+| M2 | Streamed fetch on `node:https`, 3 s deadline, 5 KB cap enforced per chunk, `content-length` checked first, no redirects, DNS answers checked and the connection pinned to the checked address. | Fixed (tests above). |
+| M3 | Firestore counters per IP and global on register, authorise page and code posts; the per-page try is charged in a transaction before the code is checked. | Fixed, with one remaining Low (R1 below). |
+| L1 | Hosts normalised (case, trailing dots, IDNA), local names and IP literals refused, non-443 ports refused, private, loopback, link-local, CGNAT, documentation and NAT64 addresses refused after DNS. | Fixed. Minor gap: 6to4 (`2002::/16`) addresses that embed a private IPv4 are not refused; negligible. |
+| L2 | `cleanText` removes Unicode format, private-use and surrogate characters. | Fixed on the server. Side effect: zero-width joiners go too, so emoji sequences in a name split (cosmetic). The phone's `displayName` is the Android agent's part. |
+| L3 | `parseStrictIso` refuses impossible dates, hour 24 and offsets past 14:00. | Fixed. |
+| L4 | Events get a server `receivedAt`; retention deletes by it. | Fixed (nothing deployed, so no older events lack the field). |
+| L5 | Client side. | Not yet (Android). |
+| L6 | A void and a type 12 are acted on only when Play no longer reports the subscription as entitled; voids for one-time products are ignored. | Fixed. The topic IAM check (section 6, item 2) still matters for everything else. |
+| L7 | 30 second grace: the old refresh token returns the same new pair, sealed with AES-256-GCM under a key derived from the old token (the database still holds no usable token); after 30 s reuse still revokes. | Fixed. Acceptable trade-off: a thief racing within 30 s gets the same pair as the client, not a new one. |
+| L8 | One message for every wrong code. | Fixed. |
+| I2 | `NODE_ENV=production` in `functions/.env` (all projects), so Express's own error pages carry no stack. | Fixed in the emulator; still confirm on the deployed site (section 6, item 4). |
+
+**Remaining finding (no failing test, because the right answer depends on the real infrastructure):**
+- **R1 (Low, availability).** The per-IP key comes from `X-Forwarded-For`, counting `CLIENT_IP_HOPS` (1) from the right (`http/ip.ts`). The `api` function has `invoker: "public"` (Hosting needs that), so it can also be called on its own `run.app` address. There, Google's front end appends only the real client address, so `X-Forwarded-For: <random>, <real>` puts the caller's own random value where Hosting traffic has the client, and the per-IP limits can be sidestepped from one machine. The global ceilings then are the only bound: they hold the guessing odds down (1,000 code posts an hour is about 24,000 guesses a day, around 3 in 100,000 per day against 1,000 live codes), but they fail closed, so the same caller can use up `g_reg` (500 an hour) or `g_azc` (1,000 an hour) and stop every new pairing until the hour ends. Fix options: refuse requests that didn't come through Hosting (for example, route `/oauth/*` only through Hosting and check a header that Hosting sets and the client can't, if one is confirmed at deploy), or key the per-IP limit on the right-most address when the chain is shorter than expected; and alert on `do.oauth.limited scope=global`. Deploy check: capture real `X-Forwarded-For` values through Hosting and directly on the `run.app` URL, and set `CLIENT_IP_HOPS` to match.
+
+**Server verdict after fixes: ready for deploy, subject to section 6's checks (now including R1's header check) and to the Android side landing L5, the purchase binding (M1's client half) and the `displayName` part of L2.** No High or Medium remains on the server.

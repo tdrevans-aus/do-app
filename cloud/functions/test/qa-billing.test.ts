@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { accountIdFor } from "../src/billing/binding";
 import { FakePlayClient } from "../src/billing/play";
@@ -39,11 +39,10 @@ const rtdn = (body: Record<string, unknown>) =>
   handleRtdn({ version: "1.0", packageName: PACKAGE, eventTimeMillis: String(Date.now()), ...body }, `qa-${randomUUID()}`, Date.now(), new FakePlayClient());
 
 describe("QA purchase verification", () => {
-  it("QA: fails until a purchase token verified by a second device stops entitling the first one", async () => {
-    // "The last device to verify a token owns it", but the earlier owner's entitlement
-    // record is left as it was, and RTDN only updates the new owner. One subscription
-    // (a token copied off a rooted phone or shared) entitles any number of devices,
-    // and the earlier ones stay entitled server-side after it expires.
+  it("a purchase token is bound to its buyer: a second device is refused and the first follows RTDN (M1)", async () => {
+    // Originally (M1): the last device to verify a token took it and the earlier owner stayed
+    // entitled, so one subscription entitled any number of devices. Now purchases are bound to
+    // the installation that made them (obfuscated account id).
     const token = `qa-shared-${randomUUID()}`;
     const first = await Phone.create();
     const second = await Phone.create();
@@ -51,7 +50,15 @@ describe("QA purchase verification", () => {
     expect((await verify(first, token)).entitled).toBe(true);
     // After the M1 fix the second device can't take the token at all (stricter than handing it over).
     expect((await verify(second, token)).entitled).toBe(false);
+    expect((await entitlement(second.uid))!).toMatchObject({ entitled: false, state: "other_device" });
     expect((await entitlement(first.uid))!.entitled).toBe(true);
+    // Nor can the second device claim to be the first: the account id is derived from the caller's uid.
+    await expect(
+      second.call("verifyPurchase", { platform: "play", packageName: PACKAGE, productId: PRODUCT, purchaseToken: token, obfuscatedAccountId: accountIdFor(first.uid) }),
+    ).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
+    // The token still belongs to the first device, so Play's notifications keep reaching it.
+    const owner = (await adminDb().collection("purchases").doc(createHash("sha256").update(`play:${token}`, "utf8").digest("hex")).get()).data();
+    expect(owner?.deviceUid).toBe(first.uid);
 
     await FakePlayClient.ref(token).update({ "purchase.subscriptionState": "SUBSCRIPTION_STATE_EXPIRED" });
     await rtdn({ subscriptionNotification: { version: "1.0", notificationType: 13, purchaseToken: token, subscriptionId: PRODUCT } });

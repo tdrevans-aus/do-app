@@ -3,6 +3,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defaultFetcher, isMetadataClientId } from "../src/oauth/clients";
+import { fetchMetadataDocument, MAX_DOC_BYTES } from "../src/oauth/fetchMetadata";
 import { adminDb } from "./helpers/admin";
 import { Assistant, form, pair, REDIRECT } from "./helpers/assistant";
 import { BASE } from "./helpers/env";
@@ -257,11 +258,20 @@ describe("QA OAuth: client ID metadata documents (SSRF)", () => {
     expect(isMetadataClientId("https://metadata.google.internal./c.json")).toBe(false);
   });
 
-  describe("the fetcher", () => {
+  describe("the fetcher (M2)", () => {
+    // How the cap is proved. Counting what the test server writes doesn't work: Linux
+    // loopback buffers megabytes in the kernel before any client can react. Instead:
+    // (1) a server that drips 1 KiB every 10 ms and never ends. A fetcher that buffers the
+    // whole body (the old response.text()) can only give up at its timeout (3 to 5 s);
+    // one that enforces the cap gives up after about 6 drips. The production fetcher
+    // (defaultFetcher) must refuse it well inside a second, and the server must see the
+    // connection closed by then, having dripped only a few KiB.
+    // (2) a server that blasts 8 MiB: the fetcher's own byte count (what it consumed
+    // from the socket) must stop within one chunk of the cap.
     let server: http.Server;
     let base = "";
-    let sent = 0;
-    const TOTAL = 8 * 1024 * 1024;
+    let dripped = 0;
+    let dripClosedAt = 0;
     beforeAll(async () => {
       server = http.createServer(async (req, res) => {
         if (req.url === "/redirect") {
@@ -269,35 +279,83 @@ describe("QA OAuth: client ID metadata documents (SSRF)", () => {
           res.end();
           return;
         }
+        if (req.url === "/small") {
+          const doc = JSON.stringify({ client_id: "x", pad: "p".repeat(3000) });
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(doc);
+          return;
+        }
+        if (req.url === "/declared") {
+          res.writeHead(200, { "content-type": "application/json", "content-length": String(10 * 1024 * 1024) });
+          const timer = setInterval(() => res.write(Buffer.alloc(1024, 0x20)), 50);
+          res.on("close", () => clearInterval(timer));
+          return;
+        }
+        if (req.url === "/drip") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.write("{");
+          dripped = 0;
+          dripClosedAt = 0;
+          const timer = setInterval(() => {
+            res.write(Buffer.alloc(1024, 0x20));
+            dripped += 1024;
+          }, 10);
+          res.on("close", () => {
+            clearInterval(timer);
+            dripClosedAt = Date.now();
+          });
+          return;
+        }
+        // /blast: as fast as the socket takes it, until the client goes away.
         res.writeHead(200, { "content-type": "application/json" });
         const chunk = Buffer.alloc(64 * 1024, 0x20);
-        sent = 0;
         let closed = false;
         res.on("close", () => {
           closed = true;
         });
-        while (sent < TOTAL && !closed) {
-          const ok = res.write(chunk);
-          sent += chunk.length;
-          if (!ok) await new Promise((resolve) => res.once("drain", resolve).once("close", resolve));
+        for (let sent = 0; sent < 8 * 1024 * 1024 && !closed; sent += chunk.length) {
+          if (!res.write(chunk)) await new Promise((resolve) => res.once("drain", resolve).once("close", resolve));
         }
         res.end();
       });
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     });
-    afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+    afterAll(() => {
+      server.closeAllConnections();
+      return new Promise<void>((resolve) => server.close(() => resolve()));
+    });
 
     it("does not follow redirects", async () => {
       await expect(defaultFetcher(`${base}/redirect`)).rejects.toBeTruthy();
     });
 
-    it("QA: fails until the metadata fetcher stops reading after the 5 KB cap", async () => {
-      // response.text() reads the whole body into memory before the size check, so an
-      // unauthenticated GET /oauth/authorize?client_id=https://attacker/big makes the
-      // 256 MiB function download whatever arrives in 5 seconds.
-      await expect(defaultFetcher(`${base}/big`)).rejects.toBeTruthy();
-      expect(sent).toBeLessThan(1024 * 1024);
+    it("still reads a document under the cap (control)", async () => {
+      await expect(defaultFetcher(`${base}/small`)).resolves.toMatchObject({ client_id: "x" });
+    });
+
+    it("gives up on an endless body as soon as it passes 5 KB, not at the timeout", async () => {
+      const started = Date.now();
+      await expect(defaultFetcher(`${base}/drip`)).rejects.toBeTruthy();
+      const elapsed = Date.now() - started;
+      expect(elapsed).toBeLessThan(1000);
+      // The fetcher closed the connection itself, promptly, after only a few KiB.
+      for (let i = 0; i < 50 && dripClosedAt === 0; i++) await new Promise((r) => setTimeout(r, 20));
+      expect(dripClosedAt).toBeGreaterThan(0);
+      expect(dripClosedAt - started).toBeLessThan(1500);
+      expect(dripped).toBeLessThan(32 * 1024);
+    });
+
+    it("refuses a declared oversized body without reading it, and stops a blast within one chunk of the cap", async () => {
+      const declared = { bytesRead: 0 };
+      const started = Date.now();
+      await expect(fetchMetadataDocument(`${base}/declared`, declared)).rejects.toBeTruthy();
+      expect(Date.now() - started).toBeLessThan(1000);
+      expect(declared.bytesRead).toBe(0);
+      const blast = { bytesRead: 0 };
+      await expect(fetchMetadataDocument(`${base}/blast`, blast)).rejects.toBeTruthy();
+      expect(blast.bytesRead).toBeGreaterThan(MAX_DOC_BYTES);
+      expect(blast.bytesRead).toBeLessThanOrEqual(MAX_DOC_BYTES + 64 * 1024);
     });
   });
 });
