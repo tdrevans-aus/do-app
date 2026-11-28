@@ -221,6 +221,9 @@ object DateParser {
             }
         }
         if (bits.time == null) {
+            phraseTime(tokens, index)?.let { (next, time) ->
+                return Piece(next, PieceKind.TIME) { it.time = time }
+            }
             parseTime(tokens, index)?.let { time ->
                 return Piece(index + 1, PieceKind.TIME) { it.time = time }
             }
@@ -486,7 +489,9 @@ object DateParser {
 
     private fun parseSimpleEvery(tokens: List<Tok>, index: Int): RepeatParse? {
         val every = parseEveryN(tokens, index) ?: return null
-        if (wordAt(tokens, every.next) == "on" || wordAt(tokens, every.next) == "after") return null
+        if (wordAt(tokens, every.next) == "on") return null
+        // "every day after work" is a repeat then a time (Spec 12); any other "after" stays unsupported.
+        if (wordAt(tokens, every.next) == "after" && phraseTime(tokens, every.next) == null) return null
         return when (every.unit) {
             RepeatUnit.MINUTE, RepeatUnit.HOUR -> plain(every.next, every.count, every.unit)
             RepeatUnit.DAY -> if (every.count == 1) plain(every.next, 1, RepeatUnit.DAY) else null
@@ -748,6 +753,16 @@ object DateParser {
             explicitYear = year != null,
         )
     }
+
+    /** Spec 12: "after work" is 5:30 pm, so a shared "Friday after work" gets a time. */
+    private fun phraseTime(tokens: List<Tok>, index: Int): Pair<Int, LocalTime>? {
+        if (wordAt(tokens, index) == "after" && wordAt(tokens, index + 1) == "work") {
+            return index + 2 to AFTER_WORK
+        }
+        return null
+    }
+
+    private val AFTER_WORK: LocalTime = LocalTime.of(17, 30)
 
     private fun parseTime(tokens: List<Tok>, index: Int): LocalTime? {
         val token = tokens.getOrNull(index) ?: return null

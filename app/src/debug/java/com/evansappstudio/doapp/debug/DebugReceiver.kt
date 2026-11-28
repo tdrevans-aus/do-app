@@ -10,6 +10,9 @@ import com.evansappstudio.doapp.backup.BackupMode
 import com.evansappstudio.doapp.billing.FakeSubscriptionBilling
 import com.evansappstudio.doapp.billing.FreeTier
 import com.evansappstudio.doapp.billing.SubscriptionState
+import com.evansappstudio.doapp.capture.AgentCreateRequest
+import com.evansappstudio.doapp.capture.AgentError
+import com.evansappstudio.doapp.capture.AgentReminder
 import android.text.format.DateFormat
 import com.evansappstudio.doapp.alarm.Actor
 import com.evansappstudio.doapp.alarm.AlertLevel
@@ -97,6 +100,9 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_SUGGESTION_RESET -> SysdDebug.suggestionReset(context, boolExtra(intent, EXTRA_FIRST_RUN))
             ACTION_SET_PROFILE -> SysdDebug.setProfile(context, intent.getStringExtra(EXTRA_AREAS))
             ACTION_SET_TODAY -> SysdDebug.setToday(context, intent.getStringExtra(EXTRA_DATE))
+            ACTION_AGENT_CREATE -> agentCreate(context, intent)
+            ACTION_AGENT_COMPLETE -> agentComplete(context, intent)
+            ACTION_AGENT_LIST -> agentList(context, intent)
         }
     }
 
@@ -1131,6 +1137,53 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * Spec 12: the AppFunctions layer without the AppFunctions service, so QA can
+     * drive createReminder, completeReminder and listReminders over adb. The
+     * caller id is the agentCaller extra (default "debug-agent").
+     */
+    private fun agentCreate(context: Context, intent: Intent) {
+        unlockedLaunch(context, "agent-create", -1) { app ->
+            val request = AgentCreateRequest(
+                text = intent.getStringExtra(EXTRA_TEXT),
+                dueAt = if (intent.hasExtra(EXTRA_DUE_AT)) intent.getLongExtra(EXTRA_DUE_AT, 0L) else null,
+                repeat = intent.getStringExtra(EXTRA_AGENT_REPEAT),
+                alertLevel = intent.getStringExtra(EXTRA_AGENT_LEVEL),
+            )
+            agentCall("create") { app.container.agent.createReminder(agentCaller(intent), request).let(::agentLine) }
+        }
+    }
+
+    private fun agentComplete(context: Context, intent: Intent) {
+        val id = DoneReceiver.longExtra(intent) ?: -1L
+        unlockedLaunch(context, "agent-complete", id) { app ->
+            agentCall("complete") { app.container.agent.completeReminder(agentCaller(intent), id).let(::agentLine) }
+        }
+    }
+
+    private fun agentList(context: Context, intent: Intent) {
+        unlockedLaunch(context, "agent-list", -1) { app ->
+            agentCall("list") {
+                val rows = app.container.agent.listReminders(intent.getIntExtra(EXTRA_LIMIT, 0))
+                (listOf("count=${rows.size}") + rows.map(::agentLine)).joinToString("\n")
+            }
+        }
+    }
+
+    private fun agentCaller(intent: Intent): String = intent.getStringExtra(EXTRA_AGENT_CALLER) ?: "debug-agent"
+
+    private fun agentLine(row: AgentReminder): String =
+        "id=${row.id} due=${row.dueAt} overdue=${row.overdue} repeat=${row.repeat ?: "OFF"} " +
+            "level=${row.alertLevel} requested=${row.requestedAlertLevel ?: "none"} approval=${row.approval} title=${row.title}"
+
+    private suspend fun agentCall(name: String, block: suspend () -> String) {
+        try {
+            Log.i(DoAlarmLog.TAG, "DoAlarm agent-$name ok ${block()}")
+        } catch (error: AgentError) {
+            Log.i(DoAlarmLog.TAG, "DoAlarm agent-$name error=${error::class.simpleName} message=${error.message}")
+        }
+    }
+
     /** Runs [block] off the main thread once the user is unlocked, as the other Room hooks do. */
     private fun unlockedLaunch(context: Context, label: String, id: Long, block: suspend (DoApp) -> Unit) {
         val pending = goAsync()
@@ -1197,6 +1250,12 @@ class DebugReceiver : BroadcastReceiver() {
         const val EXTRA_AREAS = "areas"
         const val EXTRA_DATE = "date"
         const val EXTRA_FIRST_RUN = "firstRun"
+        const val ACTION_AGENT_CREATE = "com.evansappstudio.doapp.debug.AGENT_CREATE"
+        const val ACTION_AGENT_COMPLETE = "com.evansappstudio.doapp.debug.AGENT_COMPLETE"
+        const val ACTION_AGENT_LIST = "com.evansappstudio.doapp.debug.AGENT_LIST"
+        const val EXTRA_AGENT_CALLER = "agentCaller"
+        const val EXTRA_AGENT_REPEAT = "repeat"
+        const val EXTRA_AGENT_LEVEL = "level"
         const val EXTRA_SOURCE = "source"
         const val EXTRA_SOURCE_ID = "sourceId"
         const val EXTRA_CATEGORY = "category"

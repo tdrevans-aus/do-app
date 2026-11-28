@@ -290,4 +290,36 @@
     <string name="sysd_card_stop">Stop suggesting</string>
     <string name="sysd_related_line">Related:</string>
     <string name="sysd_overdue">Overdue</string>
+    <!-- Spec 12: capture surfaces -->
+    <string name="add_field_label">What needs doing?</string>
+    <string name="share_target_label">Add to Do</string>
+    <string name="share_heading">Add to Do</string>
+    <string name="share_from_words">from “%1$s”</string>
+    <string name="share_no_date">No date found, so tomorrow at 9 am</string>
+    <string name="share_tonight">Tonight</string>
+    <string name="share_tomorrow">Tomorrow</string>
+    <string name="share_weekend">Weekend</string>
+    <string name="share_choose">Choose…</string>
+    <string name="share_save">Save and go back</string>
+    <string name="share_saved">Added to Do</string>
+    <string name="share_failed">Could not add that. Please try again in Do.</string>
+    <string name="share_empty">There was no text to add</string>
+    <string name="tile_label">Do: Add a reminder</string>
+    <string name="shortcut_add_short">Add a reminder</string>
+    <string name="shortcut_add_long">Add a reminder</string>
+    <string name="shortcut_today_short">Today</string>
+    <string name="shortcut_today_long">Today’s reminders</string>
+    <string name="shortcut_disabled">Not available</string>
+    <string name="widget_large_label">Do: next reminders</string>
+    <string name="widget_small_label">Do: overdue count</string>
+    <string name="widget_large_description">What is overdue and next, with tick to done and a quick add</string>
+    <string name="widget_small_description">How many reminders are overdue. Tap to add one.</string>
+    <string name="widget_heading">Do</string>
+    <string name="widget_overdue">%1$d overdue</string>
+    <string name="widget_overdue_word">overdue</string>
+    <string name="widget_all_clear">All clear</string>
+    <string name="widget_nothing_due">Nothing to do yet.</string>
+    <string name="widget_locked">Unlock your phone to see your reminders.</string>
+    <string name="widget_locked_short">Locked</string>
+    <string name="widget_tap_to_add">Tap to add</string>
 </resources>

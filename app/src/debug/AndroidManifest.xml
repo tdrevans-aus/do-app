@@ -49,6 +49,9 @@
                 <action android:name="com.evansappstudio.doapp.debug.SUGGESTION_RESET" />
                 <action android:name="com.evansappstudio.doapp.debug.SET_PROFILE" />
                 <action android:name="com.evansappstudio.doapp.debug.SET_TODAY" />
+                <action android:name="com.evansappstudio.doapp.debug.AGENT_CREATE" />
+                <action android:name="com.evansappstudio.doapp.debug.AGENT_COMPLETE" />
+                <action android:name="com.evansappstudio.doapp.debug.AGENT_LIST" />
             </intent-filter>
         </receiver>
     </application>

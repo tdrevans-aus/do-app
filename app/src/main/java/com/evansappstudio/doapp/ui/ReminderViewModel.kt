@@ -13,6 +13,8 @@ import com.evansappstudio.doapp.alarm.PostponeMode
 import com.evansappstudio.doapp.alarm.QuickTimeSlot
 import com.evansappstudio.doapp.alarm.QuickTimesSettings
 import com.evansappstudio.doapp.alarm.SnoozeOption
+import com.evansappstudio.doapp.capture.CaptureEntry
+import com.evansappstudio.doapp.capture.CaptureResult
 import com.evansappstudio.doapp.data.DueShiftMode
 import com.evansappstudio.doapp.data.Reminder
 import com.evansappstudio.doapp.data.RepeatPromptMode
@@ -100,7 +102,9 @@ class ReminderViewModel(
         }
     }
 
+    /** [entry] is the surface that opened Add (the app itself, the widget, the tile, a shortcut or a link). */
     fun add(
+        entry: CaptureEntry,
         title: String,
         dueAt: Long,
         nagMinutes: Int?,
@@ -109,8 +113,8 @@ class ReminderViewModel(
         onResult: (created: Boolean) -> Unit = {},
     ) {
         viewModelScope.launch {
-            val created = container.commands.add(USER, title, dueAt, nagMinutes, rule, alert) != null
-            onResult(created)
+            val result = container.capture.add(entry, title, dueAt, nagMinutes, rule, alert)
+            onResult(result is CaptureResult.Saved)
         }
     }
 

@@ -88,6 +88,12 @@ class CorePurityTest {
             "catalogue/Picks.kt",
             "catalogue/SuggestionPolicy.kt",
             "backup/BackupJson.kt",
+            // Spec 12 capture logic.
+            "capture/ShareText.kt",
+            "capture/DeepLinks.kt",
+            "capture/CaptureEntry.kt",
+            "capture/AgentRequests.kt",
+            "widget/WidgetModel.kt",
         )
 
         /** Spec 11 files that must stay in [CORE_FILES]. */

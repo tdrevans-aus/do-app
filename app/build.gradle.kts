@@ -20,6 +20,14 @@ require(exactAlarmMode == "USE" || exactAlarmMode == "SCHEDULE") {
     "exactAlarmMode must be USE or SCHEDULE (was '$exactAlarmMode')"
 }
 
+// Spec 12: the AppFunctions layer. On in debug, off in release, unless -PappFunctionsEnabled=true|false says otherwise.
+val appFunctionsOverride = providers.gradleProperty("appFunctionsEnabled").orNull?.let {
+    require(it == "true" || it == "false") { "appFunctionsEnabled must be true or false (was '$it')" }
+    it.toBoolean()
+}
+val appFunctionsDebug = appFunctionsOverride ?: true
+val appFunctionsRelease = appFunctionsOverride ?: false
+
 android {
     namespace = "com.evansappstudio.doapp"
     compileSdk = 36
@@ -48,7 +56,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "APP_FUNCTIONS_ENABLED", "$appFunctionsDebug")
+        }
         release {
+            buildConfigField("boolean", "APP_FUNCTIONS_ENABLED", "$appFunctionsRelease")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -148,6 +160,10 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+    // Glance 1.2.0 asks for WorkManager 2.7.1; pin a current stable one.
+    implementation(libs.androidx.work.runtime)
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
@@ -162,7 +178,7 @@ dependencies {
 
 val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     group = "verification"
-    description = "Release manifest has no debug receiver, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption. Release classes have no fake billing."
+    description = "Release manifest has no debug receiver and no AppFunctions service while the flag is off, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption. Release classes have no fake billing."
     dependsOn(
         "processReleaseMainManifest",
         "processDebugMainManifest",
@@ -171,6 +187,7 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     )
     val buildDirectory = layout.buildDirectory
     val mode = exactAlarmMode
+    val appFunctionsReleaseFlag = appFunctionsRelease
     doLast {
         val root = buildDirectory.get().asFile
         fun mergedManifest(variant: String): String {
@@ -227,6 +244,18 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         }
         check(debug.contains("FAKE_PURCHASE")) {
             "Debug manifest is missing FAKE_PURCHASE"
+        }
+        if (!appFunctionsReleaseFlag) {
+            for (needle in listOf("android.app.appfunctions", "BIND_APP_FUNCTION_SERVICE", "AppFunctionService")) {
+                check(!release.contains(needle)) {
+                    "Release manifest contains $needle while appFunctionsEnabled is off"
+                }
+            }
+        }
+        for ((variant, text) in listOf("release" to release, "debug" to debug)) {
+            check(!text.contains("android.permission.FOREGROUND_SERVICE")) {
+                "$variant manifest contains FOREGROUND_SERVICE (WorkManager's is removed; Do runs no foreground work)"
+            }
         }
         assertReleaseHasNoFakeBilling(root)
         assertReleaseHasNoQuietDebug(root)

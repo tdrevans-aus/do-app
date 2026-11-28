@@ -161,11 +161,19 @@ object EventLog {
 }
 
 /**
- * [text] cut to at most [max] UTF-16 units, never splitting a surrogate pair:
- * when the cut would leave a lone high surrogate at the end, that unit goes too.
+ * [text] cut to at most [max] UTF-16 units, never splitting a character as people
+ * see it: the cut goes back to the last grapheme cluster boundary, so a flag, a
+ * joined emoji or a letter with its accents is kept whole or dropped whole
+ * (Spec 12 QA, BUG-S12-06). java.text.BreakIterator is fully qualified because
+ * this file has no imports.
  */
 fun cutText(text: String, max: Int): String {
     if (text.length <= max) return text
-    val end = if (max > 0 && Character.isHighSurrogate(text[max - 1])) max - 1 else max
+    if (max <= 0) return ""
+    val breaks = java.text.BreakIterator.getCharacterInstance()
+    breaks.setText(text)
+    var end = if (breaks.isBoundary(max)) max else breaks.preceding(max)
+    if (end == java.text.BreakIterator.DONE || end < 0) end = 0
+    if (end > 0 && Character.isHighSurrogate(text[end - 1])) end--
     return text.substring(0, end)
 }

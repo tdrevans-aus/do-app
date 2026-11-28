@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="add"
+        android:shortcutLongLabel="@string/shortcut_add_long"
+        android:shortcutShortLabel="@string/shortcut_add_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="do://add"
+            android:targetClass="com.evansappstudio.doapp.MainActivity"
+            android:targetPackage="com.evansappstudio.doapp">
+            <extra
+                android:name="com.evansappstudio.doapp.extra.ENTRY"
+                android:value="SHORTCUT" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_today"
+        android:shortcutDisabledMessage="@string/shortcut_disabled"
+        android:shortcutId="today"
+        android:shortcutLongLabel="@string/shortcut_today_long"
+        android:shortcutShortLabel="@string/shortcut_today_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="do://today"
+            android:targetClass="com.evansappstudio.doapp.MainActivity"
+            android:targetPackage="com.evansappstudio.doapp">
+            <extra
+                android:name="com.evansappstudio.doapp.extra.ENTRY"
+                android:value="SHORTCUT" />
+        </intent>
+    </shortcut>
+</shortcuts>
