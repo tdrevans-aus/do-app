@@ -4,10 +4,10 @@ Last updated: Sat 28 Nov 2026, about 9 pm (AWST). Updated by Claude as work land
 
 ## Running now
 Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
-- **Do Cloud, phone-side fixes.** Server side passed re-test (`30724aa`, 84 tests, GitHub run 46146605284 green): no Highs or Mediums left. Now the phone: tie purchases to the phone (sign in first, pass the account id to Google Play), ignore inbox requests that claim to be an on-phone assistant, clean assistant names for display, and make CI also build the SCHEDULE variant and the release build.
 
 
 ## Done
+- **Do Cloud: built, security-reviewed and fixed, both halves.** `do/spec-13-android-client` at `870a8f6` holds the whole stack (Specs 9 to 13 plus the catalogue tweaks): 408 Android unit tests, 0 failures; 84 server tests; the end-to-end test against the local Firebase emulator passes. Purchases are now tied to the phone that made them; only paired assistants can act; assistant names are cleaned for display; CI now also builds the SCHEDULE variant and the release build.
 - **Do Cloud, phone side: built.** `do/spec-13-android-client` at `50e320e`: 383 unit tests, 0 failures, and an end-to-end test against the local Firebase emulator passed. Anonymous device identity, push, inbox pull and apply through the existing agent layer, mirror sync, the Assistants screen (pairing code with countdown, connected list, approval card, on/off switch), and server purchase checks. Firebase only starts when the release build is given project values; otherwise every cloud feature is hidden.
 - **Catalogue tweaks (your 28 Nov decisions): done.** Spec 11 at `0cb2f22`, 241 tests, 0 failures. One smoke alarm item for Home and Renting (now 57 items); the 19 low-confidence items are never pre-ticked; energy plan comparison hidden in WA, Tas and NT (Tas and NT flagged for a source check); every state-varying item now says to check your state's rules.
 - **Integration branch updated** with the catalogue tweaks: `bf10b57`, 339 tests, 0 failures.
@@ -24,7 +24,6 @@ Usage limits paused agents twice (Fri afternoon, Sat late morning); each time th
 
 ## Next, in order
 1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
-1. Fix anything Spec 13 QA finds
 2. Fold the catalogue tweaks into the Do Cloud branch (draft: `specs-drafts/12-capture-surfaces.md`).
 
 Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
