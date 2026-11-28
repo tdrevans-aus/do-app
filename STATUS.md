@@ -1,11 +1,12 @@
 # Do: weekend build status
 
-Last updated: Fri 27 Nov 2026, about 6:30 pm (AWST). Updated by Claude as work lands.
+Last updated: Sat 28 Nov 2026, about 8:30 am (AWST). Updated by Claude as work lands.
 
 ## Running now
 A short pause for a usage limit at about 4 pm AWST Friday; resumed straight after. Running:
-- **Spec 11 QA.** Independent review of Stuff You Should Do running.
-- **Spec 12 QA.** Independent review of the capture surfaces running.
+- **Spec 11 QA.** Independent review of Stuff You Should Do (resumed after a usage-limit stop overnight).
+- **Spec 12 QA.** Independent review of the capture surfaces (resumed after a usage-limit stop overnight).
+- **Spec 13, Do Cloud v1 (server half).** Being built in `cloud/` on `do/spec-13-do-cloud`, against Firebase's local emulator with a demo project. No real account is used and nothing is deployed.
 
 
 ## Done
@@ -19,7 +20,7 @@ A short pause for a usage limit at about 4 pm AWST Friday; resumed straight afte
 ## Next, in order
 1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
 1. Spec 11 and 12 fixes after QA
-2. Architecture: local-first with a thin cloud ("Do Cloud"), if Tim agrees; then hosting choice and Spec 13 (draft: `specs-drafts/12-capture-surfaces.md`).
+2. Spec 13 Android client half (pairing, inbox, Assistants screen), then QA of the whole of Spec 13 (draft: `specs-drafts/12-capture-surfaces.md`).
 
 Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
 
@@ -28,7 +29,7 @@ Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, s
 - iPhone engine test: build to your iPhone from your Mac (runbook will be at `ios/engine-test/RUNBOOK.md` on branch `ios/engine-test`).
 - Apply for Apple's Critical Alerts entitlement and Google's AppFunctions early access.
 - For Play Console later: consider turning off Resubscribe and Pause on the `annual` base plan (Do has no server, so a resubscribe from the Play Store is only acknowledged when Do is next opened, and a paused plan reads as ended).
-- Name a hosting account for the cloud agent API (Spec 13 can't be specced until then).
+- Do Cloud: create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
 
 ## Nothing merged, nothing published
 No merges to `main`, no PRs opened, nothing sent to Play or the App Store.
