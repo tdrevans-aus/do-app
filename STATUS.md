@@ -4,12 +4,13 @@ Last updated: Sat 28 Nov 2026, about 1 pm (AWST). Updated by Claude as work land
 
 ## Running now
 Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
-- **Spec 13 QA and security review** of the whole of Do Cloud (server and phone) running.
+- **Do Cloud fixes after the security review.** Verdict: core design sound (assistants can't bypass the free 5 or the approval hold, cloud failures never touch alarms, Firestore rules hold), but not ready to deploy until one High and three Mediums are fixed: the authorise page's security policy would block pairing in real browsers; a purchase token isn't tied to its buyer; a malicious assistant could push a huge metadata file; no rate limits on the OAuth endpoints (pairing-code guessing at scale). Server fixes first, then the phone side.
 
 
 ## Done
 - **Do Cloud, phone side: built.** `do/spec-13-android-client` at `50e320e`: 383 unit tests, 0 failures, and an end-to-end test against the local Firebase emulator passed. Anonymous device identity, push, inbox pull and apply through the existing agent layer, mirror sync, the Assistants screen (pairing code with countdown, connected list, approval card, on/off switch), and server purchase checks. Firebase only starts when the release build is given project values; otherwise every cloud feature is hidden.
 - **Catalogue tweaks (your 28 Nov decisions): done.** Spec 11 at `0cb2f22`, 241 tests, 0 failures. One smoke alarm item for Home and Renting (now 57 items); the 19 low-confidence items are never pre-ticked; energy plan comparison hidden in WA, Tas and NT (Tas and NT flagged for a source check); every state-varying item now says to check your state's rules.
+- **Integration branch updated** with the catalogue tweaks: `bf10b57`, 339 tests, 0 failures.
 - **Integration check: Specs 9 to 12 fit together.** Trial branch `do/integration-specs-9-to-12` (`6935715`): 334 unit tests, 0 failures; debug, SCHEDULE and release builds green. Conflicts were in the paywall (Spec 11's "Keep 5 for free" now uses Spec 10's paywall), restore results, and shared files (strings, debug hooks, navigation). Five behaviour questions for Gareth in `specs/integration-9-to-12.md` (for example, when first-run steps appear if the first reminder came from a widget or share).
 - **Do Cloud server now in Sydney** (`australia-southeast1`), `64f2690`, 38 of 38 tests green on GitHub (run 46109596957). Create the Firestore database in Sydney too; its location can't be changed later.
 - **Spec 13, Do Cloud v1, server half: built.** `cloud/` on `do/spec-13-do-cloud` (`0c46786`). 36 tests pass on GitHub (run 46090573321), all against Firebase's local emulator with a demo project: no real account used, nothing deployed. MCP (current spec revision, and older clients) plus a REST mirror; OAuth with an 8-character pairing code shown in Do; inbox and push to the phone; assistants see only their own reminders; rate limits; server-side Play purchase checks; daily clean-up; no reminder titles in logs. Phone contract: `cloud/CONTRACT.md`. **Your deploy checklist:** `cloud/README.md` (Firebase project in Sydney, Blaze plan with a budget alert, Anonymous sign-in, Play API access for the functions' service account, a Pub/Sub topic for Play notifications, then deploy). Not needed until you want it live.
@@ -24,7 +25,7 @@ Usage limits paused agents twice (Fri afternoon, Sat late morning); each time th
 ## Next, in order
 1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
 1. Fix anything Spec 13 QA finds
-2. Fold the catalogue tweaks into the integrated branch (draft: `specs-drafts/12-capture-surfaces.md`).
+2. Fold the catalogue tweaks into the Do Cloud branch (draft: `specs-drafts/12-capture-surfaces.md`).
 
 Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
 
@@ -33,7 +34,7 @@ Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, s
 - iPhone engine test: build to your iPhone from your Mac (runbook will be at `ios/engine-test/RUNBOOK.md` on branch `ios/engine-test`).
 - Apply for Apple's Critical Alerts entitlement and Google's AppFunctions early access.
 - Play Console (when you create Do Unlimited): **decided 28 Nov**, Resubscribe on, Pause off.
-- Do Cloud: create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
+- Do Cloud: before deploy also turn on App Check and an anonymous sign-up quota, restrict the Android API key, and restrict who can publish to the Play notifications topic. Create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
 
 ## Nothing merged, nothing published
 No merges to `main`, no PRs opened, nothing sent to Play or the App Store.
