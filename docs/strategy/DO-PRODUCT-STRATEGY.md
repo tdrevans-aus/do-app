@@ -250,6 +250,7 @@ The phone side needs no redesign: Spec 9's stable ids, versions, soft delete, ev
 - Catalogue name: "Stuff You Should Do" (SHOULD, not CAN). "Stuff" over "Things" is Tim's instinct; recommendation agrees, because "Things" is also the name of a well-known to-do app (Things 3), which is a closer clash than "Stuff You Should Know" (a podcast).
 - Cloud agent API: at launch.
 - Architecture: local-first with a thin cloud, Firebase recommended (9B).
+- **compileSdk 37 (decided by Tim, 28 Nov 2026):** move Do to compileSdk 37 so Google's AppFunctions 1.0.0 can be wired in, as its own small change after PR #8 and Spec 9 merge. It does not change which phones Do runs on (minSdk stays 26); targetSdk is a separate decision.
 
 - **Catalogue regions:** the data is built to work globally (each item tagged everywhere, a country such as `AU`, or a state such as `AU-WA`); the launch content is written for Australia. US, UK and NZ packs can follow without a redesign. Do works out the user's state from the phone's time zone (Perth: WA, Brisbane: Qld, Adelaide: SA, Darwin: NT, Hobart: Tas, Melbourne: Vic), with no location permission. "Sydney" covers NSW and ACT, so that one asks with a single tap. The picks screen shows "Using WA rules. Change" rather than asking a question. State-specific items get the right interval and wording; items that don't apply in that state are hidden.
 - **AppFunctions:** build Do's AppFunctions entry points in Spec 12 as a thin layer over the Spec 9 commands; apply for Google's AppFunctions early access now so Do can be tested with Gemini on the S24+; do not make launch depend on it. Share to Do, the widget and the cloud agent API all work without it. If Gemini access for other apps has not opened by launch, the Assistants screen shows Gemini as "Coming soon". (As at late 2026, Gemini calling third-party apps' AppFunctions is still a limited preview.)
@@ -257,7 +258,7 @@ The phone side needs no redesign: Spec 9's stable ids, versions, soft delete, ev
 **Still open:**
 
 1. Creating the Firebase project for Do Cloud (Tim, before deploy; not needed to build).
-2. Whether to move Do to compileSdk 37, which Google's AppFunctions 1.0.0 needs (Gareth).
+
 3. Applying for Google's AppFunctions early access (Tim, with a Google developer account).
 
 ## Sources (competitor scan, 27 Nov 2026)
