@@ -258,8 +258,7 @@ The phone side needs no redesign: Spec 9's stable ids, versions, soft delete, ev
 **Still open:**
 
 1. Creating the Firebase project for Do Cloud (Tim, before deploy; not needed to build).
-
-3. Applying for Google's AppFunctions early access (Tim, with a Google developer account).
+2. Applying for Google's AppFunctions early access (Tim, with a Google developer account).
 
 ## Sources (competitor scan, 27 Nov 2026)
 
