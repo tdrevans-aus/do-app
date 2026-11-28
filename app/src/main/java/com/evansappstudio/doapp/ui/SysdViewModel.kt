@@ -1,5 +1,9 @@
 package com.evansappstudio.doapp.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -97,10 +101,14 @@ class SysdViewModel(private val container: AppContainer) : ViewModel() {
 
     fun startOnboarding() = container.settings.setSysdOnboarding(SettingsStore.ONBOARDING_STARTED)
 
-    fun finishOnboarding() = container.settings.setSysdOnboarding(SettingsStore.ONBOARDING_DONE)
+    fun finishOnboarding() {
+        container.settings.setSysdOnboarding(SettingsStore.ONBOARDING_DONE)
+        clearPicks()
+    }
 
     /** Skip on step 3 or 4: go to Today and arm the head-start card for the next day. */
     fun skipOnboarding() {
+        clearPicks()
         container.settings.setSysdOnboarding(SettingsStore.ONBOARDING_SKIPPED)
         val today = service.suggestionDate()
         service.updateSuggestions { SuggestionPolicy.skipped(it, today) }
@@ -116,6 +124,43 @@ class SysdViewModel(private val container: AppContainer) : ViewModel() {
         val unlocked = unlocked()
         val pre = Picks.preTicked(groups.flatMap { it.second }, active, unlocked, FreeTier.ACTIVE_REMINDER_CAP)
         return PicksStart(groups, pre, active, unlocked)
+    }
+
+    private val picksState = MutableStateFlow<PicksStart?>(null)
+    val picks: StateFlow<PicksStart?> = picksState.asStateFlow()
+
+    /** Step 4's ticks, picked dates and Show more, kept here so rotation and the paywall keep them. */
+    val pickTicks = mutableStateMapOf<String, Boolean>()
+    val pickDates = mutableStateMapOf<String, LocalDate>()
+    val pickExpanded = mutableStateMapOf<String, Boolean>()
+
+    /** Picks waiting on the paywall. Back returns to step 4; Keep 5 for free adds what fits. */
+    var pendingPlans by mutableStateOf<List<PlannedAdd>?>(null)
+
+    fun loadPicks() {
+        if (picksState.value != null) return
+        viewModelScope.launch {
+            val start = picksStart()
+            pickTicks.clear()
+            start.preTicked.forEach { pickTicks[it] = true }
+            picksState.value = start
+        }
+    }
+
+    fun clearPicks() {
+        picksState.value = null
+        pickTicks.clear()
+        pickDates.clear()
+        pickExpanded.clear()
+        pendingPlans = null
+    }
+
+    fun suggestionsOn(): Boolean = !service.suggestionState().stopped
+
+    /** The Settings switch: off is "Stop suggesting", on brings the cards back. */
+    fun setSuggestionsOn(on: Boolean) {
+        service.updateSuggestions { it.copy(stopped = !on) }
+        refreshCard()
     }
 
     fun plan(items: List<LocalItem>, dates: Map<String, LocalDate>): List<PlannedAdd> = service.plan(items, dates)

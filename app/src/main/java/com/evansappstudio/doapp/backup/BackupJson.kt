@@ -9,6 +9,9 @@ internal sealed interface JsonValue {
     data class Arr(val items: List<JsonValue>) : JsonValue
     data class Str(val value: String) : JsonValue
     data class Num(val value: Long) : JsonValue
+
+    /** A non-integer number, kept as its text. Only [parseJson] with allowFractions makes one (the catalogue). */
+    data class Frac(val text: String) : JsonValue
     data class Bool(val value: Boolean) : JsonValue
     data object Null : JsonValue
 }
@@ -19,7 +22,11 @@ internal fun JsonValue.field(name: String): JsonValue? = (this as? JsonValue.Obj
 
 internal class JsonParseException(message: String) : IllegalArgumentException(message)
 
-internal fun parseJson(text: String): JsonValue = JsonParser(text).parse()
+/**
+ * The backup file refuses non-integer numbers. With [allowFractions] (the catalogue) they parse as
+ * [JsonValue.Frac], so the reader can skip just the item that has one.
+ */
+internal fun parseJson(text: String, allowFractions: Boolean = false): JsonValue = JsonParser(text, allowFractions).parse()
 
 internal fun encodeJson(value: JsonValue): String = buildString { writeJson(value, 0) }
 
@@ -28,10 +35,20 @@ private fun StringBuilder.writeJson(value: JsonValue, indent: Int) {
         is JsonValue.Null -> append("null")
         is JsonValue.Bool -> append(if (value.value) "true" else "false")
         is JsonValue.Num -> append(value.value.toString())
+        is JsonValue.Frac -> append(value.text)
         is JsonValue.Str -> append(quote(value.value))
         is JsonValue.Arr -> {
             append('[')
             if (value.items.isEmpty()) {
+                append(']')
+                return
+            }
+            // A list of plain values (the Spec 11 sysdAreas) stays on one line.
+            if (value.items.all { it !is JsonValue.Arr && it !is JsonValue.Obj }) {
+                value.items.forEachIndexed { index, item ->
+                    if (index > 0) append(", ")
+                    writeJson(item, indent)
+                }
                 append(']')
                 return
             }
@@ -89,7 +106,7 @@ private fun quote(value: String): String = buildString {
     append('"')
 }
 
-private class JsonParser(private val text: String) {
+private class JsonParser(private val text: String, private val allowFractions: Boolean) {
     private var index = 0
 
     fun parse(): JsonValue {
@@ -200,7 +217,7 @@ private class JsonParser(private val text: String) {
         throw JsonParseException("truncated string")
     }
 
-    private fun readNumber(): JsonValue.Num {
+    private fun readNumber(): JsonValue {
         val start = index
         if (peek('-')) index++
         if (index >= text.length || text[index] !in '0'..'9') throw JsonParseException("bad number")
@@ -210,11 +227,29 @@ private class JsonParser(private val text: String) {
             while (index < text.length && text[index] in '0'..'9') index++
         }
         if (index < text.length && text[index] in setOf('.', 'e', 'E')) {
-            throw JsonParseException("non-integer")
+            if (!allowFractions) throw JsonParseException("non-integer")
+            return readFraction(start)
         }
         val raw = text.substring(start, index)
         val value = raw.toLongOrNull() ?: throw JsonParseException("bad number")
         return JsonValue.Num(value)
+    }
+
+    private fun readFraction(start: Int): JsonValue.Frac {
+        if (peek('.')) {
+            index++
+            val digits = index
+            while (index < text.length && text[index] in '0'..'9') index++
+            if (index == digits) throw JsonParseException("bad number")
+        }
+        if (index < text.length && text[index] in setOf('e', 'E')) {
+            index++
+            if (index < text.length && text[index] in setOf('+', '-')) index++
+            val digits = index
+            while (index < text.length && text[index] in '0'..'9') index++
+            if (index == digits) throw JsonParseException("bad number")
+        }
+        return JsonValue.Frac(text.substring(start, index))
     }
 
     private fun literal(word: String, value: JsonValue): JsonValue {

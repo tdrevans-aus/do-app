@@ -89,7 +89,7 @@ object CatalogueParser {
      */
     fun parse(text: String): CatalogueParse {
         val root = try {
-            parseJson(text) as? JsonValue.Obj
+            parseJson(text, allowFractions = true) as? JsonValue.Obj
         } catch (error: JsonParseException) {
             null
         } ?: return CatalogueParse(Catalogue.EMPTY, listOf("file: not a JSON object"))

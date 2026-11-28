@@ -44,7 +44,7 @@ object RegionResolver {
     /** The eight states and territories, in the order the Change list shows them. */
     val STATES: List<String> = listOf(NSW, VIC, QLD, WA, SA, TAS, ACT, NT)
 
-    /** Sydney and Lord Howe could be either. */
+    /** Sydney could be either. */
     val NSW_OR_ACT: List<String> = listOf(NSW, ACT)
 
     private val ZONES: Map<String, String> = mapOf(
@@ -68,13 +68,14 @@ object RegionResolver {
         // Broken Hill keeps South Australian time but is in NSW.
         "Australia/Broken_Hill" to NSW,
         "Australia/Yancowinna" to NSW,
+        // Lord Howe Island is part of NSW (after QA), so it needs no question.
+        "Australia/Lord_Howe" to NSW,
+        "Australia/LHI" to NSW,
     )
 
     private val EITHER: Set<String> = setOf(
         "Australia/Sydney",
         "Australia/NSW",
-        "Australia/Lord_Howe",
-        "Australia/LHI",
     )
 
     fun resolve(zoneId: String?): RegionGuess {

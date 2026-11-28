@@ -155,8 +155,6 @@ fun ReminderApp(
     val card by sysd.card.collectAsStateWithLifecycle()
     val sysdItems by sysd.items.collectAsStateWithLifecycle()
     val sysdAdded by sysd.added.collectAsStateWithLifecycle()
-    // First run picks waiting on the paywall: added (up to the limit) when it closes.
-    var pendingPlans by remember { mutableStateOf<List<PlannedAdd>?>(null) }
 
     fun catalogueAdd(item: LocalItem, date: java.time.LocalDate?, from: String, kind: CardKind? = null) {
         sysd.addOne(item, date, kind) { blocked ->
@@ -364,19 +362,20 @@ fun ReminderApp(
             onBack = { screen = SCREEN_LIST },
             onOpenHealth = { openHealth(SCREEN_SNOOZE) },
             onUnlock = { openUnlock(SCREEN_SNOOZE) },
+            suggestionsOn = sysd::suggestionsOn,
+            onSuggestionsOn = sysd::setSuggestionsOn,
         )
         SCREEN_UNLOCK -> {
             val activity = context as? android.app.Activity
-            val waiting = pendingPlans
+            // First run picks waiting on the paywall (kept in the view model across rotation).
+            val waiting = sysd.pendingPlans
             UnlockScreen(
                 state = unlock,
                 onBack = {
-                    if (waiting != null) {
-                        pendingPlans = null
-                        finishPicks(waiting)
-                    } else {
-                        screen = unlockFrom
-                    }
+                    // Back never adds. From picks it returns to step 4 with the ticks as they were
+                    // (after buying, Add there adds them all).
+                    sysd.pendingPlans = null
+                    screen = unlockFrom
                 },
                 onBuy = { if (activity != null) container.billing.buy(activity) },
                 onRestore = { container.billing.restore() },
@@ -384,7 +383,7 @@ fun ReminderApp(
                     null
                 } else {
                     {
-                        pendingPlans = null
+                        sysd.pendingPlans = null
                         finishPicks(waiting)
                     }
                 },
@@ -405,8 +404,8 @@ fun ReminderApp(
             viewModel = sysd,
             onAdd = { plans, overCap ->
                 if (overCap) {
-                    pendingPlans = plans
-                    unlockFrom = SCREEN_LIST
+                    sysd.pendingPlans = plans
+                    unlockFrom = SCREEN_PICKS
                     screen = SCREEN_UNLOCK
                 } else {
                     finishPicks(plans)

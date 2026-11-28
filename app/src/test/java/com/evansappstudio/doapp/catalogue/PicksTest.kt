@@ -127,9 +127,12 @@ class PicksTest {
         // The month item does not use a spread day: the chore is still tomorrow.
         assertEquals(LocalDateTime.parse("2026-11-28T09:00"), local(plans[1].dueAt))
         assertEquals(LocalDateTime.parse("2026-12-01T10:00"), local(plans[2].dueAt))
-        // On 1 July before the suggested time it is today; after it, next year.
-        assertEquals(LocalDateTime.parse("2026-07-01T19:00"), local(FirstDue.plan(listOf(tax), at("2026-07-01", "08:00"), perth)[0].dueAt))
-        assertEquals(LocalDateTime.parse("2027-07-01T19:00"), local(FirstDue.plan(listOf(tax), at("2026-07-01", "20:00"), perth)[0].dueAt))
+        // Added during its own month (after QA, a call for Gareth): tomorrow at the suggested time.
+        assertEquals(LocalDateTime.parse("2026-07-02T19:00"), local(FirstDue.plan(listOf(tax), at("2026-07-01", "08:00"), perth)[0].dueAt))
+        assertEquals(LocalDateTime.parse("2026-07-03T19:00"), local(FirstDue.plan(listOf(tax), at("2026-07-02", "20:00"), perth)[0].dueAt))
+        assertEquals(LocalDateTime.parse("2026-08-01T19:00"), local(FirstDue.plan(listOf(tax), at("2026-07-31", "20:00"), perth)[0].dueAt))
+        // The month after it: next year.
+        assertEquals(LocalDateTime.parse("2027-07-01T19:00"), local(FirstDue.plan(listOf(tax), at("2026-08-01", "08:00"), perth)[0].dueAt))
         // The repeat comes from the item.
         assertEquals(RepeatRule.of(1, RepeatUnit.YEAR, RepeatFrom.DUE_DATE), plans[0].rule)
         assertEquals(RepeatRule.of(1, RepeatUnit.MONTH, RepeatFrom.COMPLETION), plans[1].rule)

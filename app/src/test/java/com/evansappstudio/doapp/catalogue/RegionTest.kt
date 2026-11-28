@@ -23,6 +23,7 @@ class RegionTest {
             "Australia/Melbourne" to "AU-VIC",
             "Australia/Canberra" to "AU-ACT",
             "Australia/Broken_Hill" to "AU-NSW",
+            "Australia/Lord_Howe" to "AU-NSW",
         )
         expected.forEach { (zone, state) ->
             val guess = RegionResolver.resolve(zone)
@@ -31,10 +32,10 @@ class RegionTest {
         }
     }
 
-    // AT-2 (Sydney and Lord Howe are "NSW or ACT", which needs one tap)
+    // AT-2 (Sydney is "NSW or ACT", which needs one tap; Lord Howe is NSW after QA)
     @Test
-    fun at2SydneyAndLordHoweNeedOneTap() {
-        listOf("Australia/Sydney", "Australia/Lord_Howe").forEach { zone ->
+    fun at2SydneyNeedsOneTap() {
+        listOf("Australia/Sydney", "Australia/NSW").forEach { zone ->
             val guess = RegionResolver.resolve(zone)
             assertTrue(zone, guess.needsChoice)
             assertEquals("AU", guess.region.code)

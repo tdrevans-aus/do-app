@@ -135,8 +135,8 @@
         "home-roof-check"
       ],
       "keywords": [
-        "gutters",
-        "gutter"
+        "clean the gutters",
+        "gutters"
       ],
       "health": false,
       "link": null
@@ -299,8 +299,8 @@
       ],
       "keywords": [
         "dryer vent",
-        "dryer lint",
-        "dryer"
+        "dryer duct",
+        "dryer lint"
       ],
       "health": false,
       "link": null
@@ -331,8 +331,9 @@
         "home-gutters-clean"
       ],
       "keywords": [
-        "roof",
-        "roof tiles"
+        "roof check",
+        "roof tiles",
+        "roof leak"
       ],
       "health": false,
       "link": null
@@ -365,7 +366,8 @@
       ],
       "keywords": [
         "rental inspection",
-        "inspection"
+        "routine inspection",
+        "house inspection"
       ],
       "health": false,
       "link": null
@@ -397,8 +399,8 @@
         "renter-contents-insurance"
       ],
       "keywords": [
-        "lease",
         "lease ends",
+        "end of lease",
         "lease renewal"
       ],
       "health": false,
@@ -493,7 +495,7 @@
       ],
       "keywords": [
         "repairs list",
-        "repairs",
+        "rental repairs",
         "property manager"
       ],
       "health": false,
@@ -559,8 +561,8 @@
       ],
       "keywords": [
         "rego",
-        "registration",
-        "car rego"
+        "car rego",
+        "car registration"
       ],
       "health": false,
       "link": null
@@ -725,7 +727,8 @@
         "car-wiper-blades"
       ],
       "keywords": [
-        "oil",
+        "engine oil",
+        "oil change",
         "coolant",
         "washer fluid"
       ],
@@ -855,8 +858,8 @@
       ],
       "keywords": [
         "immunisation",
-        "vaccinations kids",
-        "needles"
+        "immunisations",
+        "kids vaccinations"
       ],
       "health": true,
       "link": null
@@ -889,7 +892,7 @@
       "keywords": [
         "school forms",
         "permission slip",
-        "school"
+        "enrolment forms"
       ],
       "health": false,
       "link": null
@@ -1018,7 +1021,8 @@
       "keywords": [
         "worming",
         "worm the dog",
-        "worm the cat"
+        "worm the cat",
+        "worming tablet"
       ],
       "health": false,
       "link": null
@@ -1049,9 +1053,10 @@
         "pets-worming"
       ],
       "keywords": [
-        "flea",
-        "tick",
-        "flea treatment"
+        "flea treatment",
+        "flea and tick",
+        "tick treatment",
+        "fleas"
       ],
       "health": false,
       "link": null
@@ -1116,8 +1121,9 @@
         "pets-worming"
       ],
       "keywords": [
-        "vet",
-        "vet check"
+        "vet check",
+        "vet appointment",
+        "the vet"
       ],
       "health": false,
       "link": null
@@ -1277,7 +1283,7 @@
       "keywords": [
         "eye test",
         "optometrist",
-        "glasses"
+        "new glasses"
       ],
       "health": true,
       "link": null
@@ -1309,9 +1315,10 @@
         "health-skin-check"
       ],
       "keywords": [
-        "gp",
-        "doctor",
-        "check-up"
+        "gp appointment",
+        "gp check-up",
+        "doctor appointment",
+        "health check-up"
       ],
       "health": true,
       "link": null
@@ -1375,8 +1382,8 @@
       ],
       "keywords": [
         "prescription",
-        "scripts",
-        "repeats"
+        "prescriptions",
+        "repeat script"
       ],
       "health": true,
       "link": null
@@ -1439,8 +1446,8 @@
         "money-super-check"
       ],
       "keywords": [
-        "tax",
         "tax return",
+        "lodge tax",
         "ato"
       ],
       "health": false,
@@ -1474,7 +1481,7 @@
       "keywords": [
         "insurance renewal",
         "home insurance",
-        "insurance"
+        "insurance renewals"
       ],
       "health": false,
       "link": null
@@ -1537,9 +1544,9 @@
         "money-passport-expiry"
       ],
       "keywords": [
-        "licence",
         "drivers licence",
-        "driver's licence"
+        "driver's licence",
+        "licence renewal"
       ],
       "health": false,
       "link": null
@@ -1602,7 +1609,8 @@
       ],
       "keywords": [
         "subscriptions",
-        "streaming"
+        "streaming subscriptions",
+        "cancel subscription"
       ],
       "health": false,
       "link": null
@@ -1633,8 +1641,9 @@
         "money-tax-return"
       ],
       "keywords": [
-        "super",
-        "superannuation"
+        "superannuation",
+        "super fund",
+        "super balance"
       ],
       "health": false,
       "link": null
@@ -1665,7 +1674,10 @@
         "money-super-check"
       ],
       "keywords": [
-        "will"
+        "make a will",
+        "update my will",
+        "review my will",
+        "update the will"
       ],
       "health": false,
       "link": null
@@ -1699,7 +1711,8 @@
       ],
       "keywords": [
         "energy plan",
-        "electricity",
+        "electricity plan",
+        "electricity bill",
         "power bill"
       ],
       "health": false,
@@ -1732,7 +1745,8 @@
       ],
       "keywords": [
         "passwords",
-        "password"
+        "password manager",
+        "change passwords"
       ],
       "health": false,
       "link": null

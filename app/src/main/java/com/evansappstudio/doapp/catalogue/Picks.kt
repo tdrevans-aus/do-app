@@ -27,8 +27,18 @@ object Picks {
             .map { it.value }
 
     /**
+     * Within one area, the order step 4 shows: items that can be pre-ticked first
+     * (highest priority first), then `needsDate` items, so a renewal waiting for its
+     * date never pushes a ticked item behind "Show more".
+     */
+    fun displayOrder(items: List<LocalItem>): List<LocalItem> {
+        val ordered = ordered(items)
+        return ordered.filter { !it.item.needsDate } + ordered.filter { it.item.needsDate }
+    }
+
+    /**
      * Items for [areas] (all eight when empty), grouped by area in [areaOrder]
-     * order, highest priority first, items already [added] left out.
+     * order, in [displayOrder], items already [added] left out.
      */
     fun grouped(
         items: List<LocalItem>,
@@ -38,7 +48,7 @@ object Picks {
     ): List<Pair<String, List<LocalItem>>> {
         val wanted = if (areas.isEmpty()) areaOrder.toSet() else areas
         return areaOrder.filter { it in wanted }.mapNotNull { area ->
-            val inArea = ordered(items.filter { it.item.category == area && it.id !in added })
+            val inArea = displayOrder(items.filter { it.item.category == area && it.id !in added })
             if (inArea.isEmpty()) null else area to inArea
         }
     }
@@ -54,8 +64,10 @@ object Picks {
 
     /**
      * Which items start ticked: the highest-priority ones across [items], never a
-     * `needsDate` item, never more than the free slots left. An [unlocked] user
-     * gets the top [PRE_TICK_CAP] whatever is active, the same cap as a new free user.
+     * `needsDate` item, never more than the free slots left, and only among the first
+     * [SHOWN_PER_AREA] of each area in [displayOrder], so every ticked item is on screen
+     * before "Show more". An [unlocked] user gets the top [PRE_TICK_CAP] whatever is
+     * active, the same cap as a new free user.
      */
     fun preTicked(items: List<LocalItem>, activeCount: Int, unlocked: Boolean, cap: Int?): Set<String> {
         val limit = if (unlocked) {
@@ -64,7 +76,10 @@ object Picks {
             minOf(PRE_TICK_CAP, freeSlots(activeCount, cap) ?: PRE_TICK_CAP)
         }
         if (limit <= 0) return emptySet()
-        return ordered(items.filter { !it.item.needsDate }).take(limit).map { it.id }.toSet()
+        val visible = items.groupBy { it.item.category }.values.flatMap { inArea ->
+            displayOrder(inArea).take(SHOWN_PER_AREA).filter { !it.item.needsDate }
+        }
+        return ordered(visible).take(limit).map { it.id }.toSet()
     }
 
     /** The counter: free slots left after [ticked] more, or null when there is no cap. */
@@ -93,8 +108,9 @@ object FirstDue {
      * First dues for a batch, in order, so they do not all land at once:
      * - `needsDate` items: the date the user picked, at the suggested time (an item with no
      *   picked date is left out).
-     * - from-due-date items with a suggested month: the 1st of the next such month at the
-     *   suggested time (next year when this year's has passed).
+     * - from-due-date items with a suggested month: tomorrow at the suggested time when
+     *   added during that month (call for Gareth, after QA); otherwise the 1st of the next
+     *   such month at the suggested time (next year when this year's has passed).
      * - every other item (from-completion, or from-due-date with no month): the i-th of them
      *   at its suggested time i days from tomorrow, i starting at 0.
      */
@@ -111,6 +127,8 @@ object FirstDue {
             val time = LocalTime.of(item.suggestedMinute / 60, item.suggestedMinute % 60)
             val date = when {
                 item.needsDate -> pickedDates[item.id] ?: return@mapNotNull null
+                item.repeatFrom == RepeatFrom.DUE_DATE && item.suggestedMonth == today.monthValue ->
+                    today.plusDays(1)
                 item.repeatFrom == RepeatFrom.DUE_DATE && item.suggestedMonth != null ->
                     nextMonthStart(item.suggestedMonth, time, now, zone)
                 else -> today.plusDays(1L + spread++)

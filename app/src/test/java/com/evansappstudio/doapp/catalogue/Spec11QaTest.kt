@@ -171,7 +171,9 @@ class Spec11QaTest {
             "Australia/Melbourne" to "AU-VIC", "Australia/Victoria" to "AU-VIC",
             "Australia/Canberra" to "AU-ACT", "Australia/ACT" to "AU-ACT",
             "Australia/Broken_Hill" to "AU-NSW", "Australia/Yancowinna" to "AU-NSW",
-            "Australia/Sydney" to "AU", "Australia/NSW" to "AU", "Australia/Lord_Howe" to "AU", "Australia/LHI" to "AU",
+            "Australia/Sydney" to "AU", "Australia/NSW" to "AU",
+            // Changed after QA by the coordinator's call: Lord Howe Island is in NSW, so no question.
+            "Australia/Lord_Howe" to "AU-NSW", "Australia/LHI" to "AU-NSW",
         )
         zones.forEach { zone ->
             val guess = RegionResolver.resolve(zone)

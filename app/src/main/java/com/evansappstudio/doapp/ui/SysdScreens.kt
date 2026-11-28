@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +50,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
@@ -183,14 +188,24 @@ private fun RegionChoice(label: String, selected: Boolean, onClick: () -> Unit) 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NeedsDateDialog(initial: LocalDate?, onPicked: (LocalDate?) -> Unit) {
-    val start = (initial ?: LocalDate.now().plusDays(1)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-    val state = rememberDatePickerState(initialSelectedDateMillis = start)
+    val today = LocalDate.now()
+    val start = (initial?.takeIf { !it.isBefore(today) } ?: today.plusDays(1)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    // A past date would start nagging at once, so the picker offers today onwards.
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = start,
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isBefore(today)
+
+            override fun isSelectableYear(year: Int): Boolean = year >= today.year
+        },
+    )
     DatePickerDialog(
         onDismissRequest = { onPicked(null) },
         confirmButton = {
             TextButton(onClick = {
                 val millis = state.selectedDateMillis
-                onPicked(millis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() })
+                onPicked(millis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }?.takeIf { !it.isBefore(today) })
             }) { Text(stringResource(R.string.ok)) }
         },
         dismissButton = {
@@ -299,10 +314,10 @@ fun PicksScreen(
     onAdd: (plans: List<PlannedAdd>, overCap: Boolean) -> Unit,
     onSkip: () -> Unit,
 ) {
-    var start by remember { mutableStateOf<PicksStart?>(null) }
-    LaunchedEffect(Unit) { start = viewModel.picksStart() }
+    // The picks live in the view model, so rotation and a trip to the paywall keep them.
+    LaunchedEffect(Unit) { viewModel.loadPicks() }
     val region by viewModel.region.collectAsStateValue()
-    val loaded = start
+    val loaded = viewModel.picks.collectAsStateValue().value
     DoLookTheme {
         if (loaded == null) {
             Surface(color = DoLook.Ground, modifier = Modifier.fillMaxSize()) {}
@@ -320,12 +335,13 @@ private fun PicksContent(
     onAdd: (plans: List<PlannedAdd>, overCap: Boolean) -> Unit,
     onSkip: () -> Unit,
 ) {
-    val ticked = remember { mutableStateMapOf<String, Boolean>().apply { start.preTicked.forEach { put(it, true) } } }
-    val dates = remember { mutableStateMapOf<String, LocalDate>() }
-    val expanded = remember { mutableStateMapOf<String, Boolean>() }
-    var askDateFor by remember { mutableStateOf<LocalItem?>(null) }
+    val ticked = viewModel.pickTicks
+    val dates = viewModel.pickDates
+    val expanded = viewModel.pickExpanded
+    var askDateForId by rememberSaveable { mutableStateOf<String?>(null) }
     // A region change after loading re-groups the items; ticks stay by id.
     val items by viewModel.items.collectAsStateValue()
+    val askDateFor = askDateForId?.let { id -> items.firstOrNull { it.id == id } }
     val areas by viewModel.areas.collectAsStateValue()
     val added by viewModel.added.collectAsStateValue()
     val groups = remember(items, areas, added) { Picks.grouped(items, areas, added, ReminderCategory.ALL) }
@@ -408,12 +424,12 @@ private fun PicksContent(
                             if (on) {
                                 ticked[item.id] = false
                             } else if (item.item.needsDate && dates[item.id] == null) {
-                                askDateFor = item
+                                askDateForId = item.id
                             } else {
                                 ticked[item.id] = true
                             }
                         },
-                        onChangeDate = { askDateFor = item },
+                        onChangeDate = { askDateForId = item.id },
                     )
                 }
                 if (list.size > Picks.SHOWN_PER_AREA) {
@@ -430,7 +446,7 @@ private fun PicksContent(
     }
     askDateFor?.let { item ->
         NeedsDateDialog(dates[item.id]) { picked ->
-            askDateFor = null
+            askDateForId = null
             if (picked != null) {
                 dates[item.id] = picked
                 ticked[item.id] = true
@@ -610,9 +626,10 @@ fun TodayCard(
                 card.items.forEach { item ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ItemText(item, showWhy = false, modifier = Modifier.weight(1f))
+                        val said = stringResource(R.string.sysd_add_named, item.title)
                         TextButton(
                             onClick = { if (item.item.needsDate) askDateFor = item else onAdd(item, null) },
-                            modifier = Modifier.heightIn(min = DoLook.MinTouch),
+                            modifier = Modifier.heightIn(min = DoLook.MinTouch).semantics { contentDescription = said },
                         ) { Text(stringResource(R.string.sysd_add_item)) }
                     }
                 }

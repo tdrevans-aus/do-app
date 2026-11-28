@@ -101,6 +101,7 @@ Phone (Mark with Tim):
 3. Pre-tick up to the free slots left, `needsDate` never pre-ticked.
 4. First dues spread one day apart.
 5. Screens built in the new design's look now.
+6. **(Added after QA, the coordinator's call, for Gareth to confirm.)** An item with a `suggestedMonth` added during that month is due tomorrow at its `suggestedTime`, not on the 1st of that month next year. Its yearly from-due-date repeat then runs from that date. Added in any other month: the 1st of the next such month, as before.
 
 ## Build notes
 Built on `do/spec-11-stuff-you-should-do` from `a645db2` (Spec 9 at `3235db6` plus this draft). Notes by the Claude build agent, 27 Nov 2026 (AWST).
@@ -202,3 +203,24 @@ Also `backup/SysdBackupKeysTest` (3) for the optional backup keys.
 
 ### CI
 `./gradlew --no-daemon --max-workers=2 assembleDebug testDebugUnitTest lintDebug` and `./gradlew --no-daemon --max-workers=2 assembleDebug -PexactAlarmMode=SCHEDULE` both pass locally. No phone or emulator was available to the build agent, so ATs 12 to 15 and the look of the screens are untested on a device.
+
+### Fixes after QA
+From `specs/11-qa-report.md` (QA at `8e9de69`). All 27 QA tests pass, including the six that failed on purpose; the Robolectric render tests from `cee442e` are kept.
+
+1. **Bug 1, pre-ticked picks hidden behind Show more.** Within each area, step 4 now lists items that can be pre-ticked first and `needsDate` items after them (`Picks.displayOrder`), and `Picks.preTicked` chooses only among the first four shown in each area. Every ticked item is on screen before Show more, for free and Unlimited users.
+2. **Bug 2, an item added in its own month due next year.** Now due tomorrow at its suggested time (section 7, call 6). Supersedes choice 5's month rule for that case. `PicksTest.at5SuggestedMonthAlreadyPassedGoesToNextYear` was updated to match (it had asserted the old 1 July behaviour).
+3. **Bug 3, a wrongly typed backup key crashed import.** `sysdRegion` and `sysdRegionSource` are read leniently; a wrong type is ignored. A list of plain values in a backup (only `sysdAreas`) is now written on one line; the file is still the same JSON.
+4. **Bug 4, one decimal emptied the catalogue.** The JSON reader takes non-integer numbers when the catalogue asks (`parseJson(text, allowFractions = true)`) and the item with one is skipped as malformed. The backup file still refuses them.
+5. **Bug 5, broad keywords.** Single words that match everyday titles are gone or replaced by phrases: `will` (now "make a will", "update my will" and similar), `tick`, `oil`, `glasses`, `school`, `super`, `tax`, `vet`, `gp`, `doctor`, `check-up`, `insurance`, `licence`, `registration`, `lease`, `repairs`, `inspection`, `roof`, `dryer`, `electricity`, `password`, `streaming`, `scripts`, `repeats`, `needles`. Edited in `docs/catalogue/convert_sysd.py` and the asset regenerated (priorities, rules and related items unchanged).
+6. **Bug 6, TalkBack.** Add buttons on the Today card and the Catalogue tab read "Add <title>"; the Added button reads "Added <title>. Tap to remove."; the region choices expose selected state instead of a typed check mark.
+
+Low notes:
+- **Back from the paywall** reached from picks returns to step 4 with the ticks as they were and adds nothing. Only "Keep 5 for free" adds what fits. After buying, Add on step 4 adds them all.
+- **Picks state** (ticks, picked dates, Show more, and the picks waiting on the paywall) lives in `SysdViewModel`, so rotation and the trip to the paywall keep it.
+- **The date picker** offers today onwards only.
+- **Lord Howe** (`Australia/Lord_Howe`, `Australia/LHI`) maps straight to `AU-NSW`. Only Sydney asks "NSW or ACT?". This changed one expectation in QA's `everyAustraliaZoneInTzdataResolvesInsideAustralia` and in `RegionTest` (on the coordinator's instruction).
+- **Region line wording** is one style for all eight: "Using NSW / Vic / Qld / WA / SA / Tas / ACT / NT rules." ("Using Australia-wide rules." if `AU` is set with no state.)
+- **"Stop suggesting" undo:** a "Stuff You Should Do suggestions" switch in the existing settings screen (the Snooze settings button on Today). Off is the same as Stop suggesting; on brings the cards back. Spec 14 moves it to Settings, Helpers.
+- Not changed, listed for Spec 14 or Gareth: system Back on steps 3 and 4 still leaves the app (the app has no Back handling anywhere); "shown" is still recorded when the card is worked out rather than when Today is on screen; the related card can offer a second item the same day; car rego is added as Loud without the first-use explanation; the overdue split refreshes only when the list changes; "Step 3 of 4" for users who never saw steps 1 and 2; Keep 5 for free is still an outlined button under Buy; the Added outline contrast; not pre-ticking low-confidence items.
+
+Changed existing tests after QA: `catalogue/PicksTest` (the July cases, bug 2), `catalogue/RegionTest` (Lord Howe), and one map entry in QA's `catalogue/Spec11QaTest` (Lord Howe). Nothing else was weakened.

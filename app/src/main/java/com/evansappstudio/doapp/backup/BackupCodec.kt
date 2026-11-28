@@ -215,8 +215,8 @@ private fun decodeSettings(value: JsonValue?): PortableSettings? {
         quietEndMinute = quietEnd,
         quietFollowDnd = optionalBool(obj.fields["quietFollowDnd"]),
         quietCriticalPauses = optionalBool(obj.fields["quietCriticalPauses"]),
-        sysdRegion = optionalString(obj.fields["sysdRegion"])?.takeIf { RegionResolver.parse(it) != null },
-        sysdRegionSource = optionalString(obj.fields["sysdRegionSource"])?.takeIf { RegionSource.fromName(it) != null },
+        sysdRegion = lenientString(obj.fields["sysdRegion"])?.takeIf { RegionResolver.parse(it) != null },
+        sysdRegionSource = lenientString(obj.fields["sysdRegionSource"])?.takeIf { RegionSource.fromName(it) != null },
         sysdAreas = sysdAreas(obj.fields["sysdAreas"]),
     )
 }
