@@ -50,13 +50,14 @@ import com.evansappstudio.doapp.data.RepeatPromptMode
 import com.evansappstudio.doapp.data.WeekStart
 import com.evansappstudio.doapp.alarm.SnoozeLabels
 import com.evansappstudio.doapp.alarm.SnoozeOption
-import com.evansappstudio.doapp.billing.UnlockUiState
+import com.evansappstudio.doapp.billing.PaywallCopy
+import com.evansappstudio.doapp.billing.SubscriptionUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SnoozeSettingsScreen(
     viewModel: ReminderViewModel,
-    unlock: UnlockUiState,
+    unlock: SubscriptionUiState,
     onBack: () -> Unit,
     onOpenHealth: () -> Unit,
     onUnlock: () -> Unit,
@@ -108,20 +109,11 @@ fun SnoozeSettingsScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Text(
-                        text = if (unlock.unlocked) {
-                            stringResource(R.string.unlock_done)
-                        } else {
-                            stringResource(R.string.unlock_do)
-                        },
-                    )
-                    Text(
-                        text = when {
-                            unlock.pending -> stringResource(R.string.unlock_pending)
-                            unlock.unlocked -> stringResource(R.string.unlock_restore)
-                            else -> unlock.price ?: stringResource(R.string.unlock_price_unavailable)
-                        },
-                    )
+                    val copy = PaywallCopy.build(unlock, paywallTemplates())
+                    Text(text = stringResource(R.string.sub_name))
+                    // The renewal price always sits beside an intro price (priceDetail), as on the paywall.
+                    Text(text = copy.statusLine ?: copy.priceHeadline)
+                    if (copy.statusLine == null) copy.priceDetail?.let { Text(text = it) }
                 }
             }
             itemsIndexed(options) { index, option ->
