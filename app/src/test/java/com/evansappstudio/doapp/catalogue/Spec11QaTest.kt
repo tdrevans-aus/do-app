@@ -68,9 +68,10 @@ class Spec11QaTest {
         assertEquals(1, parse.catalogue.schema)
         assertEquals(1, parse.catalogue.catalogueVersion)
         val ids = parse.catalogue.items.map { it.id }
-        assertEquals(58, ids.size)
+        // Tim, 28 Nov 2026: renter-smoke-alarm-test merged into home-smoke-alarm-test (57 items).
+        assertEquals(57, ids.size)
         assertEquals(ids.size, ids.toSet().size)
-        assertEquals(starter().map { it.s("id") }.toSet(), ids.toSet())
+        assertEquals(starter().map { it.s("id") }.toSet() - "renter-smoke-alarm-test", ids.toSet())
         parse.catalogue.items.forEach { item ->
             assertTrue(item.id, item.id.startsWith(item.category + "-"))
             assertTrue(item.id, item.related.isNotEmpty())
@@ -92,10 +93,16 @@ class Spec11QaTest {
             assertNull("${obj.s("id")} confidence is editorial", obj.fields["confidence"])
         }
         val byId = catalogue.items.associateBy { it.id }
-        starter().forEach { s ->
+        // Tim, 28 Nov 2026: the merged renter item is gone, and two state-varying whys gained
+        // "Check your state's rules." at the end.
+        starter().filter { it.s("id") != "renter-smoke-alarm-test" }.forEach { s ->
             val item = byId.getValue(s.s("id")!!)
             assertEquals(item.id, s.s("title"), item.title)
-            assertEquals(item.id, s.s("why"), item.why)
+            if (item.id in setOf("kids-school-forms", "pets-microchip-details")) {
+                assertEquals(item.id, s.s("why") + " Check your state's rules.", item.why)
+            } else {
+                assertEquals(item.id, s.s("why"), item.why)
+            }
             assertEquals(item.id, s.s("category"), item.category)
             assertEquals(item.id, s.s("repeatFrom"), item.repeatFrom.name)
             assertEquals(item.id, s.b("health"), item.health)
@@ -209,11 +216,11 @@ class Spec11QaTest {
         assertEquals("AU-WA", RegionSetting.effective(null, "SOMETIMES", "Australia/Perth").region.code)
         // Sydney with no state: AU and * items show, AU-NSW state rule does not apply.
         val au = CatalogueFilter.forRegion(catalogue, Region("AU"))
-        assertEquals(58, au.size)
+        assertEquals(57, au.size)
         assertEquals(3, au.first { it.id == "home-safety-switch-test" }.interval.every)
         val nsw = CatalogueFilter.forRegion(catalogue, Region("AU-NSW"))
         assertEquals(6, nsw.first { it.id == "home-safety-switch-test" }.interval.every)
-        assertEquals(57, wa.size)
+        assertEquals(56, wa.size)
         assertFalse(wa.any { it.id == "money-energy-plan-compare" })
         assertTrue(CatalogueFilter.forRegion(catalogue, Region.OUTSIDE).all { "*" in it.item.regions })
     }

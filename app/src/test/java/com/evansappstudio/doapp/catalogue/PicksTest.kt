@@ -89,6 +89,47 @@ class PicksTest {
         assertEquals(8, Picks.grouped(waItems, emptySet(), emptySet(), ReminderCategory.ALL).size)
     }
 
+    // AT-4 (Tim, 28 Nov 2026: one smoke alarm test under Home and Renting, never listed or ticked twice)
+    @Test
+    fun at4AnItemInTwoAreasIsListedAndTickedOnce() {
+        val both = Picks.grouped(waItems, setOf("home", "renter"), emptySet(), ReminderCategory.ALL)
+        val listed = both.flatMap { g -> g.second.map { it.id } }
+        assertEquals(listed.size, listed.toSet().size)
+        assertEquals("home", both.first { g -> g.second.any { it.id == "home-smoke-alarm-test" } }.first)
+        val renterOnly = Picks.grouped(waItems, setOf("renter"), emptySet(), ReminderCategory.ALL)
+        assertEquals(listOf("renter"), renterOnly.map { it.first })
+        assertEquals("home-smoke-alarm-test", renterOnly.single().second.first().id)
+        for (areas in listOf(setOf("renter"), setOf("home", "renter"))) {
+            val items = Picks.grouped(waItems, areas, emptySet(), ReminderCategory.ALL).flatMap { it.second }
+            val ticked = Picks.preTicked(items, activeCount = 0, unlocked = true, cap = cap, areas = areas)
+            assertTrue(areas.toString(), "home-smoke-alarm-test" in ticked)
+            assertEquals(items.filter { it.id in ticked }.size, ticked.size)
+        }
+        // Seasonal and head-start cards read every area of an item.
+        val renterCard = SuggestionPolicy.decide(
+            SuggestionInput(
+                LocalDate.parse("2026-11-28"), setOf("renter"), emptySet(), emptyList(), waItems,
+                SuggestionPolicy.skipped(SuggestionState(), LocalDate.parse("2026-11-27")),
+            ),
+        ).card!!
+        assertEquals(1, renterCard.items.count { it.id == "home-smoke-alarm-test" })
+    }
+
+    // AT-4 (Tim, 28 Nov 2026: a low-confidence item is never pre-ticked, but can be ticked)
+    @Test
+    fun at4LowConfidenceIsNeverPreTicked() {
+        for (area in ReminderCategory.ALL) {
+            val items = Picks.grouped(waItems, setOf(area), emptySet(), ReminderCategory.ALL).flatMap { it.second }
+            val ticked = Picks.preTicked(items, activeCount = 0, unlocked = true, cap = cap, areas = setOf(area))
+            assertTrue(area, ticked.none { id -> !items.first { it.id == id }.item.preTick })
+        }
+        // Kids: only kids-dentist is not low confidence.
+        val kids = Picks.grouped(waItems, setOf("kids"), emptySet(), ReminderCategory.ALL).flatMap { it.second }
+        assertEquals(setOf("kids-dentist"), Picks.preTicked(kids, 1, unlocked = false, cap = cap, areas = setOf("kids")))
+        // Still listed, so it can be ticked by hand.
+        assertTrue(kids.any { it.id == "kids-car-seat-check" })
+    }
+
     // AT-5 (from-completion items spread one day apart from tomorrow, across a month and year rollover)
     @Test
     fun at5FromCompletionSpreadsAcrossAMonthRollover() {

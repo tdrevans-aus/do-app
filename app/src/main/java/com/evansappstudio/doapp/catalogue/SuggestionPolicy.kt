@@ -186,7 +186,7 @@ object SuggestionPolicy {
 
     private fun inAreas(input: SuggestionInput): List<LocalItem> {
         val areas = input.areas.ifEmpty { ReminderCategory.ALL.toSet() }
-        return input.items.filter { it.item.category in areas && it.id !in input.added }
+        return input.items.filter { local -> local.item.areas.any { it in areas } && local.id !in input.added }
     }
 
     // Rule 1: skipped in first run, the head-start card from the next day, until followed or anything is added.

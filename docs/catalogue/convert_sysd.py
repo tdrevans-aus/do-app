@@ -47,8 +47,22 @@ STATE_RULES = {
 }
 
 # Starter notes: household electricity retail choice is limited in much of WA.
+# Tim, 28 Nov 2026: also hidden in TAS and NT (needs a source check before release).
 HIDDEN_IN = {
-    "money-energy-plan-compare": ["AU-WA"],
+    "money-energy-plan-compare": ["AU-WA", "AU-TAS", "AU-NT"],
+}
+
+# Tim, 28 Nov 2026: the renter smoke alarm test merges into the home one, which
+# shows under both areas. The first area is the item's category.
+MERGED = {"renter-smoke-alarm-test": "home-smoke-alarm-test"}
+AREAS = {
+    "home-smoke-alarm-test": ["home", "renter"],
+}
+
+# Tim, 28 Nov 2026: state-varying items whose why did not say so.
+WHY_SUFFIX = {
+    "kids-school-forms": " Check your state's rules.",
+    "pets-microchip-details": " Check your state's rules.",
 }
 
 # 0 to 100. High-confidence, common items higher; low-confidence items lower.
@@ -66,7 +80,6 @@ PRIORITY = {
     "renter-inspection-prep": 44,
     "renter-lease-end-check": 70,
     "renter-contents-insurance": 58,
-    "renter-smoke-alarm-test": 90,
     "renter-repairs-list": 42,
     "renter-condition-photos": 38,
     "car-rego-renewal": 93,
@@ -128,7 +141,6 @@ RELATED = {
     "renter-inspection-prep": ["renter-repairs-list", "renter-condition-photos"],
     "renter-lease-end-check": ["renter-condition-photos", "renter-contents-insurance"],
     "renter-contents-insurance": ["money-insurance-renewals"],
-    "renter-smoke-alarm-test": ["renter-repairs-list"],
     "renter-repairs-list": ["renter-inspection-prep"],
     "renter-condition-photos": ["renter-lease-end-check"],
     "car-rego-renewal": ["car-insurance-renewal", "money-drivers-licence"],
@@ -177,7 +189,7 @@ RELATED = {
 
 # Lower case phrases matched against what someone types in Add.
 KEYWORDS = {
-    "home-smoke-alarm-test": ["smoke alarm", "smoke detector", "fire alarm"],
+    "home-smoke-alarm-test": ["smoke alarm", "smoke detector", "fire alarm", "smoke alarm rental"],
     "home-smoke-alarm-expiry": ["smoke alarm expiry", "replace smoke alarm"],
     "home-safety-switch-test": ["safety switch", "rcd", "circuit breaker"],
     "home-gutters-clean": ["clean the gutters", "gutters"],
@@ -190,7 +202,6 @@ KEYWORDS = {
     "renter-inspection-prep": ["rental inspection", "routine inspection", "house inspection"],
     "renter-lease-end-check": ["lease ends", "end of lease", "lease renewal"],
     "renter-contents-insurance": ["contents insurance"],
-    "renter-smoke-alarm-test": ["smoke alarm rental"],
     "renter-repairs-list": ["repairs list", "rental repairs", "property manager"],
     "renter-condition-photos": ["condition report", "rental photos"],
     "car-rego-renewal": ["rego", "car rego", "car registration"],
@@ -239,6 +250,7 @@ KEYWORDS = {
 
 
 def convert(starter):
+    starter = [item for item in starter if item["id"] not in MERGED]
     ids = [item["id"] for item in starter]
     known = set(ids)
     for table in (PRIORITY, RELATED, KEYWORDS):
@@ -248,7 +260,7 @@ def convert(starter):
             sys.exit(f"table mismatch: missing={sorted(missing)} extra={sorted(extra)}")
     for item_id, related in RELATED.items():
         for other in related:
-            if other not in known or other == item_id:
+            if other not in known or other == item_id or other in MERGED:
                 sys.exit(f"bad related {item_id} -> {other}")
     items = []
     for item in starter:
@@ -257,8 +269,9 @@ def convert(starter):
             "id": item_id,
             "version": 1,
             "category": item["category"],
+            "areas": AREAS.get(item_id, [item["category"]]),
             "title": item["title"],
-            "why": item["why"],
+            "why": item["why"] + WHY_SUFFIX.get(item_id, ""),
             "interval": item["interval"],
             "repeatFrom": item["repeatFrom"],
             "suggestedMonth": item["suggestedMonth"],
@@ -270,6 +283,8 @@ def convert(starter):
             "hiddenIn": HIDDEN_IN.get(item_id, []),
             "needsDate": item_id in NEEDS_DATE,
             "priority": PRIORITY[item_id],
+            # Tim, 28 Nov 2026: low-confidence items are never pre-ticked (they can be ticked by hand).
+            "preTick": item["confidence"] != "low",
             "related": RELATED[item_id],
             "keywords": KEYWORDS[item_id],
             "health": item["health"],

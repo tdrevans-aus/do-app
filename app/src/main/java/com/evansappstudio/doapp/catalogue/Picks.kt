@@ -1,5 +1,6 @@
 package com.evansappstudio.doapp.catalogue
 
+import com.evansappstudio.doapp.alarm.ReminderCategory
 import com.evansappstudio.doapp.data.MonthOn
 import com.evansappstudio.doapp.data.RepeatFrom
 import com.evansappstudio.doapp.data.RepeatRule
@@ -37,8 +38,19 @@ object Picks {
     }
 
     /**
+     * The one area an item is listed under: the first of its areas, in [areaOrder], that
+     * is among [areas] (all eight when empty). Null when none is. An item in two areas
+     * (the smoke alarm test, home and renting) is therefore listed, and ticked, once.
+     */
+    fun displayArea(item: CatalogueItem, areas: Set<String>, areaOrder: List<String>): String? {
+        val wanted = if (areas.isEmpty()) areaOrder.toSet() else areas
+        return areaOrder.firstOrNull { it in wanted && it in item.areas }
+    }
+
+    /**
      * Items for [areas] (all eight when empty), grouped by area in [areaOrder]
-     * order, in [displayOrder], items already [added] left out.
+     * order, in [displayOrder], items already [added] left out. Each item is in one
+     * group only ([displayArea]).
      */
     fun grouped(
         items: List<LocalItem>,
@@ -47,8 +59,9 @@ object Picks {
         areaOrder: List<String>,
     ): List<Pair<String, List<LocalItem>>> {
         val wanted = if (areas.isEmpty()) areaOrder.toSet() else areas
+        val listed = items.distinctBy { it.id }.filter { it.id !in added }
         return areaOrder.filter { it in wanted }.mapNotNull { area ->
-            val inArea = displayOrder(items.filter { it.item.category == area && it.id !in added })
+            val inArea = displayOrder(listed.filter { displayArea(it.item, areas, areaOrder) == area })
             if (inArea.isEmpty()) null else area to inArea
         }
     }
@@ -64,21 +77,30 @@ object Picks {
 
     /**
      * Which items start ticked: the highest-priority ones across [items], never a
-     * `needsDate` item, never more than the free slots left, and only among the first
+     * `needsDate` item, never a low-confidence item (`preTick` false), never more than
+     * the free slots left, and only among the first
      * [SHOWN_PER_AREA] of each area in [displayOrder], so every ticked item is on screen
      * before "Show more". An [unlocked] user gets the top [PRE_TICK_CAP] whatever is
      * active, the same cap as a new free user.
      */
-    fun preTicked(items: List<LocalItem>, activeCount: Int, unlocked: Boolean, cap: Int?): Set<String> {
+    fun preTicked(
+        items: List<LocalItem>,
+        activeCount: Int,
+        unlocked: Boolean,
+        cap: Int?,
+        areas: Set<String> = emptySet(),
+        areaOrder: List<String> = ReminderCategory.ALL,
+    ): Set<String> {
         val limit = if (unlocked) {
             PRE_TICK_CAP
         } else {
             minOf(PRE_TICK_CAP, freeSlots(activeCount, cap) ?: PRE_TICK_CAP)
         }
         if (limit <= 0) return emptySet()
-        val visible = items.groupBy { it.item.category }.values.flatMap { inArea ->
-            displayOrder(inArea).take(SHOWN_PER_AREA).filter { !it.item.needsDate }
-        }
+        val visible = items.distinctBy { it.id }
+            .groupBy { displayArea(it.item, areas, areaOrder) ?: it.item.category }
+            .values.flatMap { inArea -> displayOrder(inArea).take(SHOWN_PER_AREA).filter { !it.item.needsDate } }
+            .filter { it.item.preTick }
         return ordered(visible).take(limit).map { it.id }.toSet()
     }
 
