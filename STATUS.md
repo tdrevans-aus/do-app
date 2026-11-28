@@ -5,7 +5,7 @@ Last updated: Sat 28 Nov 2026, about 8:30 am (AWST). Updated by Claude as work l
 ## Running now
 A short pause for a usage limit at about 4 pm AWST Friday; resumed straight after. Running:
 - **Spec 11 fixes.** QA (report `specs/11-qa-report.md`) found two medium bugs: ticked picks could be hidden behind "Show more", and an item added in its own suggested month was due a year later (Claude's call: due tomorrow instead, for Gareth to confirm). Plus four low ones (a bad backup value could crash import, one bad number emptied the catalogue, over-matching keywords such as "will" and "oil", unlabelled Add buttons for TalkBack). QA also added screen-rendering tests (Robolectric), so the first-run step, Today card and Related line are now checked visually in tests. Builder fixing now.
-- **Spec 12 QA.** Independent review of the capture surfaces (resumed after a usage-limit stop overnight).
+- **Spec 12 fixes.** QA passed it with no blocker (nothing can stop a reminder or get round the free 5; release has no debug code). One medium bug: a shared news link with a date in its address was read as a date and mangled the title. Seven low ones, including making the assistant approval hold apply to every assistant change, not just new reminders (Spec 13 depends on it). Builder fixing now.
 - **Spec 13, Do Cloud v1 (server half).** Being built in `cloud/` on `do/spec-13-do-cloud`, against Firebase's local emulator with a demo project. No real account is used and nothing is deployed.
 
 
