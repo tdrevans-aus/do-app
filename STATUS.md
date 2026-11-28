@@ -1,9 +1,10 @@
 # Do: weekend build status
 
-Last updated: Sat 28 Nov 2026, morning (AWST). Updated by Claude as work lands.
+Last updated: Sat 28 Nov 2026, about 1 pm (AWST). Updated by Claude as work lands.
 
 ## Running now
-A short pause for a usage limit at about 4 pm AWST Friday; resumed straight after. Running:
+- **Catalogue tweaks (approved by you, 28 Nov):** one smoke-alarm item for Home and Renting; low-confidence items never pre-ticked; energy plan comparison hidden in WA, Tas and NT (Tas and NT to be source-checked).
+Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
 - **Integration check.** Specs 9 to 12 being combined on a trial branch, `do/integration-specs-9-to-12`, to prove they fit together (not for merging as is).
 - **Do Cloud server:** moving its region to Sydney (`australia-southeast1`).
 
@@ -20,7 +21,6 @@ A short pause for a usage limit at about 4 pm AWST Friday; resumed straight afte
 
 ## Next, in order
 1. Spec 11 QA, Stuff You Should Do: build (draft: `specs-drafts/11-stuff-you-should-do.md`).
-1. Catalogue tweaks if Tim agrees (one smoke-alarm item, no pre-ticking low-confidence items, energy plan hidden in WA, Tas and NT)
 2. Spec 13 Android client half (pairing, inbox, Assistants screen), then QA of the whole of Spec 13 (draft: `specs-drafts/12-capture-surfaces.md`).
 
 Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, so Gareth can review and change them before anything goes to `main`.
