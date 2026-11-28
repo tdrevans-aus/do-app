@@ -4,7 +4,7 @@ Last updated: Sat 28 Nov 2026, about 9 pm (AWST). Updated by Claude as work land
 
 ## Running now
 Usage limits paused agents twice (Fri afternoon, Sat late morning); each time they resumed where they stopped.
-- **Do Cloud fixes after the security review.** Server side done (`988f528`): pairing redirect now allowed by the page policy; purchases tied to the phone that made them; the metadata fetch capped, timed out and refused for private addresses; rate limits on the OAuth endpoints with the wrong-code counter in a transaction; plus the lows. 82 of 83 tests pass; the last is a QA test that can't pass as written (Linux buffers about 4 MB before any program can hang up), so the reviewer is reworking it and checking the builder's test edits. Phone-side fixes next.
+- **Do Cloud, phone-side fixes.** Server side passed re-test (`30724aa`, 84 tests, GitHub run 46146605284 green): no Highs or Mediums left. Now the phone: tie purchases to the phone (sign in first, pass the account id to Google Play), ignore inbox requests that claim to be an on-phone assistant, clean assistant names for display, and make CI also build the SCHEDULE variant and the release build.
 
 
 ## Done
@@ -34,7 +34,7 @@ Specs 10 to 12 are Claude drafts. They are built on branches only, not merged, s
 - iPhone engine test: build to your iPhone from your Mac (runbook will be at `ios/engine-test/RUNBOOK.md` on branch `ios/engine-test`).
 - Apply for Apple's Critical Alerts entitlement and Google's AppFunctions early access.
 - Play Console (when you create Do Unlimited): **decided 28 Nov**, Resubscribe on, Pause off.
-- Do Cloud: before deploy also turn on App Check and an anonymous sign-up quota, restrict the Android API key, and restrict who can publish to the Play notifications topic. Create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
+- Do Cloud: before deploy, check the real forwarded-IP header so per-IP limits can't be dodged on the direct function address (QA R1), pair from real Chrome, Safari and Firefox, and also turn on App Check and an anonymous sign-up quota, restrict the Android API key, and restrict who can publish to the Play notifications topic. Create the Firebase project before deploy (the builder will list exactly what's needed). Architecture decided: local-first with a thin cloud, Firebase (strategy 9B).
 
 ## Nothing merged, nothing published
 No merges to `main`, no PRs opened, nothing sent to Play or the App Store.
