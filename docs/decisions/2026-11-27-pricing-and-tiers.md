@@ -27,6 +27,8 @@ Do has grown from "copy Due" into a bigger idea: the Due-style nag engine, the l
 
 11. **Play Console settings for the `annual` base plan:** Resubscribe **on** (lapsed users can rejoin from the Play Store in one tap; Do Cloud's server confirms the purchase straight away, so the 3-day acknowledgement gap closes once Do Cloud is live). Pause **off** (a paused plan would read as "ended" in Do, and pausing adds confusion on an annual plan; anyone wanting a break can cancel and resubscribe).
 
+12. **Restoring a deleted reminder and the free limit:** an immediate undo (within 30 seconds of deleting) always works; a later restore respects the free limit of 5, like adding. Imports are unchanged (allowed above the limit).
+
 ## Still open
 
 - **Free trial:** whether to add a short free trial of the paid tier on top of the A$3.99 first year. Probably not needed, since the free tier already lets people try everything. Not decided.
