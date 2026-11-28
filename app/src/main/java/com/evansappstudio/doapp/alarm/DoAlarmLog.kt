@@ -8,6 +8,15 @@ import com.evansappstudio.doapp.data.ReminderEvent
 object DoAlarmLog {
     const val TAG = "DoAlarm"
 
+    /** Spec 13: Do Cloud lines. Never a reminder title or a token. */
+    fun cloud(message: String) {
+        try {
+            Log.i(TAG, "DoAlarm cloud $message")
+        } catch (error: RuntimeException) {
+            // JVM unit tests: android.util.Log is a stub.
+        }
+    }
+
     fun fire(id: Long, scheduled: Long, actual: Long) {
         Log.i(TAG, "DoAlarm fire id=$id scheduled=$scheduled actual=$actual")
     }

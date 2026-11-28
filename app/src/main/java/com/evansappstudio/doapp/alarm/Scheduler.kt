@@ -52,6 +52,8 @@ class Scheduler(
     private val dndActive: () -> Boolean,
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
     private val clock: () -> Long = { System.currentTimeMillis() },
+    /** Spec 13: told after a fire is logged (the cloud mirror sync). Must return at once. */
+    private val onFired: (Long) -> Unit = {},
 ) {
     private val gate = Mutex()
 
@@ -175,6 +177,10 @@ class Scheduler(
         DoAlarmLog.alert(id, level.name)
     }
 
+    /** Spec 13: the level an agent asked for, or null. */
+    internal suspend fun requestedAlertLevelOf(id: Long): AlertLevel? =
+        liveById(id)?.requestedAlertLevel?.let { AlertLevel.fromName(it) }
+
     /** The level in force, or null when the row is missing, deleted or done. */
     internal suspend fun alertLevelOf(id: Long): AlertLevel? = liveById(id)?.takeIf { !it.isDone }?.alert()
 
@@ -204,6 +210,38 @@ class Scheduler(
             )
         }
         changed()
+    }
+
+    /**
+     * Spec 13: settles a held request. Only a row whose approval is PENDING changes:
+     * approval becomes [approval] and the level in force becomes [level]. Returns false
+     * when nothing was pending (already settled, done, deleted or missing).
+     */
+    internal suspend fun settleApproval(id: Long, approval: Approval, level: AlertLevel, origin: Origin): Boolean = guarded {
+        check(unlocked()) { "Cannot save a reminder before unlock" }
+        alignRoomLocked(zone())
+        val existing = liveById(id) ?: return@guarded false
+        if (existing.isDone || existing.approval != Approval.PENDING.name) return@guarded false
+        val now = clock()
+        val settled = existing.copy(
+            approval = approval.name,
+            alertLevel = level.name,
+            updatedAt = now,
+            version = existing.version + 1,
+        )
+        tx {
+            dao().update(settled)
+            record(
+                existing.uuid,
+                EventType.LEVEL_CHANGED,
+                origin,
+                EventLog.detail("from" to existing.alertLevel, "to" to settled.alertLevel, "approval" to approval.name),
+            )
+        }
+        if (settled.alertLevel != existing.alertLevel) applyLevelOnly(settled)
+        changed()
+        DoAlarmLog.alert(id, settled.alertLevel)
+        true
     }
 
     internal suspend fun markDone(id: Long, origin: Origin = Origin(Actor.USER)) = guarded {
@@ -669,6 +707,11 @@ class Scheduler(
                 if (wasNag) EventType.NAGGED else EventType.FIRED,
                 EventLog.detail("scheduled" to scheduled, "level" to decision.effective.name),
             )
+            try {
+                onFired(reminder.id)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(reminder.id, error)
+            }
         } else {
             val entry = mirror.get(id)
             if (entry == null || entry.pendingDone) {

@@ -59,6 +59,25 @@ class CorePurityTest {
         }
     }
 
+    // Spec 13 (the cloud port is pure: no Android, AndroidX or Firebase, and only core imports)
+    @Test
+    fun spec13CloudPortFilesArePure() {
+        val files = listOf("cloud/CloudPort.kt", "cloud/CloudJson.kt", "cloud/CloudEntitlement.kt")
+        assertTrue(CORE_FILES.containsAll(files))
+        files.forEach { path ->
+            val imports = sourceFile(path).readLines().map { it.trim() }.filter { it.startsWith("import ") }
+            assertEquals(path, emptyList<String>(), imports.filter { it.startsWith("import com.google.") || it.startsWith("import android") })
+            imports.filter { it.startsWith("import com.evansappstudio.doapp.") }.forEach { line ->
+                val name = line.removePrefix("import com.evansappstudio.doapp.")
+                val pkg = name.substringBeforeLast('.')
+                val owner = CORE_FILES.any { core ->
+                    core.substringBeforeLast('/').replace('/', '.') == pkg && sourceFile(core).readText().contains(name.substringAfterLast('.'))
+                }
+                assertTrue("$path: $line is not from a core file", owner)
+            }
+        }
+    }
+
     private fun androidImports(lines: List<String>): List<String> = lines
         .map { it.trim() }
         .filter { it.startsWith("import android.") || it.startsWith("import androidx.") }
@@ -94,6 +113,12 @@ class CorePurityTest {
             "capture/CaptureEntry.kt",
             "capture/AgentRequests.kt",
             "widget/WidgetModel.kt",
+            // Spec 13: the cloud port types, its JSON and the purchase rules (and the
+            // entitlement record they use, which was already import-free).
+            "cloud/CloudPort.kt",
+            "cloud/CloudJson.kt",
+            "cloud/CloudEntitlement.kt",
+            "billing/EntitlementPolicy.kt",
         )
 
         /** Spec 11 files that must stay in [CORE_FILES]. */

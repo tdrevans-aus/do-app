@@ -1,0 +1,13 @@
+{
+  "requests": [
+    {
+      "requestId": "rq_0123456789abcdef01234567",
+      "agentId": "ag_0123456789abcdef",
+      "clientName": "Claude",
+      "kind": "create_reminder",
+      "args": { "text": "call Mum tomorrow 6pm", "dueAt": null, "repeat": null, "alertLevel": "normal" },
+      "createdAt": 1764300000000,
+      "expiresAt": 1764386400000
+    }
+  ]
+}

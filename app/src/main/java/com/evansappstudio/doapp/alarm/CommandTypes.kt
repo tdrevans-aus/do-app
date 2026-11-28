@@ -100,6 +100,19 @@ enum class Approval {
     }
 }
 
+/**
+ * Spec 13: what the person chose on the approval card for an assistant's held
+ * Loud or Alarm request. [ALLOW] rings at the level asked for (APPROVED);
+ * [AS_NORMAL] keeps the reminder at Normal (DECLINED, the request is kept in
+ * requestedAlertLevel); [DECLINE] also deletes the reminder (soft delete, so it
+ * can be restored for 30 days).
+ */
+enum class ApprovalDecision {
+    ALLOW,
+    AS_NORMAL,
+    DECLINE,
+}
+
 /** Life areas a catalogue reminder can belong to. Anything else is stored as null. */
 object ReminderCategory {
     val ALL: List<String> = listOf("home", "renter", "car", "kids", "pets", "health", "money", "digital")

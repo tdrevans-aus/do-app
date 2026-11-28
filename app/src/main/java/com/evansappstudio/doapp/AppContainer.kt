@@ -34,6 +34,15 @@ import com.evansappstudio.doapp.catalogue.CatalogueActions
 import com.evansappstudio.doapp.catalogue.CatalogueService
 import com.evansappstudio.doapp.capture.AgentFunctions
 import com.evansappstudio.doapp.capture.CaptureCommands
+import com.evansappstudio.doapp.billing.EntitlementRecord
+import com.evansappstudio.doapp.cloud.CloudConfig
+import com.evansappstudio.doapp.cloud.CloudInbox
+import com.evansappstudio.doapp.cloud.CloudMirror
+import com.evansappstudio.doapp.cloud.CloudNetworkWatcher
+import com.evansappstudio.doapp.cloud.CloudStore
+import com.evansappstudio.doapp.cloud.DoCloud
+import com.evansappstudio.doapp.cloud.FirebaseCloud
+import com.evansappstudio.doapp.cloud.WorkManagerCloudJobs
 import com.evansappstudio.doapp.widget.WidgetRefresher
 import com.evansappstudio.doapp.data.AppDatabase
 import com.evansappstudio.doapp.data.MIGRATION_1_2
@@ -97,12 +106,16 @@ class AppContainer(context: Context) {
             onCommitted = { backup.noteChange() },
             quietConfig = { quiet.read() },
             dndActive = { DndState.isActive(appContext) },
+            onFired = { cloudChanged() },
         )
     }
 
     /** The one public way to change reminders. Every caller passes an Origin. */
     val commands: ReminderCommands by lazy {
-        ReminderCommands(scheduler).also { it.addListener(widgets::request) }
+        ReminderCommands(scheduler).also {
+            it.addListener(widgets::request)
+            it.addListener(::cloudChanged)
+        }
     }
 
     /** Spec 12: the Add screen, Share, the widgets, the tile and links save through this. */
@@ -119,6 +132,104 @@ class AppContainer(context: Context) {
         )
     }
 
+    /**
+     * Spec 13: Do Cloud. Null when the build has no cloud values (release until Tim
+     * creates the project): then every cloud feature is hidden and nothing Firebase
+     * starts. Built on first use after unlock (its state is in credential storage).
+     */
+    val cloudConfig = CloudConfig(
+        projectId = BuildConfig.CLOUD_PROJECT_ID,
+        apiKey = BuildConfig.CLOUD_API_KEY,
+        appId = BuildConfig.CLOUD_APP_ID,
+        emulatorHost = BuildConfig.CLOUD_EMULATOR_HOST,
+        siteUrl = BuildConfig.CLOUD_SITE_URL,
+    )
+
+    val cloud: DoCloud? by lazy {
+        if (!cloudConfig.enabled) return@lazy null
+        check(UserUnlock.isUnlocked(appContext)) { "Do Cloud is unavailable before unlock" }
+        val store = CloudStore(appContext)
+        DoCloud(
+            config = cloudConfig,
+            portFactory = { FirebaseCloud(appContext, cloudConfig) },
+            store = store,
+            inbox = {
+                CloudInbox(
+                    agent = {
+                        AgentFunctions(
+                            enabled = store.assistantsEnabled(),
+                            commands = commands,
+                            active = { reminderDao().active() },
+                            byId = { id -> reminderDao().getById(id) },
+                            defaultNagMinutes = { settings.defaultNagMinutes() },
+                        )
+                    },
+                    commands = commands,
+                    byId = { id -> reminderDao().getById(id) },
+                    byUuid = { uuid -> reminderDao().getByUuid(uuid) },
+                    askBeforeRingThrough = { store.askBeforeRingThrough() },
+                )
+            },
+            mirror = { port ->
+                CloudMirror(
+                    port = port,
+                    store = store,
+                    reminders = { reminderDao().allIncludingDeleted() },
+                    eventsAfter = { after, limit -> reminderEventDao().after(after, limit) },
+                    maxEventId = { reminderEventDao().maxId() },
+                )
+            },
+            commands = { commands },
+            jobs = WorkManagerCloudJobs(appContext),
+            entitlement = object : DoCloud.EntitlementAccess {
+                override fun read(): EntitlementRecord = entitlement.read()
+                override fun write(record: EntitlementRecord) = entitlement.write(record)
+                override fun changed() = billing.reload()
+            },
+            appVersion = BuildConfig.VERSION_NAME,
+        )
+    }
+
+    /** Spec 13: after any reminder change or fire. Never throws, never waits. */
+    private fun cloudChanged() {
+        if (!cloudConfig.enabled || !UserUnlock.isUnlocked(appContext)) return
+        try {
+            cloud?.onRemindersChanged()
+        } catch (error: Throwable) {
+            DoAlarmLog.handlingFailed(id = -1, error)
+        }
+    }
+
+    private val cloudStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Spec 13: wires Do Cloud once unlocked (app start, or the first resume after a direct-boot
+     * start) and pulls when this device already has a cloud identity. Safe to call often.
+     */
+    fun startCloud() {
+        if (!cloudConfig.enabled || !UserUnlock.isUnlocked(appContext)) return
+        try {
+            val cloud = cloud ?: return
+            if (!cloudStarted.compareAndSet(false, true)) {
+                cloud.onAppStart()
+                return
+            }
+            billing.setPurchaseObserver { productId, token, justBought ->
+                scope.launch {
+                    try {
+                        val outcome = cloud.onPurchase(productId, token, justBought, appContext.packageName)
+                        DoAlarmLog.cloud("purchase outcome=${outcome.name.lowercase()} justBought=$justBought")
+                    } catch (error: Throwable) {
+                        DoAlarmLog.handlingFailed(id = -1, error)
+                    }
+                }
+            }
+            CloudNetworkWatcher(appContext) { cloud.onNetworkAvailable() }.start()
+            cloud.onAppStart()
+        } catch (error: Throwable) {
+            DoAlarmLog.handlingFailed(id = -1, error)
+        }
+    }
 
     val backup: BackupController by lazy {
         BackupController(
@@ -189,6 +300,7 @@ class AppContainer(context: Context) {
         } catch (error: Throwable) {
             DoAlarmLog.handlingFailed(id = -1, error)
         }
+        startCloud()
         billing.start()
         widgets.start()
         ProcessLifecycleOwner.get().lifecycle.addObserver(

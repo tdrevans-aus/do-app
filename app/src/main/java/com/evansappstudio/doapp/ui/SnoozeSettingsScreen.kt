@@ -64,6 +64,8 @@ fun SnoozeSettingsScreen(
     /** Spec 11: the way back from "Stop suggesting". */
     suggestionsOn: () -> Boolean = { true },
     onSuggestionsOn: (Boolean) -> Unit = {},
+    /** Spec 13: the Assistants screen. Null when the build has no Do Cloud (the row is hidden). */
+    onOpenAssistants: (() -> Unit)? = null,
 ) {
     var suggestions by remember { mutableStateOf(suggestionsOn()) }
     val options by viewModel.snoozeOptions.collectAsStateWithLifecycle()
@@ -257,6 +259,11 @@ fun SnoozeSettingsScreen(
                     }
                     TextButton(onClick = onOpenHealth) {
                         Text(stringResource(R.string.health_check))
+                    }
+                    if (onOpenAssistants != null) {
+                        TextButton(onClick = onOpenAssistants) {
+                            Text(stringResource(R.string.assistants_settings_entry))
+                        }
                     }
                 }
             }

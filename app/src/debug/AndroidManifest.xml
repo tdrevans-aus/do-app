@@ -2,7 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <application>
+    <!-- Spec 13: the emulator suite on the host is plain HTTP. Release keeps the platform default. -->
+    <application android:networkSecurityConfig="@xml/network_security_config">
         <receiver
             android:name=".debug.DebugReceiver"
             android:exported="true"
@@ -52,6 +53,9 @@
                 <action android:name="com.evansappstudio.doapp.debug.AGENT_CREATE" />
                 <action android:name="com.evansappstudio.doapp.debug.AGENT_COMPLETE" />
                 <action android:name="com.evansappstudio.doapp.debug.AGENT_LIST" />
+                <action android:name="com.evansappstudio.doapp.debug.CLOUD_DUMP" />
+                <action android:name="com.evansappstudio.doapp.debug.CLOUD_PULL" />
+                <action android:name="com.evansappstudio.doapp.debug.CLOUD_PAIR" />
             </intent-filter>
         </receiver>
     </application>

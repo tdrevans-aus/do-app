@@ -24,7 +24,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * no price is in the code. Grant, tell the user, then acknowledge. Pending does not grant.
  * "Active" means Play's purchase query currently returns the subscription: Play
  * includes grace periods and leaves out account hold, paused and expired ones.
- * There is no server and no other way to pay.
+ * There is no other way to pay. Spec 13: each purchased token also goes to the
+ * [PurchaseObserver] (Do Cloud's verifyPurchase), whose verdict wins when present.
  *
  * Every Play callback body runs on the main thread ([onMain]), so the fields
  * below have one owner and [publish] never races with another callback.
@@ -44,6 +45,7 @@ class PlaySubscriptionBilling(
     private var failed = false
     private var celebrate = false
     private var storeUnavailable = false
+    @Volatile private var purchaseObserver: PurchaseObserver? = null
     private val uiState = MutableStateFlow(current())
     override val ui: StateFlow<SubscriptionUiState> = uiState.asStateFlow()
 
@@ -114,6 +116,14 @@ class PlaySubscriptionBilling(
     override fun price(): PriceInfo? = price
 
     override fun dumpSource(): String = if (store.read().lastQueryOk) "play" else "cache"
+
+    override fun setPurchaseObserver(observer: PurchaseObserver?) {
+        purchaseObserver = observer
+    }
+
+    override fun reload() {
+        onMain { publish() }
+    }
 
     override fun clearCelebrate() {
         onMain {
@@ -194,6 +204,24 @@ class PlaySubscriptionBilling(
         if (ok) failed = false
         publish()
         for (token in applied.acknowledgeTokens) acknowledge(client, token)
+        if (ok) notifyPurchases(purchases.orEmpty(), applied.justGranted)
+    }
+
+    /** Spec 13: hands each purchased token to Do Cloud. Its failures never reach billing. */
+    private fun notifyPurchases(purchases: List<Purchase>, justGranted: Boolean) {
+        val observer = purchaseObserver ?: return
+        val tokens = purchases
+            .filter { FreeTier.PRODUCT_ID in it.products && it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            .map { it.purchaseToken }
+            .filter { it.isNotBlank() }
+            .distinct()
+        for (token in tokens) {
+            try {
+                observer.onPurchase(FreeTier.PRODUCT_ID, token, justGranted)
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+            }
+        }
     }
 
     private fun queryDetails() {

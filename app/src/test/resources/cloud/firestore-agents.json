@@ -1,0 +1,26 @@
+{
+  "documents": [
+    {
+      "name": "projects/demo-do-cloud/databases/(default)/documents/devices/uid123/agents/ag_0123456789abcdef",
+      "fields": {
+        "clientName": { "stringValue": "Claude" },
+        "clientId": { "stringValue": "https://claude.ai/oauth/client.json" },
+        "grantId": { "stringValue": "abc" },
+        "createdAt": { "integerValue": "1764300000000" },
+        "lastUsedAt": { "nullValue": null },
+        "eventSeq": { "integerValue": "0" }
+      },
+      "createTime": "2025-11-28T03:20:00.000000Z",
+      "updateTime": "2025-11-28T03:20:00.000000Z"
+    },
+    {
+      "name": "projects/demo-do-cloud/databases/(default)/documents/devices/uid123/agents/ag_fedcba9876543210",
+      "fields": {
+        "clientName": { "stringValue": "ChatGPT" },
+        "createdAt": { "integerValue": "1764300100000" },
+        "lastUsedAt": { "integerValue": "1764300200000" },
+        "grantRevokedAt": { "doubleValue": 1764300300000 }
+      }
+    }
+  ]
+}

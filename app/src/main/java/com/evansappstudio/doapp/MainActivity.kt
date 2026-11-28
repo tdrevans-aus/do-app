@@ -40,7 +40,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        (application as DoApp).container.billing.onResume()
+        val container = (application as DoApp).container
+        container.startCloud()
+        container.billing.onResume()
     }
 
     override fun onNewIntent(intent: Intent) {

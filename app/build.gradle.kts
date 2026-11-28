@@ -28,6 +28,32 @@ val appFunctionsOverride = providers.gradleProperty("appFunctionsEnabled").orNul
 val appFunctionsDebug = appFunctionsOverride ?: true
 val appFunctionsRelease = appFunctionsOverride ?: false
 
+// Spec 13: Do Cloud. Firebase is set up in code from these values (no google-services.json).
+// Release is blank until Tim creates the project: blank means every cloud feature is hidden.
+// Debug points at the Firebase Emulator Suite (demo project) on cloudEmulatorHost (10.0.2.2 is the
+// host machine from the Android emulator); -PcloudEmulatorHost= (empty) uses the real servers.
+fun cloudProp(name: String, fallback: String): String {
+    val value = providers.gradleProperty(name).orElse(fallback).get().trim()
+    require(!value.contains('"') && !value.contains('\\')) { "$name must not contain quotes or backslashes" }
+    return value
+}
+val cloudRelease = mapOf(
+    "CLOUD_PROJECT_ID" to cloudProp("cloudProjectId", ""),
+    "CLOUD_API_KEY" to cloudProp("cloudApiKey", ""),
+    "CLOUD_APP_ID" to cloudProp("cloudAppId", ""),
+    "CLOUD_SITE_URL" to cloudProp("cloudSiteUrl", ""),
+    "CLOUD_EMULATOR_HOST" to "",
+)
+val cloudDebug = mapOf(
+    "CLOUD_PROJECT_ID" to cloudProp("cloudDebugProjectId", "demo-do-cloud"),
+    "CLOUD_API_KEY" to cloudProp("cloudDebugApiKey", "demo-api-key"),
+    "CLOUD_APP_ID" to cloudProp("cloudDebugAppId", "1:000000000000:android:0000000000000000"),
+    "CLOUD_SITE_URL" to cloudProp("cloudDebugSiteUrl", ""),
+    "CLOUD_EMULATOR_HOST" to cloudProp("cloudEmulatorHost", "10.0.2.2"),
+)
+fun cloudOn(values: Map<String, String>): Boolean =
+    listOf("CLOUD_PROJECT_ID", "CLOUD_API_KEY", "CLOUD_APP_ID").all { values.getValue(it).isNotBlank() }
+
 android {
     namespace = "com.evansappstudio.doapp"
     compileSdk = 36
@@ -58,9 +84,13 @@ android {
     buildTypes {
         debug {
             buildConfigField("boolean", "APP_FUNCTIONS_ENABLED", "$appFunctionsDebug")
+            cloudDebug.forEach { (key, value) -> buildConfigField("String", key, "\"$value\"") }
+            resValue("bool", "cloud_enabled", "${cloudOn(cloudDebug)}")
         }
         release {
             buildConfigField("boolean", "APP_FUNCTIONS_ENABLED", "$appFunctionsRelease")
+            cloudRelease.forEach { (key, value) -> buildConfigField("String", key, "\"$value\"") }
+            resValue("bool", "cloud_enabled", "${cloudOn(cloudRelease)}")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -86,6 +116,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     lint {
@@ -164,6 +195,11 @@ dependencies {
     implementation(libs.androidx.glance.material3)
     // Glance 1.2.0 asks for WorkManager 2.7.1; pin a current stable one.
     implementation(libs.androidx.work.runtime)
+    // Spec 13: Do Cloud. Only Auth (anonymous), Functions (callables) and Messaging (data push).
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.functions)
+    implementation(libs.firebase.messaging)
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
@@ -180,6 +216,7 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     group = "verification"
     description = "Release manifest has no debug receiver and no AppFunctions service while the flag is off, exact-alarm permission matches exactAlarmMode, and no variant requests a battery-optimisation exemption. Release classes have no fake billing."
     dependsOn(
+        "generateReleaseResValues",
         "processReleaseMainManifest",
         "processDebugMainManifest",
         "compileReleaseKotlin",
@@ -188,6 +225,7 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
     val buildDirectory = layout.buildDirectory
     val mode = exactAlarmMode
     val appFunctionsReleaseFlag = appFunctionsRelease
+    val cloudReleaseOn = cloudOn(cloudRelease)
     doLast {
         val root = buildDirectory.get().asFile
         fun mergedManifest(variant: String): String {
@@ -259,6 +297,55 @@ val checkAlarmManifests = tasks.register("checkAlarmManifests") {
         }
         assertReleaseHasNoFakeBilling(root)
         assertReleaseHasNoQuietDebug(root)
+
+        // Spec 13: Do Cloud. Only the permissions and components listed in the Build notes.
+        val allowedPermissions = setOf(
+            "android.permission.USE_EXACT_ALARM",
+            "android.permission.SCHEDULE_EXACT_ALARM",
+            "android.permission.RECEIVE_BOOT_COMPLETED",
+            "android.permission.POST_NOTIFICATIONS",
+            "android.permission.VIBRATE",
+            "android.permission.USE_FULL_SCREEN_INTENT",
+            "android.permission.ACCESS_NOTIFICATION_POLICY",
+            "com.android.vending.BILLING",
+            "android.permission.INTERNET",
+            "android.permission.ACCESS_NETWORK_STATE",
+            "android.permission.WAKE_LOCK",
+            "com.google.android.c2dm.permission.RECEIVE",
+            "com.google.android.providers.gsf.permission.READ_GSERVICES",
+            "com.evansappstudio.doapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        )
+        val removedFirebaseParts = listOf(
+            "com.google.firebase.provider.FirebaseInitProvider",
+            "com.google.firebase.auth.internal.RecaptchaActivity",
+            "com.google.firebase.auth.internal.GenericIdpActivity",
+            "com.google.android.gms.auth.api.signin.internal.SignInHubActivity",
+            "com.google.android.gms.auth.api.signin.RevocationBoundService",
+            "androidx.credentials.playservices.CredentialProviderMetadataHolder",
+            "androidx.credentials.playservices.HiddenActivity",
+            "com.google.android.play.core.common.PlayCoreDialogWrapperActivity",
+        )
+        for ((variant, text) in listOf("release" to release, "debug" to debug)) {
+            val extra = usesPermissions(text).map { it.name }.filter { it !in allowedPermissions }
+            check(extra.isEmpty()) { "$variant manifest has permissions not in the Spec 13 list: $extra" }
+            for (part in removedFirebaseParts) {
+                check(!text.contains(part)) { "$variant manifest contains $part (Do uses Anonymous Auth only)" }
+            }
+            val service = Regex("""<service[^>]*DoMessagingService[^>]*>""").find(text)?.value
+                ?: error("$variant manifest is missing DoMessagingService")
+            check(service.contains("android:enabled=\"@bool/cloud_enabled\"") && service.contains("android:exported=\"false\"")) {
+                "$variant DoMessagingService must be unexported and switched by @bool/cloud_enabled: $service"
+            }
+            check(text.contains("firebase_messaging_auto_init_enabled")) { "$variant manifest lets FCM start on its own" }
+        }
+        val releaseValues = root.walkTopDown().filter { file ->
+            file.isFile && file.name == "gradleResValues.xml" && file.path.replace('\\', '/').contains("/release/")
+        }.toList()
+        check(releaseValues.isNotEmpty()) { "No release gradleResValues.xml under $root" }
+        val releaseCloud = releaseValues.joinToString("\n") { it.readText() }
+        check(releaseCloud.contains("name=\"cloud_enabled\">$cloudReleaseOn<")) {
+            "Release cloud_enabled does not match the release cloud values (on=$cloudReleaseOn)"
+        }
 
         for ((variant, text) in listOf("release" to release, "debug" to debug)) {
             check(!text.contains("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")) {

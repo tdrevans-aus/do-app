@@ -25,6 +25,21 @@ interface SubscriptionBilling {
     fun dumpSource(): String
 
     fun clearCelebrate()
+
+    /**
+     * Spec 13: told about each PURCHASED Do Unlimited token after a successful Play
+     * query (on start, on resume and after a purchase), so Do Cloud can verify it.
+     * The debug fake has no tokens and never calls it.
+     */
+    fun setPurchaseObserver(observer: PurchaseObserver?) = Unit
+
+    /** Spec 13: re-read the cached record (Do Cloud's verdict was written to it). */
+    fun reload() = Unit
+}
+
+/** [justBought] is true when this query granted a purchase the cache did not have. */
+fun interface PurchaseObserver {
+    fun onPurchase(productId: String, token: String, justBought: Boolean)
 }
 
 /**

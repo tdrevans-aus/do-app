@@ -267,6 +267,11 @@ internal class MemoryReminderEventDao : ReminderEventDao {
         rows.removeAll { it.reminderUuid in uuids }
     }
 
+    override suspend fun after(afterId: Long, limit: Int): List<ReminderEvent> =
+        rows.filter { it.id > afterId }.sortedBy { it.id }.take(limit)
+
+    override suspend fun maxId(): Long? = rows.maxOfOrNull { it.id }
+
     override suspend fun deleteAll() {
         rows.clear()
     }

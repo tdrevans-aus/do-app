@@ -28,6 +28,13 @@ interface ReminderEventDao {
     @Query("DELETE FROM reminder_event")
     suspend fun deleteAll()
 
+    /** Spec 13 mirror sync: events after [afterId], oldest first. */
+    @Query("SELECT * FROM reminder_event WHERE id > :afterId ORDER BY id ASC LIMIT :limit")
+    suspend fun after(afterId: Long, limit: Int): List<ReminderEvent>
+
+    @Query("SELECT MAX(id) FROM reminder_event")
+    suspend fun maxId(): Long?
+
     @Query("SELECT COUNT(*) FROM reminder_event")
     suspend fun count(): Int
 }

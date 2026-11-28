@@ -1,0 +1,12 @@
+{
+  "uuid": "9b2f6c1e-3a0d-4c55-9d8e-6f1a2b3c4d5e",
+  "title": "Call Mum",
+  "dueAt": 1764324000000,
+  "status": "active",
+  "alertLevel": "STANDARD",
+  "requestedAlertLevel": "CRITICAL",
+  "approval": "PENDING",
+  "repeat": "DAILY",
+  "version": 3,
+  "updatedAt": 1764300000000
+}

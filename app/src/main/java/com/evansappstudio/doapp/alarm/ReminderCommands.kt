@@ -110,6 +110,25 @@ class ReminderCommands(private val scheduler: Scheduler) {
         }
     }
 
+    /**
+     * Spec 13: the approval card. Settles a PENDING request from an assistant.
+     * [ApprovalDecision.ALLOW] rings at the requested level, [ApprovalDecision.AS_NORMAL]
+     * keeps Normal, [ApprovalDecision.DECLINE] keeps Normal and deletes the reminder.
+     * An agent can never approve its own request. Returns false when nothing was pending.
+     */
+    suspend fun resolveApproval(origin: Origin, id: Long, decision: ApprovalDecision): Boolean {
+        if (origin.actor == Actor.AGENT) return false
+        val requested = scheduler.requestedAlertLevelOf(id) ?: AlertLevel.STANDARD
+        val settled = when (decision) {
+            ApprovalDecision.ALLOW -> scheduler.settleApproval(id, Approval.APPROVED, requested, origin)
+            ApprovalDecision.AS_NORMAL -> scheduler.settleApproval(id, Approval.DECLINED, AlertLevel.STANDARD, origin)
+            ApprovalDecision.DECLINE -> scheduler.settleApproval(id, Approval.DECLINED, AlertLevel.STANDARD, origin).also {
+                if (it) scheduler.delete(id, origin)
+            }
+        }
+        return settled.committed()
+    }
+
     private fun heldForAgent(origin: Origin, level: AlertLevel): Boolean =
         AgentHold.apply(origin.actor == Actor.AGENT, level).approval == Approval.PENDING
 

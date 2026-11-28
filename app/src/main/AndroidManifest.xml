@@ -91,6 +91,64 @@
             </intent-filter>
         </service>
 
+        <!--
+            Spec 13: Do Cloud. Firebase is set up in code (DoCloud) only when the build has cloud
+            values, so its start-up provider is removed. The FCM service and receiver are switched
+            off when the build has none (@bool/cloud_enabled comes from Gradle). Sign-in screens,
+            credential and reCAPTCHA components that Firebase Auth brings are removed: Do only
+            uses Anonymous Auth.
+        -->
+        <service
+            android:name=".cloud.DoMessagingService"
+            android:directBootAware="false"
+            android:enabled="@bool/cloud_enabled"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
+        <receiver
+            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+            android:enabled="@bool/cloud_enabled"
+            tools:node="merge" />
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:enabled="@bool/cloud_enabled"
+            tools:node="merge" />
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.firebase.auth.internal.GenericIdpActivity"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.firebase.auth.internal.RecaptchaActivity"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.android.gms.auth.api.signin.internal.SignInHubActivity"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
+        <service
+            android:name="com.google.android.gms.auth.api.signin.RevocationBoundService"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
+        <service
+            android:name="androidx.credentials.playservices.CredentialProviderMetadataHolder"
+            tools:node="remove" />
+        <activity
+            android:name="androidx.credentials.playservices.HiddenActivity"
+            tools:node="remove" />
+        <activity
+            android:name="com.google.android.play.core.common.PlayCoreDialogWrapperActivity"
+            tools:node="remove" />
+
         <!-- WorkManager (through Glance) declares this; Do never runs foreground work. -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

@@ -110,6 +110,7 @@ import com.evansappstudio.doapp.catalogue.KeywordMatch
 import com.evansappstudio.doapp.catalogue.LocalItem
 import com.evansappstudio.doapp.catalogue.PlannedAdd
 import kotlinx.coroutines.launch
+import com.evansappstudio.doapp.alarm.Approval
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -130,6 +131,7 @@ private const val SCREEN_BACKUP = "backup"
 private const val SCREEN_AREAS = "sysd_areas"
 private const val SCREEN_PICKS = "sysd_picks"
 private const val SCREEN_CATALOGUE = "catalogue"
+private const val SCREEN_ASSISTANTS = "assistants"
 
 private val nagChoices = listOf(1, 5, 10, 15, 30, 60, 0)
 
@@ -392,7 +394,35 @@ fun ReminderApp(
             onUnlock = { openUnlock(SCREEN_SNOOZE) },
             suggestionsOn = sysd::suggestionsOn,
             onSuggestionsOn = sysd::setSuggestionsOn,
+            onOpenAssistants = if (container.cloudConfig.enabled) {
+                { screen = SCREEN_ASSISTANTS }
+            } else {
+                null
+            },
         )
+        SCREEN_ASSISTANTS -> {
+            val cloud = container.cloud
+            if (cloud == null) {
+                LaunchedEffect(Unit) { screen = SCREEN_SNOOZE }
+            } else {
+                val cloudUi by cloud.ui.collectAsStateWithLifecycle()
+                LaunchedEffect(Unit) { if (cloud.hasIdentity()) cloud.refreshAgents() }
+                AssistantsScreen(
+                    ui = cloudUi,
+                    held = reminders.filter { it.approval == Approval.PENDING.name && !it.isDone },
+                    onBack = {
+                        cloud.clearPairing()
+                        screen = SCREEN_SNOOZE
+                    },
+                    onConnect = { container.scope.launch { cloud.connectAssistant() } },
+                    onRefresh = { container.scope.launch { cloud.refreshAgents() } },
+                    onDisconnect = { agentId -> container.scope.launch { cloud.disconnect(agentId) } },
+                    onAssistantsEnabled = { on -> container.scope.launch { cloud.setAssistantsEnabled(on) } },
+                    onAskBefore = cloud::setAskBeforeRingThrough,
+                    onDecision = { id, decision -> container.scope.launch { cloud.resolveApproval(id, decision) } },
+                )
+            }
+        }
         SCREEN_UNLOCK -> {
             val activity = context as? android.app.Activity
             // First run picks waiting on the paywall (kept in the view model across rotation).

@@ -103,6 +103,9 @@ class DebugReceiver : BroadcastReceiver() {
             ACTION_AGENT_CREATE -> agentCreate(context, intent)
             ACTION_AGENT_COMPLETE -> agentComplete(context, intent)
             ACTION_AGENT_LIST -> agentList(context, intent)
+            ACTION_CLOUD_DUMP -> cloudDump(context)
+            ACTION_CLOUD_PULL -> cloudPull(context)
+            ACTION_CLOUD_PAIR -> cloudPair(context)
         }
     }
 
@@ -1170,6 +1173,57 @@ class DebugReceiver : BroadcastReceiver() {
         }
     }
 
+    // Spec 13: Do Cloud. Each line starts "DoAlarm cloud". No titles.
+
+    private fun cloudDump(context: Context) {
+        unlockedLaunch(context, "cloud", -1) { app ->
+            val cloud = app.container.cloud
+            if (cloud == null) {
+                DoAlarmLog.cloud("dump enabled=false")
+                return@unlockedLaunch
+            }
+            if (cloud.hasIdentity()) cloud.refreshAgents()
+            val held = app.container.reminderDao().active().count { it.approval == "PENDING" }
+            DoAlarmLog.cloud("dump ${cloud.dump()} held=$held")
+        }
+    }
+
+    /** Pulls now, in this process, and logs what happened (the worker does the same after a push). */
+    private fun cloudPull(context: Context) {
+        unlockedLaunch(context, "cloud", -1) { app ->
+            val cloud = app.container.cloud
+            if (cloud == null || !cloud.hasIdentity()) {
+                DoAlarmLog.cloud("pull skipped enabled=${cloud != null} identity=false")
+                return@unlockedLaunch
+            }
+            try {
+                val run = cloud.runPull()
+                DoAlarmLog.cloud("pull pulled=${run.pulled} applied=${run.applied} replayed=${run.replayed} completed=${run.completed} deferred=${run.deferred}")
+                val mirror = cloud.runMirror()
+                DoAlarmLog.cloud("mirror batches=${mirror?.batches ?: 0} reminders=${mirror?.reminders ?: 0} events=${mirror?.events ?: 0}")
+            } catch (error: com.evansappstudio.doapp.cloud.CloudException) {
+                DoAlarmLog.cloud("pull failed error=cloud:${error.code.wire}")
+            }
+        }
+    }
+
+    /** Signs in if needed and logs a fresh pairing code with the MCP address. */
+    private fun cloudPair(context: Context) {
+        unlockedLaunch(context, "cloud", -1) { app ->
+            val cloud = app.container.cloud
+            if (cloud == null) {
+                DoAlarmLog.cloud("pair enabled=false")
+                return@unlockedLaunch
+            }
+            val code = cloud.connectAssistant()
+            if (code == null) {
+                DoAlarmLog.cloud("pair failed")
+            } else {
+                DoAlarmLog.cloud("pair code=${code.code} expiresAt=${code.expiresAt} mcp=${cloud.config.mcpUrl()}")
+            }
+        }
+    }
+
     private fun agentCaller(intent: Intent): String = intent.getStringExtra(EXTRA_AGENT_CALLER) ?: "debug-agent"
 
     private fun agentLine(row: AgentReminder): String =
@@ -1206,6 +1260,9 @@ class DebugReceiver : BroadcastReceiver() {
 
     companion object {
         const val ACTION_ADD = "com.evansappstudio.doapp.debug.ADD"
+        const val ACTION_CLOUD_DUMP = "com.evansappstudio.doapp.debug.CLOUD_DUMP"
+        const val ACTION_CLOUD_PULL = "com.evansappstudio.doapp.debug.CLOUD_PULL"
+        const val ACTION_CLOUD_PAIR = "com.evansappstudio.doapp.debug.CLOUD_PAIR"
         const val ACTION_DONE = "com.evansappstudio.doapp.debug.DONE"
         const val ACTION_SNOOZE = "com.evansappstudio.doapp.debug.SNOOZE"
         const val ACTION_CONFIG_SNOOZE = "com.evansappstudio.doapp.debug.CONFIG_SNOOZE"
