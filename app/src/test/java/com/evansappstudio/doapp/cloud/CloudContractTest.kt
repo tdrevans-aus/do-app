@@ -171,14 +171,18 @@ class CloudContractTest {
         assertEquals(PairingCode("ABCD2345", 1764300600000), code)
         assertTrue(code.code.all { it in PairingCode.ALPHABET })
         assertTrue(contract.contains(PairingCode.ALPHABET))
+        // The phone's pairing help quotes the authorise page's own messages.
+        val strings = projectFile("src/main/res/values/strings.xml").readText()
+        assertTrue(contract.contains("That code didn't work.") && strings.contains("That code didn\\'t work"))
+        assertTrue(contract.contains("Too many tries") && strings.contains("Too many tries"))
         assertEquals("ABCD 2345", code.display())
         assertEquals(600L, code.secondsLeft(1764300000000))
         assertEquals(0L, code.secondsLeft(1764300700000))
         assertTrue(CloudJson.duplicate(parseJson("""{"ok":true,"duplicate":true}""")))
         assertFalse(CloudJson.duplicate(parseJson("""{"ok":true,"duplicate":false}""")))
         assertEquals(
-            parseJson("""{"platform":"play","packageName":"com.evansappstudio.doapp","productId":"do_unlimited","purchaseToken":"tok"}"""),
-            CloudJson.verifyPurchase(PurchaseCheck("com.evansappstudio.doapp", "do_unlimited", "tok")),
+            parseJson("""{"platform":"play","packageName":"com.evansappstudio.doapp","productId":"do_unlimited","purchaseToken":"tok","obfuscatedAccountId":"CDhzuTuPA-eMpYqBqWMW_JHG_too_1P8TwSR5kIUg88"}"""),
+            CloudJson.verifyPurchase(PurchaseCheck("com.evansappstudio.doapp", "do_unlimited", "tok", CloudEntitlement.obfuscatedAccountId("uid-1"))),
         )
         assertEquals(
             VerifiedEntitlement("active", true, 1766900000000, true, "do_unlimited", 1764300000000),

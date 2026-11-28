@@ -435,7 +435,7 @@ fun ReminderApp(
                     sysd.pendingPlans = null
                     screen = unlockFrom
                 },
-                onBuy = { if (activity != null) container.billing.buy(activity) },
+                onBuy = { if (activity != null) container.startPurchase(activity) },
                 onRestore = { container.billing.restore() },
                 onManage = { openSubscriptionPage(context) },
                 onKeepFree = if (waiting == null) {

@@ -36,7 +36,12 @@ class FakeSubscriptionBilling(
     }
 
     /** Stands in for a completed Play purchase: grants [SubscriptionState.ACTIVE]. Never connects. */
-    override fun buy(activity: Activity) {
+    /** The account id the last purchase carried (Spec 13), for DUMP_UNLOCK. Play is never reached. */
+    @Volatile var lastAccountId: String? = null
+        private set
+
+    override fun buy(activity: Activity, obfuscatedAccountId: String?) {
+        lastAccountId = obfuscatedAccountId
         applyState(STATE_ACTIVE)
     }
 

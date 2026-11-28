@@ -131,7 +131,7 @@ class ShareActivity : ComponentActivity() {
                         UnlockScreen(
                             state = state,
                             onBack = onBack,
-                            onBuy = { container.billing.buy(this) },
+                            onBuy = { container.startPurchase(this) },
                             onRestore = { container.billing.restore() },
                             onManage = { openSubscriptionPage(this) },
                         )

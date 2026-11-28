@@ -332,6 +332,7 @@
     <string name="assistants_ask_subtitle">An assistant that asks for Loud or Alarm gets Normal until you allow it here.</string>
     <string name="assistants_connect">Connect another assistant</string>
     <string name="assistants_connect_steps">In your assistant, add Do as a connector (MCP) with the address below, then enter this code when it asks.</string>
+    <string name="assistants_code_help">If your assistant says \"That code didn\'t work\", make a new code here and try again. If it says \"Too many tries\", start connecting again from your assistant.</string>
     <string name="assistants_code_label">Code</string>
     <string name="assistants_code_description">Pairing code %1$s</string>
     <string name="assistants_code_expires">Works once. Expires in %1$d:%2$02d.</string>

@@ -218,3 +218,36 @@ Fixes for `specs/13-qa-report.md`, server side only (cloud/), 28 Nov 2026.
 - **L8.** One message for every failing code: "That code didn't work. Check the code in Do, or make a new one there, and try again."
 - **I2.** `functions/.env` sets `NODE_ENV=production` for every project, so Express's own error page for a malformed `application/json` body has no stack trace in the emulator as in production. That 400 comes from the platform's body parser before Do's code runs, so it is plain text, not a JSON-RPC error; Do's own parse errors (any other content type) are JSON-RPC `-32700`.
 - **QA test changes.** `qa-billing.test.ts` was updated where the requested fixes change what is correct: its verify helper sends `obfuscatedAccountId` and its fixtures are bound to an owner (M1); a second device verifying the first device's token is now refused (`entitled: false`) rather than handed the token; and a type 12 or void notification while Play says active now leaves the purchase active (L6), where the old line documented the weakness. `qa-oauth.test.ts` "stops reading after the 5 KB cap" is unchanged and still fails: its `sent < 1 MiB` check measures what the test server writes into the kernel, and on Linux loopback (`tcp_wmem` max 4 MiB) the server writes about 3.9 MiB before any client can react, even a raw socket that resets on the first byte. `qa-fixes.test.ts` measures what the fetcher reads instead (at most one chunk past 5 KB). That QA test needs a decision (see the handback).
+
+### Fixes after QA (Android client)
+
+Against `specs/13-qa-report.md` and the changed `cloud/CONTRACT.md` (head `97c67da`). Only `app/` and `.github/workflows/ci.yml` changed.
+
+1. **Purchase binding (M1, contract section 5).**
+   - `CloudEntitlement.obfuscatedAccountId(uid)` = base64url(SHA-256("do-account:" + uid)), no padding, 43 characters. It is checked against vectors from Python's hashlib and against the server's `billing/binding.ts`.
+   - Every purchase now starts through `AppContainer.startPurchase` (Paywall, and Share's paywall). With Do Cloud on, it signs in first (at most 10 seconds) and passes the id to `SubscriptionBilling.buy(activity, obfuscatedAccountId)`. Release sets it with `BillingFlowParams.setObfuscatedAccountId`. The debug fake records it (`DUMP_UNLOCK` logs `DoAlarm cloud purchase lastBound=...`). Offline or with the cloud off, the purchase goes ahead unbound and Spec 10's local result is all there is.
+   - `verifyPurchase` sends `obfuscatedAccountId` for the current uid.
+   - New states:
+     - `other_device` means no server opinion. The local record is left exactly as it was (never switched off or on), any earlier cached verdict is dropped, and the call counts for the hourly throttle. Outcome: `VerifyOutcome.NO_OPINION`.
+     - `transferred` is never entitled, whatever `entitled` says.
+     - `purchaseTokenHash` and `source` are ignored.
+   - Known cost, as the contract says: after a reinstall the uid changes, so an existing subscription is `other_device` and only the local Play result applies.
+2. **Only paired Do Cloud assistants act (L5).**
+   - `CloudInbox` refuses any `agentId` that is not `ag_` plus 16 hex digits, with `not_found` ("This assistant is not connected to Do"). An on-phone (AppFunctions) caller id or an empty id can therefore never complete or create anything.
+   - `DoCloud.runPull` also refuses a well-formed id that is not in this device's paired list. It first re-reads the list from Firestore, so a just-paired assistant works. If the list can't be read, that request is left in the inbox for the next pull rather than answered.
+   - `Spec13QaTest.qaFailsUntilNonCloudAgentIdsAreRefused` now passes.
+3. **Assistant names (L2).** `CloudAgent.displayName` (pure) removes control, format (bidirectional marks, embeddings, overrides and isolates, zero-width space, BOM, invisible tag characters), private-use, unassigned and lone surrogate characters. Whitespace runs, including new lines and line separators, become one space, and the name is cut to 60 characters. The zero-width joiner and variation selectors stay, so joined emoji, skin tones and the heart emoji keep together. The Assistants screen (list, Disconnect dialog, approval card) uses it everywhere a name appears.
+4. **CI (AT-13 gap).** `.github/workflows/ci.yml` keeps its trigger and first step, and adds `-PexactAlarmMode=SCHEDULE assembleDebug testDebugUnitTest lintDebug` and `assembleRelease` as further steps of the same job.
+5. **Pairing copy.** Under the code, the Assistants screen now says: if the assistant shows "That code didn't work", make a new code and try again; if it says "Too many tries", start connecting again from the assistant. These are the authorise page's own messages, and a test keeps the phone's copy and the contract in step.
+
+**Tests after the fixes.** 408 unit tests (383 before, plus QA's 10 in `Spec13QaTest`, plus new `PurchaseBindingTest` and `AgentNameAndIdTest`), 0 failures, 1 skipped by default (the emulator test). The test fixture's fake port now lists both test assistants as paired by default (`connect()` still narrows it). Two existing tests were updated for the new field: the contract test's `verifyPurchase` request and `CloudPurchaseTest`'s expected `PurchaseCheck`. These builds pass:
+- `assembleDebug testDebugUnitTest lintDebug`
+- the same with `-PexactAlarmMode=SCHEDULE`
+- `assembleRelease`
+
+`CloudEmulatorE2ETest` passes against the fixed server inside `firebase emulators:exec`.
+
+**On the phone, in addition to the list above.**
+- A licence-tester purchase made after "Connect" shows `purchase start bound=true` in logcat and then `purchase outcome=verified`.
+- On a reinstalled phone with an existing subscription, the outcome is `no_opinion` and Do Unlimited stays on.
+- An assistant named with right-to-left override characters shows plainly.

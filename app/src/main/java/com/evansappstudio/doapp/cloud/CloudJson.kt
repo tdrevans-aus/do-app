@@ -67,6 +67,7 @@ internal object CloudJson {
         "packageName" to str(check.packageName),
         "productId" to str(check.productId),
         "purchaseToken" to str(check.purchaseToken),
+        "obfuscatedAccountId" to str(check.obfuscatedAccountId),
     )
 
     // Answers the phone reads. A malformed answer is a CloudException(INTERNAL).

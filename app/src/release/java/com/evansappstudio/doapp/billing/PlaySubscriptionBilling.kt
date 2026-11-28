@@ -73,9 +73,9 @@ class PlaySubscriptionBilling(
         connect()
     }
 
-    override fun buy(activity: Activity) {
+    override fun buy(activity: Activity, obfuscatedAccountId: String?) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            main.post { buy(activity) }
+            main.post { buy(activity, obfuscatedAccountId) }
             return
         }
         val client = billingClient
@@ -86,7 +86,10 @@ class PlaySubscriptionBilling(
             publish()
             return
         }
-        val params = BillingFlowParams.newBuilder()
+        val builder = BillingFlowParams.newBuilder()
+        // Spec 13 (QA M1): binds the purchase to this installation, so Do Cloud entitles only it.
+        if (!obfuscatedAccountId.isNullOrBlank()) builder.setObfuscatedAccountId(obfuscatedAccountId)
+        val params = builder
             .setProductDetailsParamsList(
                 listOf(
                     BillingFlowParams.ProductDetailsParams.newBuilder()

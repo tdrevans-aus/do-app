@@ -14,7 +14,12 @@ interface SubscriptionBilling {
 
     fun onResume()
 
-    fun buy(activity: Activity)
+    /**
+     * Spec 13: [obfuscatedAccountId] binds the purchase to this installation's Do Cloud
+     * identity (CONTRACT.md section 5); null when the cloud is off or sign-in failed.
+     * Start purchases through AppContainer.startPurchase, which signs in first.
+     */
+    fun buy(activity: Activity, obfuscatedAccountId: String? = null)
 
     fun restore()
 

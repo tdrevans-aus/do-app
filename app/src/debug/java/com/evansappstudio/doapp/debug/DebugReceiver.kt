@@ -820,6 +820,9 @@ class DebugReceiver : BroadcastReceiver() {
                     renewal = price?.renewal ?: "none",
                     product = FreeTier.PRODUCT_ID,
                 )
+                (billing as? FakeSubscriptionBilling)?.let { fake ->
+                    DoAlarmLog.cloud("purchase lastBound=${fake.lastAccountId != null} accountIdLength=${fake.lastAccountId?.length ?: 0}")
+                }
             } catch (error: Throwable) {
                 DoAlarmLog.handlingFailed(id = -1, error)
             } finally {

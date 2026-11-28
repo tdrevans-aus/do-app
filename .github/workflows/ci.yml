@@ -37,3 +37,10 @@ jobs:
 
       - name: Build, test and lint
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug
+
+      # Spec 13 AT-13: both exact-alarm variants and release.
+      - name: Build, test and lint (SCHEDULE_EXACT_ALARM variant)
+        run: ./gradlew -PexactAlarmMode=SCHEDULE assembleDebug testDebugUnitTest lintDebug
+
+      - name: Build release
+        run: ./gradlew assembleRelease

@@ -190,6 +190,28 @@ class AppContainer(context: Context) {
         )
     }
 
+    /**
+     * Spec 13 (QA M1): starts a Do Unlimited purchase. With Do Cloud on, signs in first
+     * (at most 10 seconds) so the purchase carries this installation's obfuscated account id;
+     * offline, the purchase goes ahead without it and Spec 10's local result stands.
+     */
+    fun startPurchase(activity: android.app.Activity) {
+        if (!cloudConfig.enabled || !UserUnlock.isUnlocked(appContext)) {
+            billing.buy(activity)
+            return
+        }
+        scope.launch {
+            val accountId = try {
+                cloud?.purchaseAccountId()
+            } catch (error: Throwable) {
+                DoAlarmLog.handlingFailed(id = -1, error)
+                null
+            }
+            DoAlarmLog.cloud("purchase start bound=${accountId != null}")
+            kotlinx.coroutines.withContext(Dispatchers.Main) { billing.buy(activity, accountId) }
+        }
+    }
+
     /** Spec 13: after any reminder change or fire. Never throws, never waits. */
     private fun cloudChanged() {
         if (!cloudConfig.enabled || !UserUnlock.isUnlocked(appContext)) return

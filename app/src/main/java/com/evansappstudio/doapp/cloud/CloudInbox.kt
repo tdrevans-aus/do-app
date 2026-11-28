@@ -33,6 +33,11 @@ class CloudInbox(
     private val askBeforeRingThrough: () -> Boolean,
 ) {
     suspend fun apply(request: InboxRequest): RequestResult {
+        // QA L5: only a Do Cloud assistant id (ag_ plus 16 hex) may act. Never an on-phone
+        // (AppFunctions) caller such as Gemini, never an empty owner.
+        if (!CloudAgent.isAgentId(request.agentId)) {
+            return RequestResult.Failed(PhoneErrorCode.NOT_FOUND, NOT_CONNECTED_MESSAGE)
+        }
         return try {
             when (val args = request.args) {
                 is InboxArgs.Create -> create(request.agentId, args)
@@ -71,6 +76,7 @@ class CloudInbox(
 
     companion object {
         const val NOT_FOUND_MESSAGE = "No active reminder with that id"
+        const val NOT_CONNECTED_MESSAGE = "This assistant is not connected to Do"
         const val DISABLED_MESSAGE = "The person has turned assistants off in Do"
 
         /** Who allows a held request when "Ask me before it can ring through" is off. */

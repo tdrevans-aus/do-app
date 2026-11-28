@@ -20,7 +20,7 @@ class CloudPurchaseTest {
         cx.entitlement.record = localActive
         cx.port.verdict = VerifiedEntitlement("revoked", false, 5L, false, "do_unlimited", 9L)
         assertEquals(VerifyOutcome.VERIFIED, cx.cloud.onPurchase("do_unlimited", "tok-1", justBought = true, packageName = pkg))
-        assertEquals(PurchaseCheck(pkg, "do_unlimited", "tok-1", "play"), cx.port.verifyCalls.single())
+        assertEquals(PurchaseCheck(pkg, "do_unlimited", "tok-1", CloudEntitlement.obfuscatedAccountId("uid-1"), "play"), cx.port.verifyCalls.single())
         assertEquals("uid-1", cx.store.identityUid())
         assertEquals(SubscriptionState.EXPIRED, SubscriptionState.of(cx.entitlement.record))
         assertEquals(CloudEntitlement.SOURCE_CLOUD, cx.entitlement.record.grantSource)

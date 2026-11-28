@@ -38,7 +38,7 @@ data class AssistantsUi(
 data class PullRun(val pulled: Int, val applied: Int, val replayed: Int, val completed: Int, val deferred: Int)
 
 /** What the cloud did with a Play purchase token. */
-enum class VerifyOutcome { OFF, NO_IDENTITY, CACHED, VERIFIED, KEPT_LOCAL }
+enum class VerifyOutcome { OFF, NO_IDENTITY, CACHED, VERIFIED, KEPT_LOCAL, NO_OPINION }
 
 /**
  * Spec 13: the phone's side of Do Cloud. Android-free so it runs on the JVM with a
@@ -122,6 +122,7 @@ class DoCloud(
         registerIfNeeded()
         pushEnabledIfDirty()
         val requests = port.pullInbox()
+        val paired = pairedAgents(requests)
         var applied = 0
         var replayed = 0
         var completed = 0
@@ -129,7 +130,15 @@ class DoCloud(
         var failure: Throwable? = null
         for (request in requests) {
             val earlier = store.appliedResult(request.requestId)
-            val result = if (earlier != null) {
+            val known = request.agentId in paired.ids
+            val result = if (earlier == null && !known && !paired.complete && CloudAgent.isAgentId(request.agentId)) {
+                // The paired list could not be read: leave it for the next pull.
+                deferred++
+                continue
+            } else if (earlier == null && !known) {
+                // QA L5: not an assistant paired with this device. Answered, never applied.
+                RequestResult.Failed(PhoneErrorCode.NOT_FOUND, CloudInbox.NOT_CONNECTED_MESSAGE)
+            } else if (earlier != null) {
                 replayed++
                 earlier
             } else {
@@ -158,6 +167,24 @@ class DoCloud(
         failure?.let { throw it }
         PullRun(requests.size, applied, replayed, completed, deferred)
     }
+
+    /**
+     * The assistants paired with this device, for checking inbox requests. Re-read from
+     * Firestore when a request names one the cache does not know (it may have just paired).
+     * [Paired.complete] is false when that read failed (the cache is all there is).
+     */
+    private suspend fun pairedAgents(requests: List<InboxRequest>): Paired {
+        val cached = store.agents().map { it.agentId }.toSet()
+        val unknown = requests.any { CloudAgent.isAgentId(it.agentId) && it.agentId !in cached && store.appliedResult(it.requestId) == null }
+        if (!unknown) return Paired(cached, complete = true)
+        return try {
+            Paired(loadAgents().map { it.agentId }.toSet(), complete = true)
+        } catch (error: CloudException) {
+            Paired(cached, complete = false)
+        }
+    }
+
+    private data class Paired(val ids: Set<String>, val complete: Boolean)
 
     suspend fun runMirror(): CloudMirror.Run? {
         if (!hasIdentity()) return null
@@ -235,14 +262,26 @@ class DoCloud(
         if (!hasIdentity() && !justBought) return VerifyOutcome.NO_IDENTITY
         val now = clock()
         val cached = CloudEntitlement.fresh(store.serverEntitlement(), store.serverEntitlementAt(), now)
-        if (!CloudEntitlement.shouldVerify(justBought, store.serverEntitlementAt(), now)) {
+        if (!CloudEntitlement.shouldVerify(justBought, store.verifiedAt(), now)) {
             if (cached == null) return VerifyOutcome.KEPT_LOCAL
             applyVerdict(cached, now)
             return VerifyOutcome.CACHED
         }
         return try {
-            ensureIdentity()
-            val verdict = port.verifyPurchase(PurchaseCheck(packageName = packageName, productId = productId, purchaseToken = token))
+            val identity = ensureIdentity()
+            val check = PurchaseCheck(
+                packageName = packageName,
+                productId = productId,
+                purchaseToken = token,
+                obfuscatedAccountId = CloudEntitlement.obfuscatedAccountId(identity.uid),
+            )
+            val verdict = port.verifyPurchase(check)
+            store.setVerifiedAt(now)
+            if (!CloudEntitlement.hasOpinion(verdict)) {
+                // Bought on another installation (or before a reinstall): Spec 10's local result stands.
+                store.clearServerEntitlement()
+                return VerifyOutcome.NO_OPINION
+            }
             store.setServerEntitlement(verdict, now)
             applyVerdict(verdict, now)
             VerifyOutcome.VERIFIED
@@ -254,6 +293,22 @@ class DoCloud(
             } else {
                 VerifyOutcome.KEPT_LOCAL
             }
+        }
+    }
+
+    /**
+     * The obfuscated account id to pass to Play before a purchase starts: signs in first
+     * (CONTRACT.md section 5). Null when the cloud is off or sign-in fails (offline): the
+     * purchase still goes ahead and Spec 10's local result is all there is for it.
+     */
+    suspend fun purchaseAccountId(): String? {
+        if (!enabled) return null
+        return try {
+            kotlinx.coroutines.withTimeoutOrNull(SIGN_IN_TIMEOUT_MS) {
+                CloudEntitlement.obfuscatedAccountId(ensureIdentity().uid)
+            }
+        } catch (error: CloudException) {
+            null
         }
     }
 
@@ -347,5 +402,6 @@ class DoCloud(
     companion object {
         const val PUSH_KIND = "kind"
         const val PUSH_INBOX = "inbox"
+        const val SIGN_IN_TIMEOUT_MS = 10_000L
     }
 }

@@ -129,6 +129,47 @@ data class CloudAgent(
         val ID_PATTERN = Regex("^ag_[0-9a-f]{16}$")
 
         fun isAgentId(raw: String?): Boolean = raw != null && ID_PATTERN.matches(raw)
+
+        const val MAX_NAME = 60
+
+        /**
+         * An assistant's self-chosen name, safe to show as plain text (QA L2): control,
+         * format (bidirectional overrides and isolates, invisible tag characters),
+         * private-use, unpaired surrogate and line or paragraph separator characters are
+         * removed; the zero-width joiner stays so emoji sequences keep together. Whitespace
+         * runs become one space. At most [MAX_NAME] characters. Null when nothing is left.
+         */
+        fun displayName(raw: String?): String? {
+            if (raw == null) return null
+            val out = StringBuilder()
+            var index = 0
+            while (index < raw.length) {
+                val point = raw.codePointAt(index)
+                index += Character.charCount(point)
+                val type = Character.getType(point)
+                val keep = when {
+                    point == ZERO_WIDTH_JOINER -> true
+                    type == Character.CONTROL.toInt() -> false
+                    type == Character.FORMAT.toInt() -> false
+                    type == Character.PRIVATE_USE.toInt() -> false
+                    type == Character.SURROGATE.toInt() -> false
+                    type == Character.UNASSIGNED.toInt() -> false
+                    type == Character.LINE_SEPARATOR.toInt() || type == Character.PARAGRAPH_SEPARATOR.toInt() -> false
+                    else -> true
+                }
+                if (Character.isWhitespace(point) || Character.isSpaceChar(point)) {
+                    // Tabs, new lines and line separators read as one space.
+                    if (out.isNotEmpty() && out.last() != ' ') out.append(' ')
+                    continue
+                }
+                if (keep) out.appendCodePoint(point)
+            }
+            val clean = out.toString().trim().trim('\u200D').trim()
+            if (clean.isEmpty()) return null
+            return com.evansappstudio.doapp.alarm.cutText(clean, MAX_NAME)
+        }
+
+        private const val ZERO_WIDTH_JOINER = 0x200D
     }
 }
 
@@ -218,10 +259,16 @@ data class PurchaseCheck(
     val packageName: String,
     val productId: String,
     val purchaseToken: String,
+    /** This installation's id, as passed to Play with the purchase (CONTRACT.md section 5). */
+    val obfuscatedAccountId: String,
     val platform: String = "play",
 )
 
-/** devices/{uid}/entitlement/current, as verifyPurchase returns it. Use [entitled]. */
+/**
+ * devices/{uid}/entitlement/current, as verifyPurchase returns it. Use [entitled], except that
+ * [OTHER_DEVICE] means the server has no opinion about this installation. The stored record's
+ * `source` and `purchaseTokenHash` are ignored.
+ */
 data class VerifiedEntitlement(
     val state: String,
     val entitled: Boolean,
@@ -229,7 +276,17 @@ data class VerifiedEntitlement(
     val autoRenewing: Boolean,
     val productId: String?,
     val lastCheckedAt: Long?,
-)
+) {
+    /** The purchase is bound to another installation, or to none: keep Spec 10's local result. */
+    val noOpinion: Boolean get() = state == OTHER_DEVICE
+
+    companion object {
+        const val OTHER_DEVICE = "other_device"
+
+        /** A resubscribe or upgrade moved it to another installation: not entitled here. */
+        const val TRANSFERRED = "transferred"
+    }
+}
 
 /** The standard callable error codes (CONTRACT.md), plus [OTHER] for anything else. */
 enum class CloudCallCode(val wire: String) {

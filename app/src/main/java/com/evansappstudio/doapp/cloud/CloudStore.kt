@@ -151,6 +151,16 @@ class CloudStore internal constructor(private val prefs: SharedPreferences) {
         putLong(KEY_ENTITLEMENT_AT, at)
     }
 
+    /** When verifyPurchase last answered (any verdict, other_device included). */
+    fun verifiedAt(): Long = synchronized(lock) { prefs.getLong(KEY_VERIFIED_AT, 0L) }
+
+    fun setVerifiedAt(at: Long) = edit { putLong(KEY_VERIFIED_AT, at) }
+
+    fun clearServerEntitlement() = edit {
+        remove(KEY_ENTITLEMENT)
+        remove(KEY_ENTITLEMENT_AT)
+    }
+
     private fun readObj(key: String): Map<String, JsonValue> {
         val text = prefs.getString(key, null) ?: return emptyMap()
         return try {
@@ -197,5 +207,6 @@ class CloudStore internal constructor(private val prefs: SharedPreferences) {
         private const val KEY_AGENTS = "agents"
         private const val KEY_ENTITLEMENT = "server_entitlement"
         private const val KEY_ENTITLEMENT_AT = "server_entitlement_at"
+        private const val KEY_VERIFIED_AT = "verified_at"
     }
 }

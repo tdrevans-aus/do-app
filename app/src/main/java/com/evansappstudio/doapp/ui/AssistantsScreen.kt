@@ -247,6 +247,7 @@ private fun PairingCard(ui: AssistantsUi, onConnect: () -> Unit, clock: () -> Lo
             return@Card
         }
         Text(stringResource(R.string.assistants_connect_steps), style = MaterialTheme.typography.bodyMedium, color = DoLook.Secondary)
+        Text(stringResource(R.string.assistants_code_help), style = MaterialTheme.typography.bodySmall, color = DoLook.Secondary)
         Text(stringResource(R.string.assistants_code_label), style = MaterialTheme.typography.labelMedium, color = DoLook.Secondary)
         val spoken = pairing.code.toCharArray().joinToString(" ")
         val description = stringResource(R.string.assistants_code_description, spoken)
@@ -364,9 +365,7 @@ private fun ApprovalCard(reminder: Reminder, agentName: String?, onDecision: (Lo
     }
 }
 
-/** clientName is untrusted text from the assistant: plain text only, never blank. */
+/** clientName is untrusted text from the assistant: plain text only, never blank (QA L2: no bidi or other format characters). */
 @Composable
-private fun displayName(raw: String?): String {
-    val clean = raw?.filter { !it.isISOControl() }?.trim()?.take(60)
-    return if (clean.isNullOrEmpty()) stringResource(R.string.assistants_unnamed) else clean
-}
+private fun displayName(raw: String?): String =
+    CloudAgent.displayName(raw) ?: stringResource(R.string.assistants_unnamed)

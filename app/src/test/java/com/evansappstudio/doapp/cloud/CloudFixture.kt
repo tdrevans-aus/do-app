@@ -22,11 +22,16 @@ internal class FakeCloudPort : CloudPort {
     val enabledCalls = ArrayList<Boolean>()
     val verifyCalls = ArrayList<PurchaseCheck>()
     val calls = ArrayList<String>()
-    var agents = mutableListOf<CloudAgent>()
+    /** The assistants Do Cloud says are paired. Both test ids by default; connect() narrows it. */
+    var agents = mutableListOf(
+        CloudAgent(AGENT_A, "Agent A", null, 1L, null, null),
+        CloudAgent(AGENT_B, "Agent B", null, 2L, null, null),
+    )
     var failComplete: CloudCallCode? = null
     var failSync: Map<String, CloudCallCode> = emptyMap()
     var failVerify: CloudCallCode? = null
     var failPull: CloudCallCode? = null
+    var failList: CloudCallCode? = null
     var verdict = VerifiedEntitlement("active", true, null, true, "do_unlimited", 1L)
     var code = PairingCode("ABCD2345", 1_700_000_600_000L)
 
@@ -67,6 +72,7 @@ internal class FakeCloudPort : CloudPort {
 
     override suspend fun listAgents(): List<CloudAgent> {
         note("listAgents")
+        failList?.let { throw CloudException(it, "list failed") }
         return agents.toList()
     }
 
